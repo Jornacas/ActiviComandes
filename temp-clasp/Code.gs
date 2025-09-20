@@ -66,7 +66,7 @@ function handleApiRequest(e, method) {
         result = loadRespostesData();
         break;
       case 'processFormResponses':
-        result = processFormResponses();
+        result = processRespostesData();
         break;
       case 'updateOrderStatus':
         const uuids = e.parameter.uuids ? e.parameter.uuids.split(',') :
@@ -448,6 +448,84 @@ function updateOrderStatus(uuids, newStatus) {
   }
 }
 
+function processRespostesData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Respostes");
+    
+    if (!sheet) {
+      return { 
+        success: false, 
+        error: "La hoja 'Respostes' no existe. Utilitza l'app mòbil per crear sol·licituds primer." 
+      };
+    }
+    
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    
+    if (values.length < 2) {
+      return { 
+        success: true, 
+        nuevosRegistros: 0,
+        message: "No hi ha noves sol·licituds per processar."
+      };
+    }
+    
+    // Count rows with data (excluding headers)
+    const totalRows = values.length - 1;
+    
+    // Count by status for statistics
+    const headers = values[0];
+    const estatIndex = headers.findIndex(h => h === "Estat");
+    
+    let pendents = 0;
+    let enProces = 0;
+    let preparats = 0;
+    let entregats = 0;
+    
+    if (estatIndex !== -1) {
+      for (let i = 1; i < values.length; i++) {
+        const estat = values[i][estatIndex];
+        switch (estat) {
+          case 'Pendent':
+            pendents++;
+            break;
+          case 'En proces':
+            enProces++;
+            break;
+          case 'Preparat':
+            preparats++;
+            break;
+          case 'Entregat':
+            entregats++;
+            break;
+        }
+      }
+    }
+    
+    return {
+      success: true,
+      nuevosRegistros: totalRows,
+      message: `Sincronització completada. ${totalRows} sol·licituds processades.`,
+      estadisticas: {
+        total: totalRows,
+        pendents: pendents,
+        enProces: enProces,
+        preparats: preparats,
+        entregats: entregats
+      }
+    };
+    
+  } catch (error) {
+    console.error('Error processing Respostes data:', error);
+    return {
+      success: false,
+      error: 'Error processant les dades: ' + error.toString()
+    };
+  }
+}
+
+// Legacy function - keep for backward compatibility
 function processFormResponses() { // Renamed from sincronizarEntradas
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheetComandes = ss.getSheetByName("Comandes");

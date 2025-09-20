@@ -150,7 +150,11 @@ class ApiClient {
     return this.request('loadData');
   }
 
-  async processFormResponses(): Promise<ApiResponse<{ nuevosRegistros: number }>> {
+  async processFormResponses(): Promise<ApiResponse<{ 
+    nuevosRegistros: number;
+    message?: string;
+    estadisticas?: Stats;
+  }>> {
     return this.request('processFormResponses', {}, 'GET');
   }
 

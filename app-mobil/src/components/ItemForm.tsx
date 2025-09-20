@@ -374,7 +374,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false
             onClick={handleAddItem}
             disabled={loading}
             startIcon={<Add />}
-            sx={{ py: 1.5 }}
+            sx={{ py: 1.5, textTransform: 'none' }}
           >
             Afegir al Carret
           </Button>

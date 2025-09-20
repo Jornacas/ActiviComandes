@@ -14,6 +14,16 @@ const theme = createTheme({
       main: '#dc004e',
     },
   },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 500,
+        },
+      },
+    },
+  },
 });
 
 export default function CustomThemeProvider({

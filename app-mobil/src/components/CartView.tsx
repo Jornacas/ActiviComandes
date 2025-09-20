@@ -182,7 +182,7 @@ const CartView: React.FC<CartViewProps> = ({
           onClick={onSubmitCart}
           disabled={submitting || items.length === 0}
           startIcon={<Send />}
-          sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 600 }}
+          sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 600, textTransform: 'none' }}
         >
           {submitting ? 'Enviant Sol·licitud...' : 'Enviar Sol·licitud Completa'}
         </Button>

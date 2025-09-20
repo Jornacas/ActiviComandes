@@ -213,11 +213,22 @@ export default function OrdersTable() {
       if (response.success) {
         await loadData(); // Reload data after sync
         setError(null);
+        
+        // Show success message with details
+        if (response.data?.message) {
+          console.log('Sincronització:', response.data.message);
+        }
+        
+        // Update stats if provided
+        if (response.data?.estadisticas) {
+          setStats(response.data.estadisticas);
+        }
       } else {
-        setError(response.error || 'Error al sincronizar');
+        setError(response.error || 'Error sincronitzant amb la hoja Respostes');
       }
     } catch (err) {
-      setError('Error al sincronizar respuestas del formulario');
+      setError('Error de connexió durant la sincronització');
+      console.error('Sync error:', err);
     } finally {
       setUpdating(false);
     }
@@ -341,7 +352,7 @@ export default function OrdersTable() {
           onClick={syncFormResponses}
           disabled={updating}
         >
-          Sincronitzar Formulari
+          Sincronitzar Respostes
         </Button>
 
         <Button
