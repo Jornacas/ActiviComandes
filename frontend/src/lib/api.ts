@@ -151,15 +151,15 @@ class ApiClient {
   }
 
   async processFormResponses(): Promise<ApiResponse<{ nuevosRegistros: number }>> {
-    return this.request('processFormResponses', {}, 'POST');
+    return this.request('processFormResponses', {}, 'GET');
   }
 
   async updateOrderStatus(uuids: string[], newStatus: string): Promise<ApiResponse<{ changesMade: number }>> {
-    return this.request('updateOrderStatus', { uuids, newStatus }, 'POST');
+    return this.request('updateOrderStatus', { uuids: uuids.join(','), newStatus }, 'GET');
   }
 
   async updateDeliveryInfo(): Promise<ApiResponse<{ cambiosAplicados: number }>> {
-    return this.request('updateDeliveryInfo', {}, 'POST');
+    return this.request('updateDeliveryInfo', {}, 'GET');
   }
 
   async getSchools(): Promise<ApiResponse<string[]>> {
@@ -175,7 +175,7 @@ class ApiClient {
   }
 
   async createOrder(orderData: any): Promise<ApiResponse<{ uuid: string }>> {
-    return this.request('createOrder', { orderData }, 'POST');
+    return this.request('createOrder', { orderData: JSON.stringify(orderData) }, 'GET');
   }
 
   async getStats(filters?: any): Promise<ApiResponse<any>> {
