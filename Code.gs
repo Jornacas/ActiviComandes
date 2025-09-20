@@ -100,6 +100,11 @@ function handleApiRequest(e, method) {
         }
         result = createSollicitud(sollicitudData);
         break;
+      case 'createMultipleSollicitud':
+        // Handle multiple items sollicitud from cart
+        const multipleSollicitudData = e.postData ? JSON.parse(e.postData.contents) : {};
+        result = createMultipleSollicitud(multipleSollicitudData);
+        break;
       case 'getStats':
         const filters = e.parameter.filters ? JSON.parse(e.parameter.filters) :
                        (e.postData ? JSON.parse(e.postData.contents).filters : {});
@@ -1046,6 +1051,84 @@ function createSollicitud(sollicitudData) {
       id: uuid
     }
   };
+}
+
+function createMultipleSollicitud(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Respostes");
+
+  // If Respostes sheet doesn't exist, create it
+  if (!sheet) {
+    sheet = ss.insertSheet("Respostes");
+    // Set headers for the mobile app solicitud
+    const headers = [
+      "Marca temporal",
+      "Nom i cognoms",
+      "Data de necessitat", 
+      "Escola",
+      "Activitat",
+      "Material principal",
+      "Unitats",
+      "Altres materials",
+      "UUID",
+      "Estat"
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  const timestamp = new Date();
+  const baseUuid = Utilities.getUuid();
+  const addedItems = [];
+
+  try {
+    // Process each item in the cart
+    data.items.forEach((item, index) => {
+      const itemUuid = `${baseUuid}-${index + 1}`;
+      
+      // Determine material name (handle custom materials)
+      const materialName = item.customMaterial || item.material;
+      
+      // Create row for each item
+      const newRow = [
+        timestamp,
+        data.nomCognoms || '',
+        data.dataNecessitat || '',
+        item.escola || '',
+        item.activitat || '',
+        materialName,
+        item.unitats || 0,
+        data.altresMaterials || '', // General comments
+        itemUuid,
+        'Pendent' // Default status
+      ];
+
+      sheet.appendRow(newRow);
+      addedItems.push({
+        id: itemUuid,
+        escola: item.escola,
+        activitat: item.activitat,
+        material: materialName,
+        unitats: item.unitats
+      });
+    });
+
+    return {
+      success: true,
+      data: {
+        message: `Sol·licitud múltiple enviada correctament! ${data.items.length} materials sol·licitats.`,
+        baseId: baseUuid,
+        items: addedItems,
+        totalItems: data.items.length,
+        totalUnits: data.items.reduce((sum, item) => sum + (item.unitats || 0), 0)
+      }
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error processant la sol·licitud múltiple: ${error.toString()}`
+    };
+  }
 }
 
 // Función para normalizar nombres (como en Python)

@@ -19,6 +19,22 @@ export interface SollicitudMaterial {
   altresMaterials?: string;
 }
 
+export interface CartItem {
+  id: string;
+  escola: string;
+  activitat: string;
+  material: string;
+  customMaterial?: string; // Para "Altres materials"
+  unitats: number;
+}
+
+export interface SollicitudMultiple {
+  nomCognoms: string;
+  dataNecessitat: string;
+  items: CartItem[];
+  altresMaterials?: string; // Comentarios adicionales generales
+}
+
 class ApiClient {
   private async request<T>(action: string, data?: any, method: 'GET' | 'POST' = 'GET'): Promise<ApiResponse<T>> {
     // DEBUG: Check environment variables
@@ -349,8 +365,12 @@ class ApiClient {
     return this.request('getMaterialsByActivity', { activity }, 'GET');
   }
 
-  async createSollicitud(sollicitud: SollicitudMaterial): Promise<ApiResponse<{ message: string; id: string }>> {
-    return this.request('createSollicitud', { sollicitud }, 'POST');
+  async createSollicitud(data: SollicitudMaterial): Promise<ApiResponse<any>> {
+    return this.request('createSollicitud', data, 'POST');
+  }
+
+  async createMultipleSollicitud(data: SollicitudMultiple): Promise<ApiResponse<any>> {
+    return this.request('createMultipleSollicitud', data, 'POST');
   }
 }
 
