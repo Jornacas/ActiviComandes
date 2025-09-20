@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <meta name="description" content="Sistema de gestión de pedidos de material escolar">
+    
+    <!-- Color del tema para navegadores -->
+    <!-- Nota: theme-color solo funciona en Chrome, Edge y Safari. Firefox y Opera lo ignorarán -->
+    <meta name="theme-color" content="#3498db" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#2c3e50" media="(prefers-color-scheme: dark)">
+    
+    <!-- Alternativas para otros navegadores y plataformas -->
+    <meta name="msapplication-navbutton-color" content="#3498db">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <title>COMANDA DE MATERIALES</title>
+    
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Los estilos serán incluidos por el servidor usando la función include -->
+    <?!= include('style'); ?>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1><i class="fas fa-box-open"></i> COMANDA DE MATERIALES</h1>
+        <p class="subtitle">Sistema de gestión de pedidos de material escolar</p>
+      </header>
+      
+      <!-- Contenedor de mensajes -->
+      <div id="mensajes"></div>
+      
+      <!-- Contenedor de botones superiores -->
+      <div class="button-container">
+        <button id="btnSincronizar" title="Sincronizar con nuevas entradas del formulario">
+          <i class="fas fa-sync-alt"></i> Sincronizar Entradas
+        </button>
+        
+        <button id="btnGuardar" title="Guardar todos los cambios">
+          <i class="fas fa-save"></i> Guardar Cambios
+        </button>
+        
+        <button id="btnEntregas" title="Actualizar centros y días de entrega">
+          <i class="fas fa-truck"></i> Actualizar Entregas
+        </button>
+        
+        <button id="btnDashboard" title="Ver estadísticas (próximamente)" disabled>
+          <i class="fas fa-chart-bar"></i> Ver Estadísticas
+        </button>
+      </div>
+      
+      <!-- Indicador de carga -->
+      <div id="loader" class="loader"></div>
+      
+      <!-- Panel de filtros -->
+      <div class="filter-panel">
+        <div class="filter-group">
+          <label for="filterEstado"><i class="fas fa-filter"></i> Filtrar por estado:</label>
+          <select id="filterEstado">
+            <option value="todos">Todos</option>
+            <option value="Preparado">Preparado</option>
+            <option value="En proceso">En proceso</option>
+            <option value="Entregado">Entregado</option>
+            <option value="sin-estado">Sin estado</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label for="searchBox"><i class="fas fa-search"></i> Buscar:</label>
+          <input type="text" id="searchBox" placeholder="Nombre, escuela, material...">
+        </div>
+      </div>
+      
+      <!-- Ayuda para selección múltiple -->
+      <div class="selection-help">
+        <p><i class="fas fa-info-circle"></i> Selección múltiple: Usa <kbd>Ctrl</kbd> o <kbd>⌘</kbd> + clic para seleccionar varias filas. <kbd>Shift</kbd> + clic para seleccionar un rango.</p>
+      </div>
+      
+      <!-- Tabla de datos con encabezado fijo -->
+      <div class="table-container">
+        <table id="tablaDatos">
+          <!-- La tabla se rellena dinámicamente con JavaScript -->
+        </table>
+      </div>
+      
+      <!-- Información detallada al seleccionar -->
+      <div id="infoLabel"></div>
+      
+      <!-- Botones de acción - MOVIDOS ANTES DE LAS ESTADÍSTICAS -->
+      <div class="action-buttons">
+        <button id="btnPreparado" class="status-button" title="Marcar como preparado">
+          <i class="fas fa-check"></i> Preparado
+        </button>
+        
+        <button id="btnEnProceso" class="status-button" title="Marcar como en proceso">
+          <i class="fas fa-spinner"></i> En Proceso
+        </button>
+        
+        <button id="btnEntregado" class="status-button" title="Marcar como entregado">
+          <i class="fas fa-truck-moving"></i> Entregado
+        </button>
+        
+        <button id="btnEliminarEstado" class="status-button" title="Eliminar estado">
+          <i class="fas fa-times"></i> Eliminar Estado
+        </button>
+      </div>
+      
+      <!-- Resumen estadístico -->
+      <div class="stats-container">
+        <div class="stat-box">
+          <i class="fas fa-clipboard-list"></i>
+          <span id="totalPedidos">0</span>
+          <label>Total pedidos</label>
+        </div>
+        <div class="stat-box">
+          <i class="fas fa-check-circle"></i>
+          <span id="totalPreparados">0</span>
+          <label>Preparados</label>
+        </div>
+        <div class="stat-box">
+          <i class="fas fa-hourglass-half"></i>
+          <span id="totalEnProceso">0</span>
+          <label>En proceso</label>
+        </div>
+        <div class="stat-box">
+          <i class="fas fa-truck-loading"></i>
+          <span id="totalEntregados">0</span>
+          <label>Entregados</label>
+        </div>
+      </div>
+      
+      <!-- Dashboard Mejorado -->
+      <div id="dashboardOverlay" class="dashboard-overlay dashboard-overlay-hidden">
+        <div id="dashboardModal" class="dashboard-modal">
+          <!-- Cabecera con título y botón de cierre -->
+          <div class="dashboard-modal-header">
+            <h2><i class="fas fa-chart-line"></i> Análisis de Comandas</h2>
+            <button id="closeDashboardBtn" class="close-dashboard-btn" onclick="toggleDashboard()" title="Cerrar dashboard">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <!-- Nuevo panel de configuración de análisis -->
+          <div class="dashboard-config-panel">
+            <div class="config-section">
+              <h3><i class="fas fa-sliders-h"></i> Configuración del Análisis</h3>
+              
+              <div class="config-row">
+                <div class="config-item">
+                  <label for="campo-agrupacion"><i class="fas fa-object-group"></i> Agrupar por:</label>
+                  <select id="campo-agrupacion" class="dashboard-control">
+                    <option value="nombre">Monitor/a</option>
+                    <option value="fecha">Fecha</option>
+                    <option value="escuela">Escuela</option>
+                    <option value="actividad">Actividad</option>
+                    <option value="material">Material</option>
+                  </select>
+                </div>
+                
+                <div class="config-item">
+                  <label for="tipo-valor"><i class="fas fa-calculator"></i> Calcular:</label>
+                  <select id="tipo-valor" class="dashboard-control">
+                    <option value="conteo">Número de pedidos</option>
+                    <option value="unidades">Suma de unidades</option>
+                  </select>
+                </div>
+                
+                <div class="config-item">
+                  <label for="tipo-grafico"><i class="fas fa-chart-bar"></i> Tipo de gráfico:</label>
+                  <select id="tipo-grafico" class="dashboard-control">
+                    <option value="bar">Barras</option>
+                    <option value="line">Líneas</option>
+                    <option value="pie">Circular</option>
+                    <option value="table">Tabla</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="config-row">
+                <div class="config-item">
+                  <button id="btn-generar-analisis" class="dashboard-btn primary-dashboard-btn">
+                    <i class="fas fa-sync-alt"></i> Generar Análisis
+                  </button>
+                </div>
+                
+                <div class="config-item">
+                  <button id="btn-exportar" class="dashboard-btn">
+                    <i class="fas fa-file-export"></i> Exportar Resultados
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Sección de filtros -->
+            <div class="config-section">
+              <h3><i class="fas fa-filter"></i> Filtros</h3>
+              <div class="config-row">
+                <div class="config-item">
+                  <label for="dashboard-fecha-inicio"><i class="fas fa-calendar-alt"></i> Desde:</label>
+                  <input type="date" id="dashboard-fecha-inicio" class="dashboard-control">
+                </div>
+                <div class="config-item">
+                  <label for="dashboard-fecha-fin"><i class="fas fa-calendar-alt"></i> Hasta:</label>
+                  <input type="date" id="dashboard-fecha-fin" class="dashboard-control">
+                </div>
+              </div>
+              
+              <div class="config-row">
+                <div class="config-item">
+                  <label for="dashboard-filter-escuela"><i class="fas fa-school"></i> Escuela:</label>
+                  <select id="dashboard-filter-escuela" class="dashboard-control">
+                    <option value="">Todas las escuelas</option>
+                  </select>
+                </div>
+                <div class="config-item">
+                  <label for="dashboard-filter-monitor"><i class="fas fa-user"></i> Monitor:</label>
+                  <select id="dashboard-filter-monitor" class="dashboard-control">
+                    <option value="">Todos los monitores</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="config-row">
+                <div class="config-item">
+                  <label for="dashboard-filter-material"><i class="fas fa-box"></i> Material:</label>
+                  <select id="dashboard-filter-material" class="dashboard-control">
+                    <option value="">Todos los materiales</option>
+                  </select>
+                </div>
+                <div class="config-item">
+                  <label for="dashboard-filter-actividad"><i class="fas fa-running"></i> Actividad:</label>
+                  <select id="dashboard-filter-actividad" class="dashboard-control">
+                    <option value="">Todas las actividades</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Indicador de carga global -->
+          <div id="dashboard-loading" class="dashboard-loading dashboard-loading-hidden">
+            <div class="dashboard-spinner"></div>
+            <p>Generando análisis...</p>
+          </div>
+          
+          <!-- Resumen de datos seleccionados -->
+          <div class="dashboard-summary">
+            <div class="dashboard-summary-item">
+              <i class="fas fa-clipboard-list"></i>
+              <div id="total-pedidos" class="summary-value">0</div>
+              <div class="summary-label">Total Pedidos</div>
+            </div>
+            <div class="dashboard-summary-item">
+              <i class="fas fa-box"></i>
+              <div id="total-unidades" class="summary-value">0</div>
+              <div class="summary-label">Total Unidades</div>
+            </div>
+            <div class="dashboard-summary-item">
+              <i class="fas fa-user-friends"></i>
+              <div id="total-monitores" class="summary-value">0</div>
+              <div class="summary-label">Monitores</div>
+            </div>
+            <div class="dashboard-summary-item">
+              <i class="fas fa-school"></i>
+              <div id="total-escuelas" class="summary-value">0</div>
+              <div class="summary-label">Escuelas</div>
+            </div>
+          </div>
+          
+          <!-- Contenido principal: área de visualización -->
+          <div class="dashboard-content">
+            <div class="results-container">
+              <div id="resultado-analisis" class="resultado-analisis">
+                <div class="resultado-header">
+                  <h3 id="titulo-analisis">Selecciona criterios y haz clic en "Generar Análisis"</h3>
+                </div>
+                <div id="grafico-container" class="grafico-container">
+                  <div class="empty-state">
+                    <i class="fas fa-chart-pie fa-4x"></i>
+                    <p>Los resultados del análisis aparecerán aquí</p>
+                  </div>
+                </div>
+                <div id="tabla-resultados" class="tabla-resultados tabla-resultados-hidden">
+                  <!-- La tabla de resultados se generará dinámicamente -->
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Pie del dashboard -->
+          <div class="dashboard-footer">
+            <p><i class="fas fa-info-circle"></i> Puedes personalizar tu análisis seleccionando diferentes criterios y filtros.</p>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <p>© <?= new Date().getFullYear() ?> - Comanda de Materiales v1.1.0</p>
+      </footer>
+    </div>
+    
+    <!-- El JavaScript será incluido por el servidor usando la función include -->
+    <?!= include('script'); ?>
+  </body>
+</html> 

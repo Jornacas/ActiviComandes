@@ -1,0 +1,3335 @@
+<!-- 
+Script para la webapp de Comanda de Materiales
+(Se ha añadido compatibilidad en el servidor con la función obtenerDatos)
+-->
+<script>
+// Variables globales
+var data = null;
+var dataTable = null;
+var selectedRowIndex = -1;
+var selectedRows = [];
+var estadisticasOriginales = null; // Variable para almacenar las estadísticas originales sin filtros
+var estadisticas = {}; // Variable para las estadísticas actuales
+let lastScrollPosition = 0;
+let esCargaInicial = true;
+
+// Variables para el dashboard
+let dashboardData = null;
+let dashboardCargado = false;
+let escuelasUnicas = [];
+let monitoresUnicos = [];
+let filtrosDashboard = {
+  periodo: 'todo',
+  escuela: 'todas',
+  monitor: 'todos'
+};
+
+// Variables para el dashboard simplificado
+let simpleDashboardData = null;
+let simpleDashboardLoaded = false;
+
+// Variables globales para el dashboard
+let estadisticasDashboard = null;
+let dashboardActivo = false;
+
+// Función para inicializar la aplicación
+document.addEventListener('DOMContentLoaded', function() {
+  console.log("DOM completamente cargado y analizado");
+  
+  // Asegurar que el overlay del dashboard exista y tenga los estilos correctos
+  const dashboardOverlay = document.getElementById('dashboardOverlay');
+  if (dashboardOverlay) {
+    console.log("Inicializando dashboardOverlay con estilos correctos");
+    // Asegurar que el elemento esté oculto al inicio
+    dashboardOverlay.style.display = 'none';
+    dashboardOverlay.style.opacity = '0';
+    dashboardOverlay.style.visibility = 'hidden';
+    
+    // Añadir evento de click al fondo para cerrar
+    dashboardOverlay.addEventListener('click', function(e) {
+      // Solo cerrar si se hizo clic en el overlay, no en el modal
+      if (e.target === dashboardOverlay) {
+        toggleDashboard();
+      }
+    });
+    
+    // Asegurar que el modal no propague clicks
+    const dashboardModal = document.getElementById('dashboardModal');
+    if (dashboardModal) {
+      dashboardModal.addEventListener('click', function(e) {
+        e.stopPropagation();
+      });
+    }
+  } else {
+    console.error("No se encontró el elemento dashboardOverlay");
+  }
+  
+  // Inicializar el ajuste responsivo
+  ajustarAlturaTabla();
+  // Volver a ajustar cuando cambie el tamaño de la ventana
+  window.addEventListener('resize', ajustarAlturaTabla);
+  
+  // Detectar y aplicar zoom para pantallas de 14 pulgadas
+  detectarYAplicarZoom();
+});
+
+// Función para ajustar dinámicamente la altura de la tabla según el tamaño de la pantalla
+function ajustarAlturaTabla() {
+  const tableContainer = document.querySelector('.table-container');
+  if (!tableContainer) return;
+  
+  // Obtener elementos clave para el cálculo de altura
+  const header = document.querySelector('header');
+  const buttonContainer = document.querySelector('.button-container');
+  const filterPanel = document.querySelector('.filter-panel');
+  const selectionHelp = document.querySelector('.selection-help');
+  const infoLabel = document.getElementById('infoLabel');
+  const statsContainer = document.querySelector('.stats-container');
+  const actionButtons = document.querySelector('.action-buttons');
+  
+  // Calcular altura total disponible
+  const windowHeight = window.innerHeight;
+  const windowWidth = window.innerWidth;
+  
+  // Detectar y aplicar zoom automático para pantallas de 14 pulgadas
+  detectarYAplicarZoom();
+  
+  // Calcular altura ocupada por otros elementos
+  let ocupadoHeight = 0;
+  
+  if (header) ocupadoHeight += header.offsetHeight + parseInt(getComputedStyle(header).marginBottom);
+  if (buttonContainer) ocupadoHeight += buttonContainer.offsetHeight + parseInt(getComputedStyle(buttonContainer).marginBottom);
+  if (filterPanel) ocupadoHeight += filterPanel.offsetHeight + parseInt(getComputedStyle(filterPanel).marginBottom);
+  if (selectionHelp) ocupadoHeight += selectionHelp.offsetHeight + parseInt(getComputedStyle(selectionHelp).marginTop) + parseInt(getComputedStyle(selectionHelp).marginBottom);
+  if (statsContainer) ocupadoHeight += statsContainer.offsetHeight + parseInt(getComputedStyle(statsContainer).marginTop) + parseInt(getComputedStyle(statsContainer).marginBottom);
+  if (actionButtons) ocupadoHeight += actionButtons.offsetHeight + parseInt(getComputedStyle(actionButtons).marginTop);
+  
+  // Añadir padding del body y del contenedor
+  const bodyPadding = parseInt(getComputedStyle(document.body).paddingTop) + parseInt(getComputedStyle(document.body).paddingBottom);
+  const containerPadding = parseInt(getComputedStyle(document.querySelector('.container')).paddingTop) + parseInt(getComputedStyle(document.querySelector('.container')).paddingBottom);
+  ocupadoHeight += bodyPadding + containerPadding;
+  
+  // Ajustar el margen de seguridad según el tamaño de pantalla
+  let margenSeguridad = 40;
+  if (windowWidth <= 1366) {
+    margenSeguridad = 30; // Menor margen para pantallas de 14 pulgadas
+  }
+  ocupadoHeight += margenSeguridad;
+  
+  // Calcular altura disponible para la tabla
+  let alturaDisponible = windowHeight - ocupadoHeight;
+  
+  // Establecer altura mínima y máxima según el tamaño de pantalla
+  let alturaMinima = 300;
+  let alturaMaxima = 600;
+  
+  // Ajustar altura mínima y máxima según el tamaño de la pantalla
+  if (windowHeight <= 768) {
+    // Pantallas con altura reducida
+    alturaMinima = 250;
+    alturaMaxima = 400;
+  } else if (windowHeight <= 900) {
+    // Pantallas de altura media
+    alturaMinima = 280;
+    alturaMaxima = 500;
+  }
+  
+  // Aplicar los límites
+  alturaDisponible = Math.max(alturaMinima, alturaDisponible);
+  alturaDisponible = Math.min(alturaMaxima, alturaDisponible);
+  
+  // Aplicar la altura calculada
+  tableContainer.style.maxHeight = `${alturaDisponible}px`;
+  
+  console.log(`Altura de tabla ajustada a ${alturaDisponible}px (${windowHeight}px disponibles - ${ocupadoHeight}px ocupados)`);
+  
+  // También ajustar el ancho mínimo de la tabla basado en el tamaño de la pantalla
+  const table = document.getElementById('tablaDatos');
+  if (table) {
+    // Tamaños ajustados para diferentes anchuras de pantalla
+    if (windowWidth <= 480) {
+      table.style.minWidth = "700px";
+    } else if (windowWidth <= 768) {
+      table.style.minWidth = "780px";
+    } else if (windowWidth <= 992) {
+      table.style.minWidth = "800px";
+    } else if (windowWidth <= 1200) {
+      table.style.minWidth = "900px";
+    } else if (windowWidth <= 1366) {
+      table.style.minWidth = "950px"; // Para pantallas de 14 pulgadas
+    } else if (windowWidth <= 1440) {
+      table.style.minWidth = "1000px";
+    } else {
+      table.style.minWidth = "1100px";
+    }
+  }
+  
+  // Ajustar el tamaño de fuente basado en el ancho de la ventana
+  const fontSizeAdjust = () => {
+    const body = document.body;
+    // Escalar el tamaño de fuente en proporción al ancho de la ventana
+    if (windowWidth <= 1366) {
+      // Para pantallas más pequeñas (14 pulgadas o menos)
+      document.documentElement.style.fontSize = '14px'; // Base font size
+    } else if (windowWidth <= 1440) {
+      document.documentElement.style.fontSize = '15px';
+    } else {
+      document.documentElement.style.fontSize = '16px'; // Tamaño estándar
+    }
+  };
+  
+  // Aplicar el ajuste de tamaño de fuente
+  fontSizeAdjust();
+}
+
+// Nueva función para detectar pantallas de 14 pulgadas y aplicar zoom automático
+function detectarYAplicarZoom() {
+  // Detectar pantallas de 14 pulgadas (típicamente 1366x768 o similares)
+  const esLaptop14 = (window.screen.width === 1366 && window.screen.height === 768) || 
+                     (window.innerWidth <= 1366 && window.innerHeight <= 800);
+  
+  // Referencia al elemento HTML
+  const htmlElement = document.documentElement;
+  
+  if (esLaptop14) {
+    console.log("Detectada pantalla de 14 pulgadas - Aplicando zoom automático");
+    
+    // Aplicar transform scale para toda la página
+    // Usamos un valor de 0.9 (90% del tamaño original) para reducir proporcionalmente
+    htmlElement.style.transform = "scale(0.9)";
+    htmlElement.style.transformOrigin = "top center";
+    htmlElement.style.height = "111%"; // Compensamos el espacio reducido
+    
+    // Ajustamos el body para compensar el espacio
+    document.body.style.marginBottom = "30px";
+    
+    // Guardamos el estado en localStorage para mantenerlo entre recargas
+    localStorage.setItem('zoomAplicado', 'true');
+  } else if (localStorage.getItem('zoomAplicado') === 'true') {
+    // Si cambia el tamaño de la pantalla pero anteriormente teníamos zoom aplicado, lo quitamos
+    htmlElement.style.transform = "";
+    htmlElement.style.height = "";
+    document.body.style.marginBottom = "";
+    localStorage.removeItem('zoomAplicado');
+  }
+}
+
+// Inicialización al cargar la página
+window.onload = function() {
+  // Inicialización segura: verificar que todos los elementos existan antes de continuar
+  console.log("Inicializando aplicación...");
+
+  // Asegurar que las variables globales estén actualizadas
+  dataTable = document.getElementById('tablaDatos');
+  
+  // Asegurarse de que los elementos esenciales del DOM existan
+  const tableContainer = document.querySelector('.table-container');
+  if (!tableContainer) {
+    console.error("No se encontró el contenedor de la tabla - la aplicación puede no funcionar correctamente");
+  }
+  
+  // Carga los datos iniciales
+  loadData();
+  
+  // Establece los event listeners para los botones, solo si existen
+  const inicializarBoton = (id, callback) => {
+    const boton = document.getElementById(id);
+    if (boton) {
+      boton.addEventListener('click', callback);
+      console.log(`Botón '${id}' inicializado correctamente`);
+    } else {
+      console.warn(`No se encontró el botón '${id}' en el DOM`);
+    }
+  };
+  
+  // Inicializar botones principales
+  inicializarBoton('btnSincronizar', sincronizarEntradas);
+  inicializarBoton('btnGuardar', guardarCambios);
+  inicializarBoton('btnEntregas', actualizarEntregas);
+  
+  // Inicializar botones de estado
+  inicializarBoton('btnPreparado', function() { cambiarEstado('Preparado'); });
+  inicializarBoton('btnEnProceso', function() { cambiarEstado('En proceso'); });
+  inicializarBoton('btnEntregado', function() { cambiarEstado('Entregado'); });
+  inicializarBoton('btnEliminarEstado', function() { cambiarEstado(''); });
+  
+  // Añadir listener para diagnóstico (Si el botón existe)
+  const btnDiagnostico = document.getElementById('btnDiagnostico');
+  if (btnDiagnostico) {
+    btnDiagnostico.addEventListener('click', ejecutarDiagnostico);
+  } else {
+    // Si no existe, crear el botón
+    const actionPanel = document.querySelector('.action-panel');
+    if (actionPanel) {
+      const diagnosticoBtn = document.createElement('button');
+      diagnosticoBtn.id = 'btnDiagnostico';
+      diagnosticoBtn.className = 'btn diagnostic';
+      diagnosticoBtn.innerHTML = '🔍 Diagnosticar';
+      diagnosticoBtn.title = 'Diagnosticar problemas con la hoja de cálculo';
+      diagnosticoBtn.addEventListener('click', ejecutarDiagnostico);
+      
+      // Insertarlo como último botón
+      actionPanel.appendChild(diagnosticoBtn);
+    }
+  }
+  
+  // Event listeners para filtros, solo si existen
+  const filterEstado = document.getElementById('filterEstado');
+  if (filterEstado) {
+    filterEstado.addEventListener('change', function() {
+      filtrarTabla();
+    });
+  }
+  
+  const searchBox = document.getElementById('searchBox');
+  if (searchBox) {
+    searchBox.addEventListener('input', function() {
+      filtrarTabla();
+    });
+  }
+  
+  // Guardar la posición de scroll cuando el usuario hace scroll
+  if (tableContainer) {
+    tableContainer.addEventListener('scroll', function() {
+      lastScrollPosition = tableContainer.scrollTop;
+    });
+  }
+  
+  // Ejecutar ajuste de altura de tabla después de cargar los datos
+  setTimeout(ajustarAlturaTabla, 500);
+  
+  // Ejecutar el ajuste automático cuando cambie el tamaño de la ventana
+  let resizeTimeout;
+  window.addEventListener('resize', function() {
+    // Usar debounce para evitar muchas llamadas seguidas
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(ajustarAlturaTabla, 200);
+  });
+  
+  // Ajustar también cuando cambie la orientación en dispositivos móviles
+  window.addEventListener('orientationchange', function() {
+    setTimeout(ajustarAlturaTabla, 300);
+  });
+  
+  console.log("Inicialización completada");
+  
+  // Este código debe estar al final de window.onload o añadido como un script separado
+  setTimeout(function() {
+    console.log("Ejecutando setup adicional para el dashboard (DESACTIVADO)...");
+    
+    // Configurar botón dashboard (desactivado por ahora)
+    setupDashboardButton();
+    
+    console.log("Dashboard desactivado temporalmente por decisión de negocio");
+  }, 1000);
+  
+  // Inicializar el dashboard simplificado
+  // initSimpleDashboard(); // Dashboard desactivado temporalmente
+  
+  // Añadir configuración del botón del dashboard
+  setTimeout(function() {
+    // Configurar el botón del dashboard para usar la nueva implementación
+    const btnDashboard = document.getElementById('btnDashboard');
+    if (btnDashboard) {
+      console.log("Configurando nuevo botón de dashboard...");
+      
+      // Eliminar todos los listeners antiguos
+      const nuevoBtn = btnDashboard.cloneNode(true);
+      btnDashboard.parentNode.replaceChild(nuevoBtn, btnDashboard);
+      
+      // Asignar el nuevo evento
+      nuevoBtn.addEventListener('click', function(e) {
+        console.log("Botón dashboard clickeado - Usando nueva implementación");
+        e.preventDefault();
+        mostrarDashboard();
+      });
+      
+      console.log("Botón de dashboard configurado con la nueva implementación");
+    } else {
+      console.error("No se encontró el botón del dashboard");
+    }
+  }, 1000);
+};
+
+// Añadir ajuste de altura después de operaciones importantes
+function afterDataLoad() {
+  // Ejecutar después de carga de datos
+  setTimeout(ajustarAlturaTabla, 100);
+}
+
+// Función simplificada para gestionar los encabezados fijos
+function fixTableHeader() {
+  // Esto se maneja mayormente con CSS pero podemos ajustar dinámicamente si es necesario
+  const tableContainer = document.querySelector('.table-container');
+  const headerRow = document.querySelector('table thead tr');
+  
+  if (!tableContainer || !headerRow) return;
+  
+  // Asegurarse de que el encabezado permanezca fijo durante el scroll
+  headerRow.style.position = 'sticky';
+}
+
+// Función para hacer scroll al final de la tabla (mostrar las entradas más recientes)
+function scrollToBottom() {
+  const tableContainer = document.querySelector('.table-container');
+  if (tableContainer) {
+    setTimeout(() => {
+      tableContainer.scrollTop = tableContainer.scrollHeight;
+    }, 100); // Pequeño retraso para asegurar que la tabla está completamente renderizada
+  }
+}
+
+// Función para restaurar la posición de scroll
+function restaurarPosicionScroll() {
+  const tableContainer = document.querySelector('.table-container');
+  if (tableContainer && lastScrollPosition > 0) {
+    setTimeout(() => {
+      tableContainer.scrollTop = lastScrollPosition;
+    }, 50); // Pequeño retraso para asegurar que la tabla está completamente renderizada
+  }
+}
+
+// Función para cargar datos
+function loadData(mantenerPosicion = false) {
+  mostrarLoader(true);
+  
+  if (!mantenerPosicion) {
+    // Limpiar selecciones actuales
+    selectedRows = [];
+    selectedRowIndex = -1;
+  }
+  
+  // Hacer la petición al servidor para obtener los datos
+  google.script.run
+    .withSuccessHandler(function(result) {
+      try {
+        console.log("Datos recibidos del servidor:", result);
+        
+        // Ocultar loader en caso de éxito
+        if (result && result.rows) {
+          data = result;
+          
+          try {
+            renderTable(data);
+          } catch (e) {
+            console.error("Error al renderizar tabla con datos completos:", e);
+            mostrarMensaje('Error al mostrar la tabla: ' + e.message, 'error');
+          }
+          
+          // Guardar y actualizar estadísticas
+          try {
+            if (result.estadisticas) {
+              console.log("Estadísticas recibidas del servidor:", result.estadisticas);
+              
+              // Primero guardamos una copia de las estadísticas originales (copia profunda)
+              estadisticasOriginales = {
+                total: result.estadisticas.total || 0,
+                preparados: result.estadisticas.preparados || 0,
+                enProceso: result.estadisticas.enProceso || 0,
+                entregados: result.estadisticas.entregados || 0
+              };
+              
+              console.log("Estadísticas originales guardadas:", estadisticasOriginales);
+              
+              // También guardar en sessionStorage como respaldo
+              try {
+                sessionStorage.setItem('estadisticasOriginales', JSON.stringify(estadisticasOriginales));
+                console.log("Estadísticas originales guardadas en sessionStorage durante carga");
+              } catch (e) {
+                console.warn("No se pudieron guardar estadísticas en sessionStorage:", e);
+              }
+              
+              // Luego actualizamos la interfaz con las estadísticas
+              actualizarEstadisticas(result.estadisticas);
+              
+              // Asegurarse de quitar el indicador de estadísticas filtradas
+              marcarEstadisticasComoFiltradas(false);
+            } else {
+              // Si no hay estadísticas, intentar recuperar del sessionStorage
+              try {
+                const estadisticasGuardadas = sessionStorage.getItem('estadisticasOriginales');
+                if (estadisticasGuardadas) {
+                  console.log("Recuperando estadísticas desde sessionStorage");
+                  estadisticasOriginales = JSON.parse(estadisticasGuardadas);
+                  actualizarEstadisticas(estadisticasOriginales);
+                  marcarEstadisticasComoFiltradas(false);
+                } else {
+                  // Si no hay estadísticas guardadas, calcularlas en el cliente
+                  console.log("No hay estadísticas en sessionStorage, calculando localmente");
+                  calcularEstadisticasLocalmente();
+                }
+              } catch (e) {
+                console.error("Error al recuperar estadísticas de sessionStorage:", e);
+                // Si hay un error, calcular estadísticas localmente
+                calcularEstadisticasLocalmente();
+              }
+            }
+          } catch (e) {
+            console.error("Error al actualizar estadísticas:", e);
+          }
+          
+          try {
+            mostrarLoader(false);
+          } catch (e) {
+            console.error("Error al ocultar loader después de éxito:", e);
+          }
+          
+          // Ir al final de la tabla para ver las entradas más recientes
+          // o mantener posición si así se solicita
+          try {
+            if (esCargaInicial || !mantenerPosicion) {
+              scrollToBottom();
+              esCargaInicial = false;
+            } else if (mantenerPosicion && lastScrollPosition > 0) {
+              restaurarPosicionScroll();
+            }
+          } catch (e) {
+            console.error("Error al ajustar scroll:", e);
+          }
+          
+          // Mostrar mensaje de éxito si todo fue bien
+          if (data.rows.length > 0) {
+            mostrarMensaje('Datos cargados correctamente: ' + data.rows.length + ' registros', 'success');
+          } else {
+            mostrarMensaje('No hay registros para mostrar. Use "Sincronizar" para cargar nuevos datos.', 'warning');
+          }
+          
+          // Ajustar altura de la tabla después de cargar datos
+          afterDataLoad();
+        } else {
+          console.error("Datos recibidos con formato incorrecto:", result);
+          mostrarMensaje('Error: Datos recibidos con formato incorrecto', 'error');
+          mostrarLoader(false);
+        }
+      } catch (e) {
+        console.error("Error general al procesar respuesta:", e);
+        
+        try {
+          mostrarLoader(false);
+          mostrarMensaje('Error al procesar datos: ' + e.message, 'error');
+        } catch (e2) {
+          console.error("Error secundario:", e2);
+        }
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error("Error al cargar datos:", error);
+      mostrarLoader(false);
+      mostrarMensaje('Error al cargar datos: ' + error, 'error');
+    })
+    .loadData(mantenerPosicion); // Cambiar obtenerDatos por loadData para que coincida con la función en Code.gs
+}
+
+// Función para actualizar las estadísticas
+function actualizarEstadisticas(stats) {
+  if (!stats) return;
+  
+  console.log("Actualizando estadísticas en la UI:", stats);
+  
+  // Asegurarnos que tenemos valores válidos en cada propiedad
+  stats.total = stats.total || 0;
+  stats.preparados = stats.preparados || 0;
+  stats.enProceso = stats.enProceso || 0;
+  stats.entregados = stats.entregados || 0;
+  
+  // Actualizar la variable global de estadísticas
+  estadisticas = Object.assign({}, stats);
+  
+  // Actualizar elementos del DOM
+  document.getElementById('totalPedidos').textContent = stats.total;
+  document.getElementById('totalPreparados').textContent = stats.preparados;
+  document.getElementById('totalEnProceso').textContent = stats.enProceso;
+  document.getElementById('totalEntregados').textContent = stats.entregados;
+}
+
+// Función para guardar las estadísticas originales
+function guardarEstadisticasOriginales(stats) {
+  if (!stats) {
+    console.warn("Intento de guardar estadísticas originales con valor nulo");
+    return;
+  }
+  
+  // Hacer una copia profunda para evitar referencias
+  estadisticasOriginales = {
+    total: Number(stats.total) || 0,
+    preparados: Number(stats.preparados) || 0,
+    enProceso: Number(stats.enProceso) || 0,
+    entregados: Number(stats.entregados) || 0
+  };
+  
+  // Verificar que las estadísticas tienen valores válidos
+  if (estadisticasOriginales.total === 0 && 
+      data && data.rows && data.rows.length > 0) {
+    console.warn("Estadísticas originales con total cero a pesar de tener datos. Ajustando...");
+    estadisticasOriginales.total = data.rows.length;
+  }
+  
+  console.log("Estadísticas originales guardadas:", estadisticasOriginales);
+  
+  // También guardar en sessionStorage como respaldo
+  try {
+    sessionStorage.setItem('estadisticasOriginales', JSON.stringify(estadisticasOriginales));
+    console.log("Estadísticas originales guardadas en sessionStorage");
+  } catch (e) {
+    console.warn("No se pudieron guardar estadísticas en sessionStorage:", e);
+  }
+}
+
+// Función para calcular estadísticas localmente
+function calcularEstadisticasLocalmente() {
+  if (!data || !data.rows) return;
+  
+  const stats = {
+    total: data.rows.length,
+    preparados: 0,
+    enProceso: 0,
+    entregados: 0
+  };
+  
+  // Encontrar índice de columna de estado
+  const estadoIndex = data.headers.findIndex(header => 
+    header && header.toString().toUpperCase() === 'ESTADO'
+  );
+  
+  // Si no encontramos la columna de estado, intentar buscar por nombre parcial
+  let estadoIdx = estadoIndex;
+  if (estadoIdx === -1) {
+    estadoIdx = data.headers.findIndex(header => 
+      header && header.toString().toUpperCase().includes('ESTADO')
+    );
+  }
+  
+  // Si aún no encontramos, usar la última columna
+  if (estadoIdx === -1) {
+    estadoIdx = data.headers.length - 1;
+  }
+  
+  // Contar entradas por estado
+  data.rows.forEach(row => {
+    const estado = row[estadoIdx] ? row[estadoIdx].toString().trim() : '';
+    
+    if (estado === 'Preparado') {
+      stats.preparados++;
+    } else if (estado === 'En proceso') {
+      stats.enProceso++;
+    } else if (estado === 'Entregado') {
+      stats.entregados++;
+    }
+  });
+  
+  // Guardar estadísticas originales
+  guardarEstadisticasOriginales(stats);
+  
+  // Actualizar UI
+  actualizarEstadisticas(stats);
+}
+
+// Función para aplicar filtros a las filas
+function filterRows(rows) {
+  try {
+    console.log("Iniciando filtrado de filas...");
+    // Obtener los valores actuales de los filtros
+    var estadoVal = document.getElementById('filterEstado').value;
+    var searchVal = document.getElementById('searchBox').value.trim().toLowerCase();
+    
+    console.log("Filtros activos: estado = '" + estadoVal + "', búsqueda = '" + searchVal + "'");
+    
+    // Si no hay filtros, devolver todas las filas
+    if (estadoVal === 'todos' && !searchVal) {
+      console.log("No hay filtros activos, devolviendo todas las filas: " + rows.length);
+      return rows;
+    }
+    
+    // Buscar índice de la columna de estado
+    var estadoIdx = -1;
+    if (data && data.headers) {
+      for (var i = 0; i < data.headers.length; i++) {
+        var headerName = data.headers[i] ? data.headers[i].toString().toUpperCase() : '';
+        if (headerName === 'ESTADO') {
+          estadoIdx = i;
+          break;
+        }
+      }
+      
+      if (estadoIdx === -1) {
+        for (var i = 0; i < data.headers.length; i++) {
+          var headerName = data.headers[i] ? data.headers[i].toString().toUpperCase() : '';
+          if (headerName.indexOf('ESTADO') !== -1) {
+            estadoIdx = i;
+            break;
+          }
+        }
+      }
+      
+      if (estadoIdx === -1) {
+        estadoIdx = data.headers.length - 1; // Última columna si no se encuentra
+      }
+    }
+    
+    console.log("Columna de estado encontrada en índice: " + estadoIdx);
+    
+    // Filtrar filas según criterios
+    var filteredRows = rows.filter(function(row) {
+      try {
+        // Filtrar por estado si no es 'todos'
+        if (estadoVal !== 'todos') {
+          var estadoRow = row[estadoIdx] ? row[estadoIdx].toString().trim() : '';
+          
+          if (estadoVal === 'sin-estado') {
+            // Sin estado incluye filas con estado vacío
+            if (estadoRow !== '') {
+              return false;
+            }
+          } else if (estadoVal !== estadoRow) {
+            // Comparar directamente con el valor del select
+            return false;
+          }
+        }
+        
+        // Filtrar por texto de búsqueda si hay algo escrito
+        if (searchVal) {
+          // Verificar en todos los campos de la fila excepto el ID
+          var encontrado = false;
+          for (var i = 1; i < row.length; i++) {
+            var valorCelda = row[i] !== null && row[i] !== undefined ? row[i].toString().toLowerCase() : '';
+            if (valorCelda.includes(searchVal)) {
+              encontrado = true;
+              break;
+            }
+          }
+          
+          if (!encontrado) {
+            return false;
+          }
+        }
+        
+        // Si pasó todos los filtros, incluir esta fila
+        return true;
+      } catch (error) {
+        console.error("Error al filtrar fila:", error);
+        return true; // En caso de error, incluir la fila
+      }
+    });
+    
+    console.log("Filas después de filtrar: " + filteredRows.length + " de " + rows.length);
+    return filteredRows;
+  } catch (error) {
+    console.error("Error general en filterRows:", error);
+    return rows; // En caso de error, devolver todas las filas
+  }
+}
+
+// Función para renderizar la tabla
+function renderTable(data) {
+  // Limpia la tabla actual
+  if (!dataTable) {
+    dataTable = document.getElementById('tablaDatos');
+  }
+  
+  // Si el dataTable sigue siendo null, intentamos trabajar con el contenedor de la tabla
+  var tableContainer = document.querySelector('.table-container');
+  
+  if (!tableContainer) {
+    console.error("No se encontró el contenedor de la tabla");
+    mostrarMensaje('Error: No se encontró el contenedor de la tabla', 'error');
+    mostrarLoader(false);
+    return;
+  }
+  
+  // Limpiamos el contenido
+  tableContainer.innerHTML = '';
+  
+  if (!data || !data.headers || !data.rows) {
+    tableContainer.innerHTML = '<div class="alert alert-warning">No hay datos disponibles</div>';
+    return;
+  }
+  
+  console.log("Renderizando tabla con " + data.rows.length + " filas");
+  
+  var headers = data.headers;
+  
+  // Usar las filas en su orden original (antiguas arriba, nuevas abajo)
+  var rows = data.rows;
+  
+  console.log("Manteniendo orden original: entradas antiguas arriba, nuevas abajo");
+  
+  // Aplicar filtros
+  var filteredRows = filterRows(rows);
+  console.log("Filas después de filtrar:", filteredRows.length);
+  
+  if (filteredRows.length === 0) {
+    tableContainer.innerHTML = '<div class="alert alert-info">No hay resultados que coincidan con los filtros aplicados</div>';
+    return;
+  }
+  
+  // Crear tabla
+  dataTable = document.createElement('table');
+  dataTable.id = 'tablaDatos';
+  dataTable.className = 'data-table';
+  
+  // Crear encabezado
+  var thead = document.createElement('thead');
+  var headerRow = document.createElement('tr');
+  
+  // No incluimos la columna ID (índice 0) que es oculta
+  for (var i = 1; i < headers.length; i++) {
+    var th = document.createElement('th');
+    th.textContent = headers[i];
+    
+    // Asignar clase basada en el nombre de la columna
+    var headerName = headers[i].toLowerCase().replace(/\s+/g, '-');
+    th.className = 'col-' + headerName;
+    
+    headerRow.appendChild(th);
+  }
+  
+  thead.appendChild(headerRow);
+  dataTable.appendChild(thead);
+  
+  // Crear cuerpo de la tabla
+  var tbody = document.createElement('tbody');
+  tbody.id = 'tableBody';
+  
+  // Encontrar índice de la columna ESTADO
+  var estadoIdx = -1;
+  for (var i = 0; i < headers.length; i++) {
+    var headerName = headers[i] ? headers[i].toString().toUpperCase() : '';
+    if (headerName === 'ESTADO') {
+      estadoIdx = i;
+      break;
+    }
+  }
+  
+  if (estadoIdx === -1) {
+    for (var i = 0; i < headers.length; i++) {
+      var headerName = headers[i] ? headers[i].toString().toUpperCase() : '';
+      if (headerName.indexOf('ESTADO') !== -1) {
+        estadoIdx = i;
+        break;
+      }
+    }
+  }
+  
+  if (estadoIdx === -1) {
+    estadoIdx = headers.length - 1; // Última columna si no se encuentra
+  }
+  
+  // Reiniciar array de filas seleccionadas
+  selectedRows = [];
+  
+  // Para cada fila filtrada, crear una fila en la tabla
+  for (var i = 0; i < filteredRows.length; i++) {
+    var rowData = filteredRows[i];
+    var tr = document.createElement('tr');
+    
+    // Guardar índice y ID para uso posterior
+    tr.dataset.rowIndex = i;
+    tr.dataset.id = rowData[0];
+    
+    // Añadir clase según el estado
+    var estado = rowData[estadoIdx] ? rowData[estadoIdx].toString().trim() : '';
+    if (estado) {
+      tr.classList.add('estado-' + estado.toLowerCase().replace(/\s+/g, '-'));
+    }
+    
+    // Añadir manejador de clic para la fila (selección simple y múltiple)
+    tr.addEventListener('click', function(e) {
+      var rowIndex = parseInt(this.dataset.rowIndex);
+      
+      // Si la tecla Ctrl o Cmd está presionada, permitir seleccionar/deseleccionar múltiples filas
+      if (e.ctrlKey || e.metaKey) {
+        // Buscar si esta fila ya está seleccionada
+        const index = selectedRows.indexOf(rowIndex);
+        
+        if (index === -1) {
+          // Si no está seleccionada, añadirla y marcarla como seleccionada
+          selectedRows.push(rowIndex);
+          this.classList.add('selected');
+        } else {
+          // Si ya está seleccionada, quitarla y eliminar el resaltado
+          selectedRows.splice(index, 1);
+          this.classList.remove('selected');
+        }
+        
+        // Actualizar información de la selección
+        mostrarInfoMultipleSeleccion(selectedRows, filteredRows, headers);
+      } 
+      // Si la tecla Shift está presionada, seleccionar un rango de filas
+      else if (e.shiftKey && selectedRowIndex !== -1) {
+        // Limpiar selección previa
+        tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+        
+        // Determinar el rango a seleccionar
+        const inicio = Math.min(selectedRowIndex, rowIndex);
+        const fin = Math.max(selectedRowIndex, rowIndex);
+        
+        // Reiniciar el array de filas seleccionadas
+        selectedRows = [];
+        
+        // Seleccionar todas las filas en el rango
+        for (let i = inicio; i <= fin; i++) {
+          selectedRows.push(i);
+          const fila = tbody.querySelector(`tr[data-row-index="${i}"]`);
+          if (fila) fila.classList.add('selected');
+        }
+        
+        // Actualizar información de la selección
+        mostrarInfoMultipleSeleccion(selectedRows, filteredRows, headers);
+      }
+      // De otro modo, seleccionar solo esta fila
+      else {
+        // Quitar selección previa
+        tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+        
+        // Añadir selección a esta fila
+        this.classList.add('selected');
+        
+        // Actualizar variables de selección
+        selectedRowIndex = rowIndex;
+        selectedRows = [rowIndex];
+        
+        // Mostrar detalles
+        mostrarInfoDetallada(filteredRows[rowIndex], headers);
+      }
+    });
+    
+    // No incluimos la columna ID (índice 0)
+    for (var j = 1; j < rowData.length; j++) {
+      var td = document.createElement('td');
+      
+      // Formatear el valor según el tipo de columna
+      var valorCelda = rowData[j] !== null && rowData[j] !== undefined ? rowData[j] : '';
+      
+      // Asignar clase basada en el nombre de la columna
+      var columnName = headers[j] ? headers[j].toLowerCase().replace(/\s+/g, '-') : '';
+      td.className = 'col-' + columnName;
+      
+      // Formateo especial para columnas específicas
+      if (columnName === 'fecha-necesidad' || columnName.indexOf('fecha') !== -1) {
+        // Ya formateado en el servidor, mantener como texto
+        td.textContent = valorCelda;
+      } else if (columnName === 'estado') {
+        // Formateo para estados con símbolos especiales
+        if (valorCelda === 'Preparado') {
+          td.innerHTML = '<span class="estado preparado">✓</span> Preparado';
+        } else if (valorCelda === 'Entregado') {
+          td.innerHTML = '<span class="estado entregado">✓✓</span> Entregado';
+        } else if (valorCelda === 'En proceso') {
+          td.innerHTML = '<span class="estado en-proceso">⟳</span> En proceso';
+        } else {
+          td.textContent = valorCelda || '';
+        }
+      } else {
+        // Valor normal
+        td.textContent = valorCelda;
+      }
+      
+      tr.appendChild(td);
+    }
+    
+    tbody.appendChild(tr);
+  }
+  
+  dataTable.appendChild(tbody);
+  tableContainer.appendChild(dataTable);
+  
+  // Forzar recálculo de dimensiones
+  setTimeout(function() {
+    if (dataTable && tableContainer) {
+      tableContainer.style.width = '100%';
+    }
+  }, 10);
+}
+
+// Muestra información cuando hay múltiples filas seleccionadas
+function mostrarInfoMultipleSeleccion(indices, filas, headers) {
+  if (!indices || indices.length === 0) return;
+  
+  const infoDiv = document.getElementById('infoLabel');
+  if (!infoDiv) return;
+  
+  // Actualizar estilo para mostrar selección múltiple
+  infoDiv.classList.add('multiple-selection');
+  
+  // Si hay una sola fila seleccionada, mostrar info normal
+  if (indices.length === 1) {
+    mostrarInfoDetallada(filas[indices[0]], headers);
+    return;
+  }
+  
+  // Para múltiples filas, mostrar resumen
+  infoDiv.innerHTML = `
+    <div><strong>${indices.length} filas seleccionadas</strong></div>
+    <div class="selection-help">
+      <em>✓ Utilice los botones de acción para cambiar el estado de todas las filas seleccionadas a la vez.</em>
+    </div>
+  `;
+  
+  // Mostrar botones de acción para estados
+  document.querySelectorAll('.status-button').forEach(btn => {
+    btn.style.display = 'block';
+  });
+}
+
+// Muestra información detallada de una fila seleccionada
+function mostrarInfoDetallada(fila, headers) {
+  if (!fila) return;
+  
+  const infoDiv = document.getElementById('infoLabel');
+  if (!infoDiv) return;
+  
+  // Quitar clase de selección múltiple
+  infoDiv.classList.remove('multiple-selection');
+  
+  // Encontrar índices relevantes (usar solo datos que son útiles para mostrar)
+  const nombreIdx = encontrarIndiceColumna(headers, 'NOMBRE');
+  const materialIdx = encontrarIndiceColumna(headers, 'MATERIAL');
+  const unidadesIdx = encontrarIndiceColumna(headers, 'UNIDADES');
+  const otrosMatIdx = encontrarIndiceColumna(headers, 'OTROS');
+  const escuelaIdx = encontrarIndiceColumna(headers, 'ESCUELA');
+  const fechaIdx = encontrarIndiceColumna(headers, 'FECHA');
+  
+  let detalles = '';
+  
+  // Construir cadena con detalles relevantes
+  if (nombreIdx !== -1) {
+    detalles += `<strong>${fila[nombreIdx]}</strong>`;
+  }
+  
+  if (escuelaIdx !== -1 && fila[escuelaIdx]) {
+    detalles += ` | Escuela: ${fila[escuelaIdx]}`;
+  }
+  
+  if (fechaIdx !== -1 && fila[fechaIdx]) {
+    detalles += ` | Fecha: ${fila[fechaIdx]}`;
+  }
+  
+  if (materialIdx !== -1 && fila[materialIdx]) {
+    detalles += ` | Material: ${fila[materialIdx]}`;
+  }
+  
+  if (unidadesIdx !== -1 && fila[unidadesIdx]) {
+    detalles += ` | Unidades: ${fila[unidadesIdx]}`;
+  }
+  
+  if (otrosMatIdx !== -1 && fila[otrosMatIdx]) {
+    detalles += ` | Otros: ${fila[otrosMatIdx]}`;
+  }
+  
+  infoDiv.innerHTML = detalles;
+  
+  // Mostrar botones de acción para estados
+  document.querySelectorAll('.status-button').forEach(btn => {
+    btn.style.display = 'block';
+  });
+}
+
+// Función auxiliar para encontrar el índice de una columna por nombre
+function encontrarIndiceColumna(headers, texto) {
+  for (let i = 0; i < headers.length; i++) {
+    if (headers[i] && headers[i].toString().toUpperCase().includes(texto)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// Función para scroll al inicio de la tabla
+function scrollToTop() {
+  const tableContainer = document.querySelector('.table-container');
+  if (tableContainer) {
+    setTimeout(() => {
+      tableContainer.scrollTop = 0;
+    }, 100); // Pequeño retraso para asegurar que la tabla está completamente renderizada
+  }
+}
+
+// Muestra información detallada al seleccionar una fila
+function mostrarInfoDetallada(rowData, headers) {
+  const infoLabel = document.getElementById('infoLabel');
+  if (!infoLabel) return;
+  
+  // Crear un resumen de los datos principales
+  let detalles = '';
+  
+  // Si hay encabezados, mostrar datos con etiquetas
+  if (headers && headers.length === rowData.length) {
+    const items = [];
+    for (let i = 0; i < Math.min(headers.length, rowData.length); i++) {
+      if (rowData[i]) {
+        items.push(`${headers[i]}: ${rowData[i]}`);
+      }
+    }
+    detalles = items.join(' | ');
+  } else {
+    // Fallback si no hay encabezados
+    detalles = rowData.filter(Boolean).join(' | ');
+  }
+  
+  infoLabel.textContent = detalles;
+  infoLabel.style.display = 'block';
+}
+
+// Actualiza el estado de las filas seleccionadas
+function actualizarEstado(estado) {
+  // Si no hay filas seleccionadas, mostrar error
+  if (selectedRows.length === 0) {
+    mostrarMensaje('Por favor, selecciona al menos una fila primero', 'warning');
+    return;
+  }
+  
+  // Guardar la posición actual de scroll
+  const tableContainer = document.querySelector('.table-container');
+  if (tableContainer) {
+    lastScrollPosition = tableContainer.scrollTop;
+  }
+  
+  mostrarLoader(true);
+  
+  // Si hay múltiples filas seleccionadas, usar la función de actualización múltiple
+  if (selectedRows.length > 1) {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          mostrarMensaje(`Estado actualizado a "${estado || 'Sin estado'}" en ${result.filasCambiadas} de ${result.totalFilas} filas seleccionadas`, 'success');
+          // Recargar datos para mostrar los cambios, pero mantener la posición
+          loadData(true);
+        } else {
+          mostrarMensaje('Error al actualizar: ' + (result.error || 'Error desconocido'), 'error');
+          mostrarLoader(false);
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('Error al actualizar estados:', error);
+        mostrarLoader(false);
+        mostrarMensaje('Error al actualizar estados: ' + error, 'error');
+      })
+      .actualizarEstadoMultiple(selectedRows, estado);
+  } 
+  // Si solo hay una fila seleccionada, usar la función original
+  else {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          mostrarMensaje(`Estado actualizado a: ${estado || 'Sin estado'}`, 'success');
+          // Recargar datos para mostrar los cambios, pero mantener la posición
+          loadData(true);
+        } else {
+          mostrarMensaje('Error al actualizar: ' + (result.error || 'Error desconocido'), 'error');
+          mostrarLoader(false);
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('Error al actualizar estado:', error);
+        mostrarLoader(false);
+        mostrarMensaje('Error al actualizar estado: ' + error, 'error');
+      })
+      .actualizarEstado(selectedRows[0], estado);
+  }
+}
+
+// Función para sincronizar entradas del formulario
+function sincronizarEntradas() {
+  console.log("Iniciando sincronización...");
+  
+  // Activar el indicador de carga siempre que exista
+  try {
+    mostrarLoader(true);
+  } catch (e) {
+    console.error("Error al mostrar el loader:", e);
+  }
+  
+  // Mostrar mensaje informativo
+  try {
+    mostrarMensaje('Sincronizando entradas del formulario...', 'info');
+  } catch (e) {
+    console.error("Error al mostrar mensaje:", e);
+  }
+  
+  // Deshabilitar botón de sincronización de forma segura
+  let syncBtn = null;
+  try {
+    // Buscar por múltiples selectores para aumentar posibilidades de encontrarlo
+    syncBtn = document.getElementById('btnSincronizar') || 
+              document.querySelector('button[title="Sincronizar"]') || 
+              document.querySelector('button:contains("Sincronizar")');
+    
+    // Deshabilitar solo si se encontró el botón
+    if (syncBtn) {
+      syncBtn.disabled = true;
+      console.log("Botón de sincronización deshabilitado");
+    } else {
+      console.warn("No se encontró el botón de sincronización para deshabilitar");
+    }
+  } catch (e) {
+    console.error("Error al deshabilitar el botón de sincronización:", e);
+  }
+  
+  // Añadir timeout como respaldo para liberar la interfaz después de un tiempo
+  const timeoutId = setTimeout(function() {
+    console.error("Timeout en sincronización - el servidor no respondió a tiempo");
+    
+    try {
+      mostrarMensaje('Error: Tiempo de espera agotado en sincronización. Intente nuevamente.', 'error');
+    } catch (e) {
+      console.error("Error al mostrar mensaje de timeout:", e);
+    }
+    
+    try {
+      mostrarLoader(false);
+    } catch (e) {
+      console.error("Error al ocultar loader después de timeout:", e);
+    }
+    
+    // Re-habilitar botón en caso de timeout de forma segura
+    try {
+      if (syncBtn) {
+        syncBtn.disabled = false;
+        console.log("Botón de sincronización re-habilitado después de timeout");
+      }
+    } catch (e) {
+      console.error("Error al re-habilitar el botón después de timeout:", e);
+    }
+  }, 60000); // 60 segundos de timeout para sincronización
+  
+  // Ejecutar la sincronización en el servidor
+  try {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        // Limpiar timeout
+        clearTimeout(timeoutId);
+        console.log("Resultado de sincronización:", result);
+        
+        // Habilitar nuevamente el botón de forma segura
+        try {
+          // Buscar el botón nuevamente por si el DOM ha cambiado
+          if (!syncBtn) {
+            syncBtn = document.getElementById('btnSincronizar') || 
+                     document.querySelector('button[title="Sincronizar"]') || 
+                     document.querySelector('button:contains("Sincronizar")');
+          }
+          
+          if (syncBtn) {
+            syncBtn.disabled = false;
+            console.log("Botón de sincronización re-habilitado después de éxito");
+          }
+        } catch (e) {
+          console.error("Error al re-habilitar el botón después de sincronización:", e);
+        }
+        
+        // Procesar resultado
+        if (result && result.success) {
+          try {
+            mostrarMensaje('Sincronización completada. Nuevos registros: ' + (result.nuevosRegistros || 0), 'success');
+            
+            // Recargar datos después de la sincronización
+            console.log("Recargando datos después de sincronización exitosa");
+            loadData(false); // No mantener posición, ya que queremos ver los nuevos registros
+          } catch (e) {
+            console.error("Error al procesar sincronización exitosa:", e);
+            mostrarLoader(false); // Asegurar que el loader se oculte
+          }
+        } else {
+          // Manejar respuesta errónea pero no null
+          try {
+            const errorMsg = result && result.error ? result.error : 'Error desconocido en la sincronización';
+            mostrarMensaje('Error al sincronizar: ' + errorMsg, 'error');
+            mostrarLoader(false);
+          } catch (e) {
+            console.error("Error al procesar error de sincronización:", e);
+            mostrarLoader(false); // Asegurar que el loader se oculte
+          }
+        }
+      })
+      .withFailureHandler(function(error) {
+        // Limpiar timeout
+        clearTimeout(timeoutId);
+        
+        console.error('Error en sincronización:', error);
+        
+        try {
+          mostrarLoader(false);
+        } catch (e) {
+          console.error("Error al ocultar loader después de error:", e);
+        }
+        
+        try {
+          mostrarMensaje('Error en sincronización: ' + error, 'error');
+        } catch (e) {
+          console.error("Error al mostrar mensaje de error:", e);
+        }
+        
+        // Habilitar nuevamente el botón en caso de error de forma segura
+        try {
+          // Buscar el botón nuevamente por si el DOM ha cambiado
+          if (!syncBtn) {
+            syncBtn = document.getElementById('btnSincronizar') || 
+                     document.querySelector('button[title="Sincronizar"]') || 
+                     document.querySelector('button:contains("Sincronizar")');
+          }
+          
+          if (syncBtn) {
+            syncBtn.disabled = false;
+            console.log("Botón de sincronización re-habilitado después de error");
+          }
+        } catch (e) {
+          console.error("Error al re-habilitar el botón después de error:", e);
+        }
+      })
+      .sincronizarEntradas();
+  } catch (e) {
+    console.error("Error al iniciar la sincronización:", e);
+    
+    // Limpiar timeout si ocurre un error al iniciar
+    clearTimeout(timeoutId);
+    
+    // Asegurar que la interfaz se restaure
+    try {
+      mostrarLoader(false);
+    } catch (e2) {
+      console.error("Error secundario al ocultar loader:", e2);
+    }
+    
+    try {
+      mostrarMensaje('Error al iniciar sincronización: ' + e.message, 'error');
+    } catch (e2) {
+      console.error("Error secundario al mostrar mensaje:", e2);
+    }
+    
+    // Re-habilitar botón de forma segura
+    try {
+      if (syncBtn) {
+        syncBtn.disabled = false;
+      }
+    } catch (e2) {
+      console.error("Error secundario al re-habilitar botón:", e2);
+    }
+  }
+}
+
+// Función para guardar cambios
+function guardarCambios() {
+  // Guardar la posición actual de scroll
+  const tableContainer = document.querySelector('.table-container');
+  if (tableContainer) {
+    lastScrollPosition = tableContainer.scrollTop;
+  }
+  
+  mostrarLoader(true);
+  
+  // Prepara los datos para enviar
+  const dataToSave = [];
+  dataToSave.push(data.headers); // Primera fila con encabezados
+  
+  // Añade los datos de cada fila
+  data.rows.forEach(row => {
+    dataToSave.push(row);
+  });
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        mostrarMensaje('Datos guardados correctamente', 'success');
+        mostrarLoader(false);
+        // Restaurar la posición de scroll
+        restaurarPosicionScroll();
+      } else {
+        mostrarMensaje('Error al guardar: ' + (result.error || 'Error desconocido'), 'error');
+        mostrarLoader(false);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al guardar:', error);
+      mostrarLoader(false);
+      mostrarMensaje('Error al guardar: ' + error, 'error');
+    })
+    .guardarDatos(dataToSave);
+}
+
+// Función para actualizar entregas
+function actualizarEntregas() {
+  // Guardar la posición actual de scroll
+  const tableContainer = document.querySelector('.table-container');
+  if (tableContainer) {
+    lastScrollPosition = tableContainer.scrollTop;
+  }
+  
+  mostrarLoader(true);
+  
+  // Obtener datos de centros y días de entrega
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result && result.datos) {
+        mostrarMensaje('Entregas actualizadas. Cambios aplicados: ' + result.cambiosAplicados, 'success');
+        // Recargar datos para mostrar los cambios
+        loadData(true); // Mantener posición
+      } else {
+        mostrarMensaje('No se pudieron actualizar las entregas', 'warning');
+        mostrarLoader(false);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al actualizar entregas:', error);
+      mostrarLoader(false);
+      mostrarMensaje('Error al actualizar entregas: ' + error, 'error');
+    })
+    .actualizarCentrosDeEntregaYDia();
+}
+
+// Mostrar/ocultar el indicador de carga
+function mostrarLoader(show) {
+  try {
+    const loader = document.getElementById('loader');
+    if (loader) {
+      loader.style.display = show ? 'block' : 'none';
+    } else {
+      console.warn("Elemento 'loader' no encontrado en el DOM");
+      
+      // Si no existe el loader y queremos mostrarlo, intentar crearlo
+      if (show) {
+        try {
+          const nuevoLoader = document.createElement('div');
+          nuevoLoader.id = 'loader';
+          nuevoLoader.className = 'loader';
+          nuevoLoader.innerHTML = '<div class="spinner"></div>';
+          nuevoLoader.style.display = 'block';
+          nuevoLoader.style.position = 'fixed';
+          nuevoLoader.style.top = '0';
+          nuevoLoader.style.left = '0';
+          nuevoLoader.style.width = '100%';
+          nuevoLoader.style.height = '100%';
+          nuevoLoader.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+          nuevoLoader.style.zIndex = '9999';
+          nuevoLoader.style.display = 'flex';
+          nuevoLoader.style.alignItems = 'center';
+          nuevoLoader.style.justifyContent = 'center';
+          
+          // Añadir spinner al loader
+          const spinner = document.createElement('div');
+          spinner.className = 'spinner';
+          spinner.style.width = '50px';
+          spinner.style.height = '50px';
+          spinner.style.border = '5px solid #f3f3f3';
+          spinner.style.borderTop = '5px solid #3498db';
+          spinner.style.borderRadius = '50%';
+          spinner.style.animation = 'spin 2s linear infinite';
+          
+          // Añadir animación para el spinner
+          const styleElement = document.createElement('style');
+          styleElement.textContent = `
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `;
+          
+          document.head.appendChild(styleElement);
+          nuevoLoader.appendChild(spinner);
+          document.body.appendChild(nuevoLoader);
+          console.log("Loader creado dinámicamente");
+        } catch (e) {
+          console.error("Error al crear loader dinámicamente:", e);
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error en mostrarLoader:", e);
+  }
+}
+
+// Mostrar mensajes al usuario
+function mostrarMensaje(mensaje, tipo = 'info') {
+  try {
+    // Verificar que tengamos un mensaje
+    if (!mensaje) {
+      console.warn("Se intentó mostrar un mensaje vacío");
+      return;
+    }
+    
+    // Obtener o crear el contenedor de mensajes
+    let contenedorMensajes = document.getElementById('mensajes');
+    
+    // Si no existe el contenedor, crearlo
+    if (!contenedorMensajes) {
+      console.warn("Contenedor de mensajes no encontrado, creándolo dinámicamente");
+      
+      contenedorMensajes = document.createElement('div');
+      contenedorMensajes.id = 'mensajes';
+      contenedorMensajes.style.position = 'fixed';
+      contenedorMensajes.style.top = '10px';
+      contenedorMensajes.style.right = '10px';
+      contenedorMensajes.style.zIndex = '9999';
+      contenedorMensajes.style.maxWidth = '400px';
+      document.body.appendChild(contenedorMensajes);
+    }
+    
+    // Crear nuevo mensaje
+    const mensajeElement = document.createElement('div');
+    mensajeElement.className = `mensaje ${tipo}`;
+    mensajeElement.textContent = mensaje;
+    
+    // Aplicar estilos adicionales si es creado dinámicamente
+    mensajeElement.style.backgroundColor = tipo === 'error' ? '#f8d7da' :
+                                          tipo === 'warning' ? '#fff3cd' :
+                                          tipo === 'success' ? '#d4edda' : '#d1ecf1';
+    mensajeElement.style.color = tipo === 'error' ? '#721c24' :
+                                tipo === 'warning' ? '#856404' :
+                                tipo === 'success' ? '#155724' : '#0c5460';
+    mensajeElement.style.padding = '10px 15px';
+    mensajeElement.style.margin = '0 0 10px 0';
+    mensajeElement.style.borderRadius = '4px';
+    mensajeElement.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+    mensajeElement.style.opacity = '1';
+    mensajeElement.style.transition = 'opacity 0.5s ease-in-out';
+    
+    // Añadir al contenedor
+    contenedorMensajes.appendChild(mensajeElement);
+    
+    // Desaparecer después de un tiempo
+    setTimeout(function() {
+      try {
+        mensajeElement.style.opacity = '0';
+        setTimeout(function() {
+          try {
+            if (mensajeElement.parentNode) {
+              mensajeElement.parentNode.removeChild(mensajeElement);
+            }
+          } catch (e) {
+            console.error("Error al eliminar mensaje del DOM:", e);
+          }
+        }, 500);
+      } catch (e) {
+        console.error("Error al desvanecer mensaje:", e);
+      }
+    }, 5000);
+    
+    // Registrar en consola para depuración
+    const niveles = {
+      'error': 'error',
+      'warning': 'warn',
+      'info': 'info',
+      'success': 'log'
+    };
+    
+    const logFn = console[niveles[tipo] || 'log'];
+    logFn.call(console, `[${tipo.toUpperCase()}] ${mensaje}`);
+    
+  } catch (e) {
+    console.error("Error en mostrarMensaje:", e);
+    // Fallback a console.log para asegurar que el mensaje se vea en algún lado
+    console.log(`[${tipo.toUpperCase()}] ${mensaje}`);
+  }
+}
+
+// Función para filtrar la tabla
+function filtrarTabla() {
+  try {
+    console.log("Aplicando filtros a la tabla...");
+    
+    // Validar que tengamos datos para filtrar
+    if (!data || !data.rows || data.rows.length === 0) {
+      console.warn("No hay datos para filtrar");
+      return;
+    }
+    
+    // Guardar la posición actual de scroll
+    const tableContainer = document.querySelector('.table-container');
+    let scrollPosition = 0;
+    if (tableContainer) {
+      scrollPosition = tableContainer.scrollTop;
+    }
+    
+    // Obtener los filtros actuales
+    const filterEstado = document.getElementById('filterEstado');
+    const searchBox = document.getElementById('searchBox');
+    
+    const estadoFiltro = filterEstado ? filterEstado.value : 'todos';
+    const busqueda = searchBox ? searchBox.value.trim().toLowerCase() : '';
+    
+    console.log(`Filtros activos - Estado: "${estadoFiltro}", Búsqueda: "${busqueda}"`);
+    console.log("Estadísticas originales disponibles:", estadisticasOriginales);
+    
+    // Comprobar si no hay filtros activos
+    const sinFiltrosActivos = estadoFiltro === 'todos' && busqueda === '';
+    console.log("¿Sin filtros activos?", sinFiltrosActivos);
+    
+    // Mostrar indicador visual de que el filtro se está aplicando
+    mostrarLoader(true);
+    
+    // Usar setTimeout para permitir que la interfaz se actualice antes del procesamiento intensivo
+    setTimeout(() => {
+      try {
+        // Renderizar tabla con filtros aplicados
+        renderTable(data);
+        
+        // Actualizar estadísticas basadas en los filtros
+        if (sinFiltrosActivos) {
+          console.log("No hay filtros activos, restaurando estadísticas originales:", estadisticasOriginales);
+          
+          // Verificar que tenemos estadísticas originales válidas
+          if (estadisticasOriginales && typeof estadisticasOriginales === 'object' && 
+              'total' in estadisticasOriginales && estadisticasOriginales.total > 0) {
+            
+            // Usar las estadísticas originales (nunca modificadas)
+            console.log("RESTAURANDO estadísticas originales completas:", estadisticasOriginales);
+            actualizarEstadisticas(estadisticasOriginales);
+            marcarEstadisticasComoFiltradas(false);
+          } else {
+            console.warn("Estadísticas originales no válidas, recalculando localmente");
+            calcularEstadisticasLocalmente();
+          }
+        } else {
+          // Calcular y mostrar estadísticas para datos filtrados
+          console.log("Aplicando filtros y calculando estadísticas para datos filtrados");
+          calcularEstadisticasFiltradasYActualizar();
+        }
+        
+        // Restaurar la posición de scroll si se mantuvo
+        if (tableContainer && scrollPosition > 0) {
+          tableContainer.scrollTop = scrollPosition;
+        }
+        
+        // Ajustar altura de la tabla después de filtrar
+        afterDataLoad();
+        
+        mostrarLoader(false);
+      } catch (error) {
+        console.error("Error al aplicar filtros:", error);
+        mostrarMensaje("Error al aplicar filtros: " + error.message, "error");
+        mostrarLoader(false);
+      }
+    }, 50); // Pequeño retraso para mejorar la experiencia de usuario
+    
+  } catch (error) {
+    console.error("Error general en filtrarTabla:", error);
+    mostrarMensaje("Error al filtrar: " + error.message, "error");
+    mostrarLoader(false);
+  }
+}
+
+// Función para calcular estadísticas basadas en los datos filtrados
+function calcularEstadisticasFiltradasYActualizar() {
+  // Verificar que hay datos y una tabla para analizar
+  const tableBody = document.getElementById('tableBody');
+  if (!tableBody || !data || !data.rows) {
+    console.warn("No hay datos o tabla para calcular estadísticas filtradas");
+    return;
+  }
+  
+  // Inicializar contadores para estadísticas de filas visibles
+  const statsFiltradas = {
+    total: 0,
+    preparados: 0,
+    enProceso: 0,
+    entregados: 0
+  };
+  
+  try {
+    // Contar solo las filas visibles en la tabla
+    const filas = tableBody.querySelectorAll('tr:not([style*="display: none"])');
+    statsFiltradas.total = filas.length;
+    
+    console.log(`Contando estadísticas de ${filas.length} filas visibles`);
+    console.log("DOM contenido:", tableBody.innerHTML.substring(0, 100) + "...");
+    
+    // Si no hay filas visibles, mostrar todo en cero
+    if (filas.length === 0) {
+      console.log("No hay filas visibles, mostrando estadísticas en cero");
+      actualizarEstadisticas(statsFiltradas);
+      marcarEstadisticasComoFiltradas(true);
+      return;
+    }
+    
+    // Encontrar el índice de la columna de estado
+    const estadoIndex = data.headers.findIndex(header => 
+      header && header.toString().toUpperCase() === 'ESTADO'
+    );
+    
+    let estadoIdx = estadoIndex;
+    if (estadoIdx === -1) {
+      estadoIdx = data.headers.findIndex(header => 
+        header && header.toString().toUpperCase().includes('ESTADO')
+      );
+    }
+    
+    if (estadoIdx === -1) {
+      estadoIdx = data.headers.length - 1;
+      console.warn("No se encontró columna de estado, usando última columna:", estadoIdx);
+    }
+    
+    console.log("Índice de columna de estado para conteo:", estadoIdx);
+    
+    // Para cada fila visible, analizar su estado
+    filas.forEach((fila, index) => {
+      try {
+        // Obtener el ID de la fila para encontrar sus datos
+        const filaId = fila.getAttribute('data-id');
+        if (!filaId) {
+          console.warn(`Fila ${index} sin data-id`);
+          return;
+        }
+        
+        // Encontrar el índice de la fila en los datos originales
+        const rowIndex = data.rows.findIndex(row => row[0].toString() === filaId);
+        if (rowIndex === -1) {
+          console.warn(`No se encontró fila con ID ${filaId} en datos originales`);
+          return;
+        }
+        
+        // Obtener el estado de esa fila
+        const estado = data.rows[rowIndex][estadoIdx] ? 
+                      data.rows[rowIndex][estadoIdx].toString().trim() : '';
+        
+        // Incrementar contador según el estado
+        if (estado === 'Preparado') {
+          statsFiltradas.preparados++;
+        } else if (estado === 'En proceso') {
+          statsFiltradas.enProceso++;
+        } else if (estado === 'Entregado') {
+          statsFiltradas.entregados++;
+        }
+        
+        // Log para depuración
+        if (index < 5) { // Limitar a las primeras 5 filas para no saturar la consola
+          console.log(`Fila ${index} - ID: ${filaId}, Estado: "${estado}"`);
+        }
+      } catch (err) {
+        console.error("Error al procesar fila individual para estadísticas:", err);
+      }
+    });
+    
+    console.log("Estadísticas calculadas para datos filtrados:", statsFiltradas);
+    
+    // Actualizar estadísticas en la interfaz
+    actualizarEstadisticas(statsFiltradas);
+    
+    // Marcar las estadísticas como filtradas para indicación visual
+    marcarEstadisticasComoFiltradas(true);
+    
+  } catch (error) {
+    console.error("Error al calcular estadísticas filtradas:", error);
+    
+    // En caso de error, restaurar las estadísticas originales
+    if (estadisticasOriginales) {
+      console.log("Restaurando estadísticas originales debido a error:", estadisticasOriginales);
+      actualizarEstadisticas(estadisticasOriginales);
+      marcarEstadisticasComoFiltradas(false);
+    }
+  }
+}
+
+// Función para marcar estadísticas como filtradas (añadir indicador visual)
+function marcarEstadisticasComoFiltradas(estaFiltrado) {
+  try {
+    // Obtener contenedor de estadísticas
+    const statsContainer = document.querySelector('.stats-container');
+    const tooltipElement = document.querySelector('.stats-tooltip');
+    
+    if (statsContainer) {
+      if (estaFiltrado) {
+        // Agregar clase para estilo visual de estadísticas filtradas
+        statsContainer.classList.add('filtered-stats');
+        
+        // Crear tooltip si no existe
+        if (!tooltipElement) {
+          const tooltip = document.createElement('div');
+          tooltip.className = 'stats-tooltip';
+          tooltip.textContent = 'Mostrando estadísticas de los datos filtrados';
+          statsContainer.parentNode.insertBefore(tooltip, statsContainer);
+        }
+      } else {
+        // Quitar clase de estadísticas filtradas
+        statsContainer.classList.remove('filtered-stats');
+        
+        // Eliminar tooltip si existe
+        if (tooltipElement) {
+          tooltipElement.remove();
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error al marcar estadísticas como filtradas:", e);
+  }
+}
+
+// Configurar eventos de filtrado
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    console.log("Configurando eventos de filtrado...");
+    
+    // Agregar evento al select de filtro de estado
+    const filterEstado = document.getElementById('filterEstado');
+    if (filterEstado) {
+      filterEstado.addEventListener('change', function() {
+        console.log("Filtro de estado cambiado:", this.value);
+        
+        // Guardar valor en localStorage para recordarlo entre sesiones
+        try {
+          localStorage.setItem('filtroEstadoPreferido', this.value);
+        } catch (e) {
+          console.warn("No se pudo guardar preferencia de filtro:", e);
+        }
+        
+        // Aplicar filtrado
+        filtrarTabla();
+      });
+      
+      // Restaurar valor previo del filtro si existe
+      try {
+        const filtroGuardado = localStorage.getItem('filtroEstadoPreferido');
+        if (filtroGuardado) {
+          console.log("Restaurando filtro guardado:", filtroGuardado);
+          filterEstado.value = filtroGuardado;
+        }
+      } catch (e) {
+        console.warn("No se pudo restaurar filtro guardado:", e);
+      }
+    }
+    
+    // Agregar evento al campo de búsqueda
+    const searchBox = document.getElementById('searchBox');
+    if (searchBox) {
+      let timeoutId = null;
+      
+      searchBox.addEventListener('input', function() {
+        // Limpiar timeout anterior para evitar múltiples filtrados
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        
+        // Esperar a que el usuario termine de escribir
+        timeoutId = setTimeout(function() {
+          console.log("Búsqueda actualizada:", searchBox.value);
+          filtrarTabla();
+        }, 300);
+      });
+      
+      // Agregar evento para limpiar búsqueda con botón
+      const clearSearchBtn = document.getElementById('clearSearch');
+      if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', function() {
+          console.log("Limpiando búsqueda");
+          searchBox.value = '';
+          filtrarTabla();
+        });
+      }
+    }
+    
+    console.log("Eventos de filtrado configurados correctamente");
+  } catch (e) {
+    console.error("Error al configurar eventos de filtrado:", e);
+  }
+});
+
+// Función para ejecutar diagnóstico
+function ejecutarDiagnostico() {
+  mostrarLoader(true);
+  mostrarMensaje('Ejecutando diagnóstico de la hoja de cálculo...', 'info');
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      console.log("Resultado de diagnóstico:", result);
+      
+      // Crear un mensaje de diagnóstico detallado
+      let mensajeDiagnostico = '📊 Diagnóstico de la hoja de cálculo:\n\n';
+      
+      if (result.error) {
+        mensajeDiagnostico += '❌ Error: ' + result.error + '\n\n';
+      }
+      
+      // Información sobre la hoja de cálculo
+      mensajeDiagnostico += '✓ Acceso a la hoja de cálculo: ' + (result.acceso_spreadsheet ? 'Correcto' : 'Fallido') + '\n';
+      
+      if (result.nombre_spreadsheet) {
+        mensajeDiagnostico += '📝 Nombre de la hoja de cálculo: ' + result.nombre_spreadsheet + '\n';
+      }
+      
+      mensajeDiagnostico += '✓ Hoja "Comandes" existe: ' + (result.hoja_Comandes_existe ? 'Sí' : 'No') + '\n';
+      
+      if (!result.hoja_Comandes_existe && result.todas_hojas) {
+        mensajeDiagnostico += '📋 Hojas disponibles: ' + result.todas_hojas.join(', ') + '\n';
+      }
+      
+      if (result.error_lectura) {
+        mensajeDiagnostico += '❌ Error al leer datos: ' + result.error_lectura + '\n';
+      }
+      
+      if (result.contenido_Comandes) {
+        if (typeof result.contenido_Comandes === 'string') {
+          mensajeDiagnostico += '📋 Contenido: ' + result.contenido_Comandes + '\n';
+        } else {
+          mensajeDiagnostico += '📊 Filas: ' + result.contenido_Comandes.filas + 
+                         ', Columnas: ' + result.contenido_Comandes.columnas + '\n';
+          
+          if (result.contenido_Comandes.muestra && result.contenido_Comandes.muestra.length > 0) {
+            mensajeDiagnostico += '📋 Muestra de datos: ' + JSON.stringify(result.contenido_Comandes.muestra).slice(0, 200) + '...\n';
+          }
+        }
+      }
+      
+      // Recomendar acciones
+      mensajeDiagnostico += '\n🛠️ Acciones recomendadas:\n';
+      
+      if (!result.acceso_spreadsheet) {
+        mensajeDiagnostico += '- Verificar permisos de acceso a la hoja de cálculo\n';
+        mensajeDiagnostico += '- Confirmar que el ID de la hoja es correcto\n';
+      } else if (!result.hoja_Comandes_existe) {
+        mensajeDiagnostico += '- La hoja "Comandes" no existe, intente hacer clic en "Sincronizar" para crearla automáticamente\n';
+      } else if (result.contenido_Comandes === "Hoja vacía" || 
+                (result.contenido_Comandes.filas === 1 && result.contenido_Comandes.muestra)) {
+        mensajeDiagnostico += '- La hoja existe pero está vacía o solo tiene encabezados\n';
+        mensajeDiagnostico += '- Intente hacer clic en "Sincronizar" para importar datos del formulario\n';
+      }
+      
+      // Mostrar resultado en un diálogo
+      mostrarDialogoDiagnostico(mensajeDiagnostico);
+      mostrarLoader(false);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error ejecutando diagnóstico:', error);
+      mostrarMensaje('Error al ejecutar diagnóstico: ' + error, 'error');
+      mostrarLoader(false);
+    })
+    .diagnosticarHojaCalculo();
+}
+
+// Función para mostrar diálogo de diagnóstico
+function mostrarDialogoDiagnostico(mensaje) {
+  // Primero, eliminar cualquier diálogo existente
+  const dialogoExistente = document.getElementById('diagnosticoDialog');
+  if (dialogoExistente) {
+    document.body.removeChild(dialogoExistente);
+  }
+  
+  // Crear el diálogo
+  const dialogo = document.createElement('div');
+  dialogo.id = 'diagnosticoDialog';
+  dialogo.className = 'diagnostic-dialog';
+  
+  // Crear el contenido
+  const contenido = document.createElement('div');
+  contenido.className = 'diagnostic-content';
+  
+  // Título
+  const titulo = document.createElement('h3');
+  titulo.textContent = 'Diagnóstico de la Aplicación';
+  contenido.appendChild(titulo);
+  
+  // Mensaje
+  const mensajeElement = document.createElement('pre');
+  mensajeElement.textContent = mensaje;
+  mensajeElement.className = 'diagnostic-message';
+  contenido.appendChild(mensajeElement);
+  
+  // Botón para cerrar
+  const cerrarBtn = document.createElement('button');
+  cerrarBtn.textContent = 'Cerrar';
+  cerrarBtn.className = 'btn';
+  cerrarBtn.onclick = function() {
+    document.body.removeChild(dialogo);
+  };
+  contenido.appendChild(cerrarBtn);
+  
+  // Botón para forzar sincronización
+  const sincronizarBtn = document.createElement('button');
+  sincronizarBtn.textContent = 'Forzar Sincronización';
+  sincronizarBtn.className = 'btn primary';
+  sincronizarBtn.onclick = function() {
+    document.body.removeChild(dialogo);
+    sincronizarEntradas();
+  };
+  contenido.appendChild(sincronizarBtn);
+  
+  // Agregar contenido al diálogo
+  dialogo.appendChild(contenido);
+  
+  // Mostrar el diálogo
+  document.body.appendChild(dialogo);
+}
+
+// Añadir esto después de la función loadData
+function addDiagnosticStyles() {
+  // Si ya existe el estilo, no hacer nada
+  if (document.getElementById('diagnosticStyles')) return;
+  
+  const styleElement = document.createElement('style');
+  styleElement.id = 'diagnosticStyles';
+  styleElement.textContent = `
+    .diagnostic-dialog {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .diagnostic-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 5px;
+      max-width: 80%;
+      max-height: 80%;
+      overflow: auto;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+    
+    .diagnostic-message {
+      white-space: pre-wrap;
+      background-color: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      margin: 10px 0;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    
+    .btn.diagnostic {
+      background-color: #6c757d;
+      color: white;
+    }
+    
+    .btn.diagnostic:hover {
+      background-color: #5a6268;
+    }
+  `;
+  
+  document.head.appendChild(styleElement);
+}
+
+// Llamar a la función para agregar los estilos
+addDiagnosticStyles();
+
+// Inicialización para el dashboard - agregado al final de window.onload
+function initDashboard() {
+  console.log("Inicializando dashboard...");
+  
+  // Asegurarse de que los elementos existen antes de continuar
+  const btnDashboard = document.getElementById('btnDashboard');
+  const btnCerrarDashboard = document.getElementById('cerrarDashboard');
+  const btnRefreshDashboard = document.getElementById('refreshDashboard');
+  const dashboardContainer = document.getElementById('dashboardContainer');
+  
+  if (!dashboardContainer) {
+    console.error("Error: No se encontró el contenedor del dashboard");
+    return;
+  }
+  
+  // Mostrar información de depuración
+  console.log("Estado inicial del dashboard:", {
+    btnDashboard: btnDashboard ? "encontrado" : "no encontrado",
+    btnCerrarDashboard: btnCerrarDashboard ? "encontrado" : "no encontrado",
+    btnRefreshDashboard: btnRefreshDashboard ? "encontrado" : "no encontrado"
+  });
+  
+  // Inicializar botón principal si existe
+  if (btnDashboard) {
+    console.log("Configurando evento click para btnDashboard");
+    // Primero eliminar cualquier listener previo para evitar duplicados
+    btnDashboard.removeEventListener('click', toggleDashboard);
+    // Añadir un log para saber cuándo se ha hecho clic
+    btnDashboard.onclick = function(e) {
+      console.log("[DEBUG] Botón dashboard onclick ejecutado", new Date().toISOString());
+      e.preventDefault();
+      e.stopPropagation();
+      toggleDashboard();
+      return false;
+    };
+    console.log("Evento onclick asignado a btnDashboard");
+  } else {
+    console.error("Error: No se encontró el botón btnDashboard");
+  }
+  
+  // Inicializar botón de cierre si existe
+  if (btnCerrarDashboard) {
+    console.log("Configurando evento click para btnCerrarDashboard");
+    // Primero eliminar cualquier listener previo
+    btnCerrarDashboard.removeEventListener('click', toggleDashboard);
+    // Luego añadir el nuevo listener
+    btnCerrarDashboard.addEventListener('click', function(e) {
+      console.log("Botón cerrar dashboard clickeado");
+      e.preventDefault();
+      toggleDashboard();
+    });
+  } else {
+    console.error("Error: No se encontró el botón cerrarDashboard");
+  }
+  
+  // Inicializar botón de refresco si existe
+  if (btnRefreshDashboard) {
+    console.log("Configurando evento click para btnRefreshDashboard");
+    btnRefreshDashboard.addEventListener('click', function(e) {
+      console.log("Botón refrescar dashboard clickeado");
+      e.preventDefault();
+      refrescarDashboard();
+    });
+  }
+  
+  // Inicializar los filtros del dashboard
+  try {
+    console.log("Inicializando filtros del dashboard");
+    initDashboardFilters();
+  } catch (error) {
+    console.error("Error al inicializar filtros del dashboard:", error);
+  }
+  
+  console.log("Inicialización del dashboard completada");
+}
+
+// Inicializar los filtros del dashboard
+function initDashboardFilters() {
+  try {
+    const filtroFechaInicio = document.getElementById('filtroFechaInicio');
+    const filtroFechaFin = document.getElementById('filtroFechaFin');
+    const filtroEscuela = document.getElementById('filtroEscuelaDashboard');
+    const filtroMonitor = document.getElementById('filtroMonitorDashboard');
+    
+    console.log("Verificando filtros del dashboard:", {
+      filtroFechaInicio: filtroFechaInicio ? "encontrado" : "no encontrado",
+      filtroFechaFin: filtroFechaFin ? "encontrado" : "no encontrado",
+      filtroEscuela: filtroEscuela ? "encontrado" : "no encontrado",
+      filtroMonitor: filtroMonitor ? "encontrado" : "no encontrado"
+    });
+    
+    // Validar que todos los elementos existen
+    if (!filtroFechaInicio || !filtroFechaFin || !filtroEscuela || !filtroMonitor) {
+      console.error("Error: No se encontraron todos los elementos de filtro necesarios");
+      return;
+    }
+    
+    // Asignar fecha actual como fin
+    const hoy = new Date();
+    const fechaFin = hoy.toISOString().split('T')[0];
+    filtroFechaFin.value = fechaFin;
+    
+    // Asignar fecha de 6 meses atrás como inicio
+    const seisMesesAtras = new Date();
+    seisMesesAtras.setMonth(hoy.getMonth() - 6);
+    const fechaInicio = seisMesesAtras.toISOString().split('T')[0];
+    filtroFechaInicio.value = fechaInicio;
+    
+    console.log("Fechas de filtro establecidas:", {
+      inicio: fechaInicio,
+      fin: fechaFin
+    });
+    
+    // Agregar event listeners para los filtros con manejo de errores
+    const agregarEventListener = (elemento, tipo, funcion) => {
+      try {
+        // Primero eliminar posibles eventos anteriores
+        elemento.removeEventListener(tipo, funcion);
+        // Luego añadir el nuevo
+        elemento.addEventListener(tipo, funcion);
+        console.log(`Evento ${tipo} añadido correctamente a ${elemento.id}`);
+      } catch (error) {
+        console.error(`Error al añadir evento ${tipo} a ${elemento.id}:`, error);
+      }
+    };
+    
+    agregarEventListener(filtroFechaInicio, 'change', aplicarFiltrosDashboard);
+    agregarEventListener(filtroFechaFin, 'change', aplicarFiltrosDashboard);
+    agregarEventListener(filtroEscuela, 'change', aplicarFiltrosDashboard);
+    agregarEventListener(filtroMonitor, 'change', aplicarFiltrosDashboard);
+    
+    // Verificar que el botón de refrescar existe
+    const btnRefresh = document.getElementById('refreshDashboard');
+    if (btnRefresh) {
+      agregarEventListener(btnRefresh, 'click', refrescarDashboard);
+    } else {
+      console.error("Error: No se encontró el botón refreshDashboard");
+    }
+    
+    console.log("Filtros del dashboard inicializados correctamente");
+  } catch (error) {
+    console.error("Error en initDashboardFilters:", error);
+  }
+}
+
+// Función para aplicar filtros al dashboard
+function aplicarFiltrosDashboard() {
+  mostrarLoadingEnDashboard();
+  
+  if (!dashboardData) {
+    cargarDatosDashboard();
+    return;
+  }
+  
+  const filtroFechaInicio = document.getElementById('filtroFechaInicio').value;
+  const filtroFechaFin = document.getElementById('filtroFechaFin').value;
+  const filtroEscuela = document.getElementById('filtroEscuelaDashboard').value;
+  const filtroMonitor = document.getElementById('filtroMonitorDashboard').value;
+  
+  // Filtrar datos según criterios
+  // Nota: Esta es una simulación de filtrado. En una implementación real,
+  // podríamos volver a llamar al servidor con los filtros o filtrar los datos ya cargados.
+  setTimeout(() => {
+    // Renderizar los datos filtrados (en una implementación real, filtrarías los datos)
+    renderizarDatosDashboard(dashboardData);
+    ocultarLoadingEnDashboard();
+  }, 500);
+}
+
+// Función para refrescar los datos del dashboard
+function refrescarDashboard() {
+  dashboardCargado = false;
+  generarAnalisisDashboard();
+}
+
+// Función para mostrar u ocultar el dashboard
+function toggleDashboard() {
+  console.log("Ejecutando toggleDashboard...");
+  const overlay = document.getElementById('dashboardOverlay');
+  
+  if (!overlay) {
+    console.error("Elemento dashboardOverlay no encontrado");
+    mostrarMensaje("Error: No se pudo mostrar el dashboard. Contacte al administrador.", "error");
+    return;
+  }
+  
+  console.log("Estado actual del dashboardOverlay:", {
+    display: overlay.style.display,
+    opacity: window.getComputedStyle(overlay).opacity,
+    visibility: window.getComputedStyle(overlay).visibility,
+    className: overlay.className
+  });
+  
+  const dashboardModal = document.getElementById('dashboardModal');
+  if (!dashboardModal) {
+    console.error("Elemento dashboardModal no encontrado");
+    mostrarMensaje("Error: No se pudo mostrar el contenido del dashboard. Contacte al administrador.", "error");
+    return;
+  }
+  
+  const currentDisplay = overlay.style.display;
+  
+  if (currentDisplay === 'none' || currentDisplay === '') {
+    console.log("Mostrando dashboard...");
+    
+    // FORZAR ESTILO DIRECTO para mostrar el overlay
+    overlay.style.opacity = '0';
+    overlay.style.display = 'flex';
+    overlay.style.visibility = 'visible';
+    
+    // Forzar reflow para que los estilos se apliquen antes de la transición
+    void overlay.offsetWidth;
+    
+    // Dar tiempo para que se aplique el display antes de añadir la transición
+    overlay.style.opacity = '1';
+    overlay.classList.add('visible');
+    
+    console.log("Estilos aplicados al dashboard:", {
+      display: overlay.style.display,
+      opacity: overlay.style.opacity,
+      visibility: overlay.style.visibility,
+      className: overlay.className
+    });
+    
+    // Inicializar fechas por defecto si están vacías
+    const fechaInicio = document.getElementById('dashboard-fecha-inicio');
+    const fechaFin = document.getElementById('dashboard-fecha-fin');
+    
+    if (fechaInicio && !fechaInicio.value) {
+      // Establecer fecha de inicio al primer día del mes anterior
+      const today = new Date();
+      const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      fechaInicio.value = lastMonth.toISOString().split('T')[0];
+    }
+    
+    if (fechaFin && !fechaFin.value) {
+      // Establecer fecha de fin a hoy
+      const today = new Date();
+      fechaFin.value = today.toISOString().split('T')[0];
+    }
+    
+    try {
+      // Actualizar filtros disponibles
+      actualizarFiltrosDashboard();
+      
+      // Configurar eventos del panel de análisis
+      configurarEventosDashboard();
+    } catch (error) {
+      console.error("Error al inicializar el dashboard:", error);
+      mostrarMensaje("Error al inicializar el dashboard: " + error.message, "error");
+    }
+  } else {
+    console.log("Ocultando dashboard...");
+    
+    // Ocultar el dashboard
+    overlay.classList.remove('visible');
+    overlay.style.opacity = '0';
+    
+    // Esperar a que termine la transición antes de ocultar
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      overlay.style.visibility = 'hidden';
+      console.log("Dashboard completamente oculto");
+    }, 300);
+  }
+}
+
+// Configurar eventos del dashboard
+function configurarEventosDashboard() {
+  // Botón de generar análisis
+  const btnGenerar = document.getElementById('btn-generar-analisis');
+  if (btnGenerar) {
+    btnGenerar.onclick = generarAnalisisDashboard;
+  }
+  
+  // Botón de exportar
+  const btnExportar = document.getElementById('btn-exportar');
+  if (btnExportar) {
+    btnExportar.onclick = exportarResultados;
+  }
+  
+  // Cambio en tipo de gráfico
+  const tipoGrafico = document.getElementById('tipo-grafico');
+  if (tipoGrafico) {
+    tipoGrafico.onchange = function() {
+      const resultados = window.ultimosResultadosAnalisis;
+      if (resultados) {
+        renderizarResultados(resultados, this.value);
+      }
+    };
+  }
+}
+
+// Función principal para generar análisis personalizado
+function generarAnalisisDashboard() {
+  console.log("Generando análisis personalizado...");
+  
+  // Mostrar indicador de carga
+  const loadingIndicator = document.getElementById('dashboard-loading');
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'flex';
+  } else {
+    console.warn("Elemento 'dashboard-loading' no encontrado");
+  }
+  
+  try {
+    // Verificar existencia de elementos necesarios
+    const campoAgrupacion = document.getElementById('campo-agrupacion');
+    const tipoValor = document.getElementById('tipo-valor');
+    const tipoGrafico = document.getElementById('tipo-grafico');
+    const fechaInicio = document.getElementById('dashboard-fecha-inicio');
+    const fechaFin = document.getElementById('dashboard-fecha-fin');
+    
+    console.log("Estado de elementos de configuración:", {
+      campoAgrupacion: campoAgrupacion ? "encontrado" : "no encontrado",
+      tipoValor: tipoValor ? "encontrado" : "no encontrado",
+      tipoGrafico: tipoGrafico ? "encontrado" : "no encontrado",
+      fechaInicio: fechaInicio ? "encontrado" : "no encontrado",
+      fechaFin: fechaFin ? "encontrado" : "no encontrado"
+    });
+    
+    // Obtener la configuración y filtros seleccionados
+    const configuracion = {
+      // Campos para agrupar y calcular
+      agruparPor: campoAgrupacion ? campoAgrupacion.value : 'nombre',
+      tipoValor: tipoValor ? tipoValor.value : 'conteo',
+      tipoGrafico: tipoGrafico ? tipoGrafico.value : 'bar',
+      
+      // Filtros
+      filtros: {
+        fechaInicio: fechaInicio ? fechaInicio.value : null,
+        fechaFin: fechaFin ? fechaFin.value : null,
+        escuela: document.getElementById('dashboard-filter-escuela')?.value || null,
+        monitor: document.getElementById('dashboard-filter-monitor')?.value || null,
+        material: document.getElementById('dashboard-filter-material')?.value || null,
+        actividad: document.getElementById('dashboard-filter-actividad')?.value || null
+      }
+    };
+    
+    console.log("Configuración de análisis:", configuracion);
+    
+    // Llamar al servidor con la configuración actual
+    google.script.run
+      .withSuccessHandler(function(result) {
+        // Ocultar indicador de carga
+        if (loadingIndicator) {
+          loadingIndicator.style.display = 'none';
+        }
+        
+        if (result && result.success) {
+          console.log("Datos recibidos para análisis:", result);
+          
+          try {
+            // Actualizar el resumen general
+            actualizarResumenDashboard(result.data);
+            
+            // Procesar los datos según configuración
+            const datosAgrupados = procesarDatosSegunConfiguracion(result.data, configuracion);
+            
+            // Guardar para referencia (cambio de gráfico, etc.)
+            window.datosResultados = datosAgrupados;
+            
+            // Renderizar resultados
+            renderizarResultados(datosAgrupados, configuracion.tipoGrafico);
+          } catch (error) {
+            console.error("Error al procesar o renderizar resultados:", error);
+            mostrarMensaje("Error al procesar resultados: " + error.message, "error");
+          }
+          
+        } else {
+          console.error("Error o sin datos:", result);
+          const mensajeError = result && result.message ? result.message : "No hay datos disponibles para el análisis solicitado";
+          mostrarMensajeNoData(mensajeError);
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error("Error al generar análisis:", error);
+        
+        // Ocultar indicador de carga
+        if (loadingIndicator) {
+          loadingIndicator.style.display = 'none';
+        }
+        
+        // Mostrar mensaje de error
+        mostrarMensaje("Error al generar análisis: " + error, "error");
+      })
+      .obtenerEstadisticasDashboard(configuracion.filtros);
+  } catch (error) {
+    console.error("Error en generarAnalisisDashboard:", error);
+    mostrarMensaje("Error al configurar el análisis: " + error.message, "error");
+    
+    if (loadingIndicator) {
+      loadingIndicator.style.display = 'none';
+    }
+  }
+}
+
+// Obtener la configuración del análisis a partir de los controles
+function obtenerConfiguracionAnalisis() {
+  return {
+    // Campos para agrupar y calcular
+    campoAgrupacion: document.getElementById('campo-agrupacion')?.value || 'nombre',
+    tipoValor: document.getElementById('tipo-valor')?.value || 'conteo',
+    tipoGrafico: document.getElementById('tipo-grafico')?.value || 'bar',
+    
+    // Filtros
+    filtros: {
+      fechaInicio: document.getElementById('dashboard-fecha-inicio')?.value || null,
+      fechaFin: document.getElementById('dashboard-fecha-fin')?.value || null,
+      escuela: document.getElementById('dashboard-filter-escuela')?.value || null,
+      monitor: document.getElementById('dashboard-filter-monitor')?.value || null,
+      material: document.getElementById('dashboard-filter-material')?.value || null,
+      actividad: document.getElementById('dashboard-filter-actividad')?.value || null
+    }
+  };
+}
+
+/**
+ * Procesa los datos según la configuración seleccionada por el usuario
+ */
+function procesarDatosSegunConfiguracion(datos, configuracion) {
+  console.log("Procesando datos según configuración:", configuracion);
+  
+  // Inicializar objeto de resultados
+  const datosAgrupados = {
+    labels: [],
+    values: [],
+    title: "",
+    data: []
+  };
+  
+  // Determinar qué campo usar para agrupar según la configuración
+  switch (configuracion.agruparPor) {
+    case 'nombre':
+      if (datos.monitorasPorFrecuencia) {
+        datosAgrupados.title = "Análisis por Monitor";
+        Object.entries(datos.monitorasPorFrecuencia).forEach(([nombre, cantidad]) => {
+          datosAgrupados.data.push({ label: nombre, value: cantidad });
+        });
+      }
+      break;
+      
+    case 'escuela':
+      if (datos.escuelasPorFrecuencia) {
+        datosAgrupados.title = "Análisis por Escuela";
+        Object.entries(datos.escuelasPorFrecuencia).forEach(([escuela, cantidad]) => {
+          datosAgrupados.data.push({ label: escuela, value: cantidad });
+        });
+      }
+      break;
+      
+    case 'material':
+      if (datos.materialesPorFrecuencia) {
+        datosAgrupados.title = "Análisis por Material";
+        Object.entries(datos.materialesPorFrecuencia).forEach(([material, cantidad]) => {
+          datosAgrupados.data.push({ label: material, value: cantidad });
+        });
+      }
+      break;
+      
+    case 'actividad':
+      if (datos.actividadesPorFrecuencia) {
+        datosAgrupados.title = "Análisis por Actividad";
+        Object.entries(datos.actividadesPorFrecuencia).forEach(([actividad, cantidad]) => {
+          datosAgrupados.data.push({ label: actividad, value: cantidad });
+        });
+      }
+      break;
+      
+    default:
+      datosAgrupados.title = "Análisis General";
+      break;
+  }
+  
+  // Ordenar por valor (de mayor a menor)
+  datosAgrupados.data.sort((a, b) => b.value - a.value);
+  
+  // Limitar a los primeros N resultados si hay muchos
+  if (datosAgrupados.data.length > 20) {
+    datosAgrupados.data = datosAgrupados.data.slice(0, 20);
+  }
+  
+  // Preparar arrays para gráficos
+  datosAgrupados.labels = datosAgrupados.data.map(item => item.label);
+  datosAgrupados.values = datosAgrupados.data.map(item => item.value);
+  
+  return datosAgrupados;
+}
+
+/**
+ * Renderiza los resultados según el tipo de visualización seleccionado
+ */
+function renderizarResultados(datos, tipoGrafico) {
+  console.log("Renderizando resultados:", datos, "Tipo:", tipoGrafico);
+  
+  try {
+    // Verificar si tenemos datos válidos
+    if (!datos || !datos.labels || !datos.values || datos.labels.length === 0) {
+      console.error("Datos inválidos para renderizar:", datos);
+      mostrarMensajeNoData("No hay datos disponibles para mostrar");
+      return;
+    }
+    
+    // Actualizar título del análisis
+    const tituloAnalisis = document.getElementById("titulo-analisis");
+    if (tituloAnalisis) {
+      tituloAnalisis.textContent = datos.title || "Resultados del Análisis";
+    } else {
+      console.warn("Elemento 'titulo-analisis' no encontrado");
+    }
+    
+    // Obtener contenedor de gráficos
+    const chartContainer = document.getElementById("grafico-container");
+    if (!chartContainer) {
+      console.error("Contenedor de gráficos no encontrado (grafico-container)");
+      mostrarMensaje("Error: No se puede mostrar el gráfico. Elemento contenedor no encontrado.", "error");
+      return;
+    }
+    
+    // Limpiar contenedor antes de añadir nuevo contenido
+    chartContainer.innerHTML = '';
+    
+    // Manejar tabla de manera especial
+    if (tipoGrafico === 'table') {
+      renderizarTablaResultados(datos);
+      return;
+    }
+    
+    // Crear canvas para el gráfico
+    const canvas = document.createElement('canvas');
+    canvas.id = 'analisisChart';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    chartContainer.appendChild(canvas);
+    
+    // Verificar que Chart.js está disponible
+    if (typeof Chart === 'undefined') {
+      console.error("Chart.js no está disponible");
+      chartContainer.innerHTML = '<div class="error-chart">Error: La biblioteca de gráficos no está disponible</div>';
+      return;
+    }
+    
+    // Opciones comunes para todos los gráficos
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+        },
+        title: {
+          display: true,
+          text: datos.title
+        }
+      }
+    };
+    
+    // Paleta de colores para los gráficos
+    const colors = [
+      'rgba(54, 162, 235, 0.7)',
+      'rgba(255, 99, 132, 0.7)',
+      'rgba(255, 206, 86, 0.7)',
+      'rgba(75, 192, 192, 0.7)',
+      'rgba(153, 102, 255, 0.7)',
+      'rgba(255, 159, 64, 0.7)',
+      'rgba(199, 199, 199, 0.7)',
+      'rgba(83, 102, 255, 0.7)',
+      'rgba(40, 167, 69, 0.7)',
+      'rgba(220, 53, 69, 0.7)'
+    ];
+    
+    // Declarar variable para el gráfico
+    let chart;
+    
+    // Crear el gráfico según el tipo seleccionado
+    try {
+      switch (tipoGrafico) {
+        case 'bar':
+          chart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+              labels: datos.labels,
+              datasets: [{
+                label: 'Cantidad',
+                data: datos.values,
+                backgroundColor: datos.labels.map((_, i) => colors[i % colors.length]),
+                borderWidth: 1
+              }]
+            },
+            options: {
+              ...options,
+              scales: {
+                y: {
+                  beginAtZero: true
+                }
+              }
+            }
+          });
+          break;
+          
+        case 'line':
+          chart = new Chart(canvas, {
+            type: 'line',
+            data: {
+              labels: datos.labels,
+              datasets: [{
+                label: 'Cantidad',
+                data: datos.values,
+                fill: false,
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+              }]
+            },
+            options: {
+              ...options,
+              scales: {
+                y: {
+                  beginAtZero: true
+                }
+              }
+            }
+          });
+          break;
+          
+        case 'pie':
+          chart = new Chart(canvas, {
+            type: 'pie',
+            data: {
+              labels: datos.labels,
+              datasets: [{
+                label: 'Cantidad',
+                data: datos.values,
+                backgroundColor: datos.labels.map((_, i) => colors[i % colors.length]),
+                hoverOffset: 4
+              }]
+            },
+            options: options
+          });
+          break;
+          
+        default:
+          console.error("Tipo de gráfico no reconocido:", tipoGrafico);
+          chartContainer.innerHTML = `<div class="error-chart">Error: Tipo de gráfico '${tipoGrafico}' no soportado</div>`;
+          break;
+      }
+    } catch (error) {
+      console.error("Error al crear el gráfico:", error);
+      chartContainer.innerHTML = `<div class="error-chart">Error al crear el gráfico: ${error.message}</div>`;
+    }
+  } catch (error) {
+    console.error("Error general en renderizarResultados:", error);
+    mostrarMensaje("Error al mostrar los resultados: " + error.message, "error");
+  }
+}
+
+/**
+ * Renderiza los resultados en formato tabla
+ */
+function renderizarTablaResultados(datos) {
+  const chartContainer = document.getElementById("grafico-container");
+  if (!chartContainer) {
+    console.error("Contenedor de gráficos no encontrado");
+    return;
+  }
+  
+  // Calcular total para porcentajes
+  const total = datos.values.reduce((sum, val) => sum + val, 0);
+  
+  // Crear tabla HTML
+  let tableHtml = `
+    <table class="table table-striped table-hover">
+      <thead>
+        <tr>
+          <th>${obtenerNombreColumna(datos.title)}</th>
+          <th>Cantidad</th>
+          <th>Porcentaje</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  
+  // Añadir filas con datos
+  for (let i = 0; i < datos.data.length; i++) {
+    const item = datos.data[i];
+    const porcentaje = total > 0 ? ((item.value / total) * 100).toFixed(2) : "0";
+    
+    tableHtml += `
+      <tr>
+        <td>${item.label}</td>
+        <td>${item.value}</td>
+        <td>${porcentaje}%</td>
+      </tr>
+    `;
+  }
+  
+  // Añadir fila de totales
+  tableHtml += `
+      <tr class="table-info">
+        <td><strong>TOTAL</strong></td>
+        <td><strong>${total}</strong></td>
+        <td><strong>100%</strong></td>
+      </tr>
+    </tbody>
+  </table>
+  `;
+  
+  // Agregar tabla al contenedor
+  chartContainer.innerHTML = tableHtml;
+}
+
+/**
+ * Determina el nombre apropiado para la columna basado en el título
+ */
+function obtenerNombreColumna(titulo) {
+  if (titulo.includes("Monitor")) return "Monitor";
+  if (titulo.includes("Escuela")) return "Escuela";
+  if (titulo.includes("Material")) return "Material";
+  if (titulo.includes("Actividad")) return "Actividad";
+  return "Categoría";
+}
+
+// Función para exportar resultados
+function exportarResultados() {
+  console.log("Exportando resultados...");
+  // Verificar si hay resultados para exportar
+  if (!window.datosResultados || !window.datosResultados.labels || window.datosResultados.labels.length === 0) {
+    mostrarMensaje("No hay resultados para exportar", "error");
+    return;
+  }
+  
+  // Preparar datos para CSV
+  let csvContent = "Categoría,Valor,Porcentaje\n";
+  
+  const total = window.datosResultados.values.reduce((sum, val) => sum + val, 0);
+  
+  // Añadir cada fila
+  for (let i = 0; i < window.datosResultados.labels.length; i++) {
+    const porcentaje = ((window.datosResultados.values[i] / total) * 100).toFixed(2) + "%";
+    csvContent += `"${window.datosResultados.labels[i]}",${window.datosResultados.values[i]},"${porcentaje}"\n`;
+  }
+  
+  // Crear enlace de descarga
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", "resultados_analisis.csv");
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Muestra un mensaje cuando no hay datos disponibles en el dashboard
+ */
+function mostrarMensajeNoData(mensaje) {
+  const chartContainer = document.getElementById("grafico-container");
+  if (chartContainer) {
+    chartContainer.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-chart-pie fa-4x"></i>
+        <p>${mensaje || "No hay datos disponibles para mostrar"}</p>
+      </div>
+    `;
+  }
+  
+  // Ocultar botón de exportar
+  const btnExportar = document.getElementById("btn-exportar");
+  if (btnExportar) {
+    btnExportar.style.display = "none";
+  }
+}
+
+// Función para actualizar el resumen del dashboard
+function actualizarResumenDashboard(datos) {
+  console.log("Actualizando resumen del dashboard:", datos);
+  
+  // Actualizar contadores
+  document.getElementById('total-pedidos').textContent = datos.filasFiltradas || '0';
+  document.getElementById('total-unidades').textContent = datos.totalUnidades || '0';
+  document.getElementById('total-monitores').textContent = Object.keys(datos.monitorasPorFrecuencia || {}).length || '0';
+  document.getElementById('total-escuelas').textContent = Object.keys(datos.escuelasPorFrecuencia || {}).length || '0';
+}
+
+// Función para actualizar los filtros del dashboard
+function actualizarFiltrosDashboard() {
+  console.log("Actualizando filtros del dashboard...");
+  
+  // Mostrar indicador de carga
+  const loadingIndicator = document.getElementById("dashboard-loading");
+  if (loadingIndicator) {
+    loadingIndicator.style.display = "block";
+  } else {
+    console.warn("Elemento dashboard-loading no encontrado");
+  }
+  
+  // Verificar si los selectores existen antes de intentar cargar datos
+  const escuelasSelect = document.getElementById("dashboard-filter-escuela");
+  const monitoresSelect = document.getElementById("dashboard-filter-monitor");
+  const materialesSelect = document.getElementById("dashboard-filter-material");
+  const actividadesSelect = document.getElementById("dashboard-filter-actividad");
+  
+  console.log("Estado de los selectores de filtro:", {
+    escuelasSelect: escuelasSelect ? "encontrado" : "no encontrado",
+    monitoresSelect: monitoresSelect ? "encontrado" : "no encontrado",
+    materialesSelect: materialesSelect ? "encontrado" : "no encontrado",
+    actividadesSelect: actividadesSelect ? "encontrado" : "no encontrado"
+  });
+  
+  // Si ninguno de los elementos existe, salir de la función y mostrar error
+  if (!escuelasSelect && !monitoresSelect && !materialesSelect && !actividadesSelect) {
+    console.error("No se encontraron elementos de filtro en el DOM");
+    if (loadingIndicator) loadingIndicator.style.display = "none";
+    mostrarMensaje("Error: No se pudieron cargar los filtros del dashboard.", "error");
+    return;
+  }
+  
+  // Cargar datos para popular selectores
+  google.script.run
+    .withSuccessHandler(function(response) {
+      if (response && response.success && response.data) {
+        console.log("Datos recibidos para filtros:", response.data);
+        
+        // Actualizar selector de escuelas
+        if (escuelasSelect) {
+          try {
+            // Limpiar opciones existentes pero mantener la primera (Todas)
+            while (escuelasSelect.options.length > 1) {
+              escuelasSelect.remove(1);
+            }
+            
+            // Obtener escuelas únicas
+            const escuelas = Object.keys(response.data.escuelasPorFrecuencia || {}).sort();
+            escuelas.forEach(escuela => {
+              if (escuela && escuela.trim() !== "") {
+                const option = document.createElement("option");
+                option.value = escuela;
+                option.text = escuela;
+                escuelasSelect.add(option);
+              }
+            });
+          } catch (error) {
+            console.error("Error al actualizar escuelas:", error);
+          }
+        } else {
+          console.warn("Selector de escuelas no encontrado (dashboard-filter-escuela)");
+        }
+        
+        // Actualizar selector de monitores
+        if (monitoresSelect) {
+          try {
+            // Limpiar opciones existentes pero mantener la primera (Todos)
+            while (monitoresSelect.options.length > 1) {
+              monitoresSelect.remove(1);
+            }
+            
+            // Obtener monitores únicos
+            const monitores = Object.keys(response.data.monitorasPorFrecuencia || {}).sort();
+            monitores.forEach(monitor => {
+              if (monitor && monitor.trim() !== "") {
+                const option = document.createElement("option");
+                option.value = monitor;
+                option.text = monitor;
+                monitoresSelect.add(option);
+              }
+            });
+          } catch (error) {
+            console.error("Error al actualizar monitores:", error);
+          }
+        } else {
+          console.warn("Selector de monitores no encontrado (dashboard-filter-monitor)");
+        }
+        
+        // Actualizar selector de materiales
+        if (materialesSelect) {
+          try {
+            // Limpiar opciones existentes pero mantener la primera (Todos)
+            while (materialesSelect.options.length > 1) {
+              materialesSelect.remove(1);
+            }
+            
+            // Obtener materiales únicos
+            const materiales = Object.keys(response.data.materialesPorFrecuencia || {}).sort();
+            materiales.forEach(material => {
+              if (material && material.trim() !== "") {
+                const option = document.createElement("option");
+                option.value = material;
+                option.text = material;
+                materialesSelect.add(option);
+              }
+            });
+          } catch (error) {
+            console.error("Error al actualizar materiales:", error);
+          }
+        } else {
+          console.warn("Selector de materiales no encontrado (dashboard-filter-material)");
+        }
+        
+        // Actualizar selector de actividades
+        if (actividadesSelect) {
+          try {
+            // Limpiar opciones existentes pero mantener la primera (Todas)
+            while (actividadesSelect.options.length > 1) {
+              actividadesSelect.remove(1);
+            }
+            
+            // Obtener actividades únicas
+            const actividades = Object.keys(response.data.actividadesPorFrecuencia || {}).sort();
+            actividades.forEach(actividad => {
+              if (actividad && actividad.trim() !== "") {
+                const option = document.createElement("option");
+                option.value = actividad;
+                option.text = actividad;
+                actividadesSelect.add(option);
+              }
+            });
+          } catch (error) {
+            console.error("Error al actualizar actividades:", error);
+          }
+        } else {
+          console.warn("Selector de actividades no encontrado (dashboard-filter-actividad)");
+        }
+        
+        // Ocultar indicador de carga
+        if (loadingIndicator) {
+          loadingIndicator.style.display = "none";
+        }
+      } else {
+        console.error("Error al cargar filtros:", response ? response.message : "Respuesta vacía");
+        mostrarMensaje("Error al cargar filtros: " + (response ? response.message : "Sin datos"), "error");
+        if (loadingIndicator) {
+          loadingIndicator.style.display = "none";
+        }
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error("Error al cargar filtros:", error);
+      mostrarMensaje("Error al cargar filtros: " + error, "error");
+      if (loadingIndicator) {
+        loadingIndicator.style.display = "none";
+      }
+    })
+    .obtenerEstadisticasDashboard({});
+}
+
+// Función para mostrar indicadores de carga en todos los paneles
+function mostrarLoadingEnDashboard() {
+  const elementos = [
+    'monitorasChart', 'materialesChart', 'escuelasChart',
+    'tendenciaChart', 'topUnidadesChart', 'estadosChart'
+  ];
+  
+  elementos.forEach(id => {
+    const elemento = document.getElementById(id);
+    if (elemento) {
+      elemento.innerHTML = '<div class="loading-chart"><i class="fas fa-spinner fa-spin"></i> Cargando datos...</div>';
+    }
+  });
+}
+
+// Función para ocultar indicadores de carga
+function ocultarLoadingEnDashboard() {
+  // Esta función no hace nada directamente ya que los indicadores 
+  // de carga son reemplazados por los datos reales al renderizarlos
+}
+
+// Función para cargar los datos del dashboard desde el servidor
+function cargarDatosDashboard(fechaInicio, fechaFin, escuela, monitor) {
+  console.log("Cargando datos del dashboard con filtros:", {
+    fechaInicio: fechaInicio || 'todos',
+    fechaFin: fechaFin || 'todos',
+    escuela: escuela || 'todas',
+    monitor: monitor || 'todos'
+  });
+  
+  // Mostrar indicador de carga
+  const loadingIndicator = document.getElementById('dashboard-loading');
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'block';
+  }
+  
+  // Preparar parámetros
+  const params = {
+    fechaInicio: fechaInicio || null,
+    fechaFin: fechaFin || null,
+    escuela: escuela || null,
+    monitor: monitor || null
+  };
+  
+  // Llamada al servidor para obtener estadísticas
+  google.script.run
+    .withSuccessHandler(function(result) {
+      // Ocultar indicador de carga
+      if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+      }
+      
+      // Comprobar si la operación fue exitosa
+      if (result && result.success) {
+        console.log("Datos para el dashboard recibidos:", result.data);
+        const datos = result.data;
+        
+        // Actualizar resumen de datos
+        actualizarResumenDashboard(datos);
+        
+        // Renderizar cada sección con los datos correspondientes
+        renderizarMonitoresMasActivos(datos.topMonitores);
+        renderizarMaterialesMasSolicitados(datos.topMateriales);
+        renderizarEscuelasMasPedidos(datos.topEscuelas);
+        renderizarTendenciaTemporal(datos.pedidosPorMes);
+        renderizarTopUnidades(datos.topMaterialesPorUnidades);
+        renderizarDistribucionEstados(datos.pedidosPorEstado);
+        
+        // Mostrar estadísticas generales
+        if (datos.totalUnidades && datos.totalFilas) {
+          document.getElementById('top-unidades').innerHTML = `
+            <div class="card-content">
+              <h3>Total Unidades</h3>
+              <p class="big-number">${datos.totalUnidades}</p>
+            </div>
+          `;
+          
+          document.getElementById('distribucion-estados').innerHTML = `
+            <div class="card-content">
+              <h3>Total Pedidos</h3>
+              <p class="big-number">${datos.totalFilas}</p>
+            </div>
+          `;
+        }
+      } else {
+        // Mostrar mensaje si no hay datos disponibles
+        mostrarMensajeNoData(result.message || "No hay datos disponibles");
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error("Error al cargar datos del dashboard:", error);
+      
+      // Ocultar indicador de carga
+      if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+      }
+      
+      // Mostrar mensaje de error
+      mostrarMensaje("Error al cargar datos del dashboard: " + error, "error");
+      
+      // No hay datos disponibles para mostrar en los gráficos
+      document.getElementById('tendenciaChart').innerHTML = `
+        <p class="loading-chart">No hay datos de tendencia mensual</p>
+      `;
+    })
+    .obtenerEstadisticasDashboard(params);
+}
+
+/**
+ * Inicializa el dashboard simplificado
+ */
+function initSimpleDashboard() {
+  console.log("Inicializando dashboard simplificado...");
+  // Esta función se implementará en futuras versiones
+  // Por ahora solo es un placeholder para evitar errores
+}
+
+/**
+ * Configura el botón del dashboard - DESACTIVADO TEMPORALMENTE
+ */
+function setupDashboardButton() {
+  console.log("Configurando botón del dashboard (DESACTIVADO)...");
+  const btnDashboard = document.getElementById('btnDashboard');
+  
+  if (!btnDashboard) {
+    console.error("No se encontró el botón del dashboard (btnDashboard)");
+    return;
+  }
+  
+  // El botón ahora está desactivado en el HTML y visualmente mostrará "Próximamente"
+  console.log("Botón dashboard configurado como desactivado");
+}
+
+/**
+ * Muestra el dashboard de estadísticas
+ */
+function mostrarDashboard() {
+  console.log("Mostrando dashboard de estadísticas...");
+  // Intentar el método normal primero
+  toggleDashboard();
+  
+  // Verificar después de un breve retraso si el dashboard está visible
+  setTimeout(() => {
+    const overlay = document.getElementById('dashboardOverlay');
+    if (overlay && (overlay.style.display === 'none' || overlay.style.opacity === '0')) {
+      console.warn("El dashboard no se mostró correctamente, forzando apertura...");
+      forzarAbrirDashboard();
+    }
+  }, 500);
+}
+
+/**
+ * Muestra un mensaje cuando no hay datos disponibles para el análisis
+ */
+function mostrarMensajeNoData(mensaje) {
+  console.log("Mostrando mensaje de no datos:", mensaje);
+  
+  try {
+    const chartContainer = document.getElementById("grafico-container");
+    if (!chartContainer) {
+      console.error("Contenedor de gráficos no encontrado (grafico-container)");
+      return;
+    }
+    
+    // Crear mensaje visual
+    chartContainer.innerHTML = `
+      <div class="no-data-message">
+        <i class="fas fa-info-circle fa-3x"></i>
+        <p>${mensaje || "No hay datos disponibles para el análisis con los filtros seleccionados."}</p>
+      </div>
+    `;
+    
+    // Ocultar tabla de resultados si está visible
+    const tablaResultados = document.getElementById("tabla-resultados");
+    if (tablaResultados) {
+      tablaResultados.style.display = "none";
+    }
+    
+    // Actualizar el resumen del dashboard con ceros
+    actualizarResumenDashboard({
+      totalPedidos: 0,
+      totalUnidades: 0,
+      totalMonitores: 0,
+      totalEscuelas: 0
+    });
+    
+  } catch (error) {
+    console.error("Error al mostrar mensaje de no datos:", error);
+    mostrarMensaje("Error al mostrar mensaje: " + error.message, "error");
+  }
+}
+
+/**
+ * Actualiza el resumen del dashboard con totales
+ */
+function actualizarResumenDashboard(datos) {
+  console.log("Actualizando resumen del dashboard:", datos);
+  
+  try {
+    // Verificar si tenemos el contenedor del resumen
+    const totalPedidos = document.getElementById("total-pedidos");
+    const totalUnidades = document.getElementById("total-unidades");
+    const totalMonitores = document.getElementById("total-monitores");
+    const totalEscuelas = document.getElementById("total-escuelas");
+    
+    // Actualizar valores si existen los elementos
+    if (totalPedidos) {
+      totalPedidos.textContent = datos.totalPedidos || datos.total || 0;
+    }
+    
+    if (totalUnidades) {
+      totalUnidades.textContent = datos.totalUnidades || datos.unidades || 0;
+    }
+    
+    if (totalMonitores) {
+      totalMonitores.textContent = datos.totalMonitores || (datos.monitorasPorFrecuencia ? Object.keys(datos.monitorasPorFrecuencia).length : 0);
+    }
+    
+    if (totalEscuelas) {
+      totalEscuelas.textContent = datos.totalEscuelas || (datos.escuelasPorFrecuencia ? Object.keys(datos.escuelasPorFrecuencia).length : 0);
+    }
+  } catch (error) {
+    console.error("Error al actualizar resumen:", error);
+  }
+}
+
+/**
+ * Muestra el dashboard de estadísticas forzando su visualización
+ */
+function forzarAbrirDashboard() {
+  console.log("Forzando apertura del dashboard...");
+  
+  const overlay = document.getElementById('dashboardOverlay');
+  if (!overlay) {
+    console.error("CRÍTICO: No se encuentra el elemento dashboardOverlay");
+    alert("Error: No se puede mostrar el panel de estadísticas porque no se encuentra el elemento necesario.");
+    return;
+  }
+  
+  // Log de depuración
+  console.log("Estado DOM del dashboard antes de mostrar:", {
+    overlayDisplay: overlay.style.display,
+    overlayOpacity: window.getComputedStyle(overlay).opacity,
+    overlayVisibility: window.getComputedStyle(overlay).visibility,
+    overlayClass: overlay.className,
+    overlayHTML: overlay.outerHTML.substring(0, 100) + "..."
+  });
+  
+  // Forzar mostrar con estilo inline
+  overlay.style.display = 'flex';
+  overlay.style.visibility = 'visible';
+  overlay.style.opacity = '1';
+  overlay.classList.add('visible');
+  
+  // Inicializar fechas por defecto si están vacías
+  const fechaInicio = document.getElementById('dashboard-fecha-inicio');
+  const fechaFin = document.getElementById('dashboard-fecha-fin');
+  
+  if (fechaInicio && !fechaInicio.value) {
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    fechaInicio.value = lastMonth.toISOString().split('T')[0];
+  }
+  
+  if (fechaFin && !fechaFin.value) {
+    const today = new Date();
+    fechaFin.value = today.toISOString().split('T')[0];
+  }
+  
+  try {
+    // Actualizar filtros disponibles
+    actualizarFiltrosDashboard();
+    
+    // Configurar eventos del panel de análisis
+    configurarEventosDashboard();
+    
+    // Log después de mostrar
+    setTimeout(() => {
+      console.log("Estado DOM del dashboard después de mostrar:", {
+        overlayDisplay: overlay.style.display,
+        overlayOpacity: window.getComputedStyle(overlay).opacity,
+        overlayVisibility: window.getComputedStyle(overlay).visibility,
+        overlayClass: overlay.className
+      });
+    }, 100);
+    
+  } catch (error) {
+    console.error("Error al inicializar el dashboard:", error);
+    mostrarMensaje("Error al inicializar el dashboard: " + error.message, "error");
+  }
+}
+
+// Función para guardar copia de las estadísticas originales
+function guardarEstadisticasOriginales(stats) {
+  // Hacer una copia profunda para asegurar que no se modifiquen por referencia
+  estadisticas = JSON.parse(JSON.stringify(stats));
+}
+
+// Función para cambiar el estado de la(s) fila(s) seleccionada(s)
+function cambiarEstado(estado) {
+  try {
+    // Verificar que hay alguna fila seleccionada
+    if (!selectedRows || selectedRows.length === 0) {
+      mostrarMensaje('Seleccione una o varias filas primero', 'warning');
+      return;
+    }
+    
+    // Mostrar indicador de carga
+    mostrarLoader(true);
+    
+    // Obtener el ID de las filas seleccionadas
+    var filasFiltradas = filterRows(data.rows);
+    var filasToChange = [];
+    
+    for (var i = 0; i < selectedRows.length; i++) {
+      var rowIndex = selectedRows[i];
+      if (rowIndex >= 0 && rowIndex < filasFiltradas.length) {
+        // Encontrar el índice real en los datos completos
+        var idSeleccionada = filasFiltradas[rowIndex][0];
+        
+        // Buscar el índice real en los datos completos
+        var indexInData = data.rows.findIndex(row => row[0] === idSeleccionada);
+        if (indexInData !== -1) {
+          filasToChange.push(indexInData);
+        }
+      }
+    }
+    
+    console.log(`Cambiando estado a "${estado}" para ${filasToChange.length} filas`, filasToChange);
+    
+    // Si hay múltiples filas seleccionadas, usar la función para actualizar múltiples
+    if (filasToChange.length > 1) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            mostrarMensaje(`Estado actualizado a "${estado || 'Sin estado'}" en ${result.filasCambiadas} de ${result.totalFilas} filas seleccionadas`, 'success');
+            // Recargar datos para mostrar los cambios, pero mantener la posición
+            loadData(true);
+          } else {
+            mostrarMensaje('Error al actualizar: ' + (result.error || 'Error desconocido'), 'error');
+            mostrarLoader(false);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error al actualizar estados:', error);
+          mostrarLoader(false);
+          mostrarMensaje('Error al actualizar estados: ' + error, 'error');
+        })
+        .actualizarEstadoMultiple(filasToChange, estado);
+    } 
+    // Si solo hay una fila seleccionada, usar la función original
+    else if (filasToChange.length === 1) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            mostrarMensaje(`Estado actualizado a: ${estado || 'Sin estado'}`, 'success');
+            // Recargar datos para mostrar los cambios, pero mantener la posición
+            loadData(true);
+          } else {
+            mostrarMensaje('Error al actualizar: ' + (result.error || 'Error desconocido'), 'error');
+            mostrarLoader(false);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error al actualizar estado:', error);
+          mostrarLoader(false);
+          mostrarMensaje('Error al actualizar estado: ' + error, 'error');
+        })
+        .actualizarEstado(filasToChange[0], estado);
+    } else {
+      mostrarMensaje('No se pudieron identificar las filas seleccionadas', 'error');
+      mostrarLoader(false);
+    }
+  } catch (error) {
+    console.error("Error en cambiarEstado:", error);
+    mostrarMensaje("Error al cambiar estado: " + error.message, "error");
+    mostrarLoader(false);
+  }
+}
+</script> 
