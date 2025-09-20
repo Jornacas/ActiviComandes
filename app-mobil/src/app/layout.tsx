@@ -6,8 +6,8 @@ import CustomThemeProvider from '../components/ThemeProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Sol·licitud de Materials',
-  description: 'App per sol·licitar materials educatius',
+  title: 'Sol·licitud de Materials - v2.1',
+  description: 'App per sol·licitar materials educatius - Sistema de carret',
   viewport: 'width=device-width, initial-scale=1',
   themeColor: '#1976d2',
   manifest: '/manifest.json',
