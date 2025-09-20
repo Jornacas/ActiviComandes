@@ -153,8 +153,16 @@ class ApiClient {
       url.searchParams.append('action', action);
       url.searchParams.append('token', API_TOKEN);
 
-      // For createSollicitud, flatten the data
-      if (action === 'createSollicitud' && data?.sollicitud) {
+      let method = 'GET';
+      let body: string | undefined = undefined;
+
+      // Use POST for complex data structures
+      if (action === 'createMultipleSollicitud') {
+        method = 'POST';
+        body = JSON.stringify(data);
+        console.log(`📤 POST body for ${action}:`, body);
+      } else if (action === 'createSollicitud' && data?.sollicitud) {
+        // For simple createSollicitud, flatten the data to URL params
         const sollicitud = data.sollicitud;
         Object.keys(sollicitud).forEach(key => {
           const value = sollicitud[key];
@@ -163,9 +171,11 @@ class ApiClient {
           }
         });
       } else if (data) {
+        // For other actions, flatten simple data to URL params
         Object.keys(data).forEach(key => {
-          if (data[key]) {
-            url.searchParams.append(key, String(data[key]));
+          const value = data[key];
+          if (value !== null && value !== undefined && typeof value !== 'object') {
+            url.searchParams.append(key, String(value));
           }
         });
       }
@@ -173,11 +183,20 @@ class ApiClient {
       const finalUrl = url.toString();
       console.log(`🌐 FETCH URL for ${action} (${finalUrl.length} chars):`, finalUrl);
 
-      const response = await fetch(finalUrl, {
-        method: 'GET',
+      const fetchOptions: RequestInit = {
+        method,
         mode: 'cors',
         credentials: 'omit',
-      });
+      };
+
+      if (method === 'POST' && body) {
+        fetchOptions.headers = {
+          'Content-Type': 'application/json',
+        };
+        fetchOptions.body = body;
+      }
+
+      const response = await fetch(finalUrl, fetchOptions);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
