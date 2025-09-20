@@ -75,12 +75,13 @@ class ApiClient {
 
     const config: RequestInit = {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
     };
 
+    // Only add Content-Type header for POST requests with body
     if (method === 'POST') {
+      config.headers = {
+        'Content-Type': 'application/json',
+      };
       config.body = JSON.stringify({
         action,
         token: API_TOKEN,
