@@ -87,7 +87,7 @@ const FormulariSollicitud: React.FC = () => {
     }
 
     if (cartItems.length === 0) {
-      setError('Si us plau, afegeix almenys un material al carrito');
+      setError('Si us plau, afegeix almenys un material al carret');
       return;
     }
 
@@ -138,9 +138,16 @@ const FormulariSollicitud: React.FC = () => {
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 2 }}>
       <Card sx={{ mb: 3 }}>
         <CardContent sx={{ p: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center" color="primary">
-            🛒 Sol·licitud de Materials - Sistema de Carrito
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 1 }}>
+            <img 
+              src="https://www.eixoscreativa.com/wp-content/uploads/2024/01/Eixos-creativa.png.webp" 
+              alt="Eixos Creativa" 
+              style={{ height: '60px', objectFit: 'contain' }}
+            />
+            <Typography variant="h4" component="h1" color="primary">
+              Sol·licitud de Materials
+            </Typography>
+          </Box>
 
           <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 3 }}>
             Omple les teves dades, afegeix els materials que necessites i envia la sol·licitud completa
@@ -231,7 +238,7 @@ const FormulariSollicitud: React.FC = () => {
           {/* Informació adicional */}
           <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary" align="center">
-              💡 <strong>Consell:</strong> Pots afegir múltiples materials de diferents escoles i activitats al mateix carrito abans d'enviar la sol·licitud
+              💡 <strong>Consell:</strong> Pots afegir múltiples materials de diferents escoles i activitats al mateix carret abans d'enviar la sol·licitud
             </Typography>
           </Box>
         </CardContent>
