@@ -175,7 +175,19 @@ export default function OrdersTable() {
         const transformedOrders = rows.map((row, index) => {
           const order: any = { id: index };
           headers.forEach((header, headerIndex) => {
-            const key = header.toLowerCase().replace(/\s+/g, '');
+            // Convert header to camelCase
+            let key = header.toLowerCase().replace(/\s+/g, '');
+            // Special handling for common field names
+            if (key === 'idpedido') key = 'idPedido';
+            if (key === 'iditem') key = 'idItem';
+            if (key === 'nomcognoms') key = 'nomCognoms';
+            if (key === 'datanecessitat') key = 'dataNecessitat';
+            if (key === 'esmaterialpersonalitzat') key = 'esMaterialPersonalitzat';
+            if (key === 'comentarisgenerals') key = 'comentarisGenerals';
+            if (key === 'dataestat') key = 'dataEstat';
+            if (key === 'responsablepreparacio') key = 'responsablePreparacio';
+            if (key === 'notesinternes') key = 'notesInternes';
+            
             order[key] = row[headerIndex] || '';
           });
           return order;
@@ -216,10 +228,10 @@ export default function OrdersTable() {
 
     setUpdating(true);
     try {
-      // Get UUIDs of selected orders
+      // Get UUIDs of selected orders (use idPedido or idItem)
       const selectedUuids = selectedRows.map(rowId => {
         const order = orders.find(o => o.id === rowId);
-        return order?.uuid || '';
+        return order?.idPedido || order?.idItem || order?.uuid || '';
       }).filter(uuid => uuid);
 
       const response = await apiClient.updateOrderStatus(selectedUuids, newStatus);

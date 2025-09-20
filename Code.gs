@@ -73,7 +73,7 @@ function handleApiRequest(e, method) {
                       (e.postData ? JSON.parse(e.postData.contents).uuids : []);
         const newStatus = e.parameter.newStatus ||
                          (e.postData ? JSON.parse(e.postData.contents).newStatus : '');
-        result = updateOrderStatus(uuids, newStatus);
+        result = updateRespostesOrderStatus(uuids, newStatus);
         break;
       case 'updateDeliveryInfo':
         result = actualizarCentrosDeEntregaYDia();
@@ -323,6 +323,86 @@ function getCachedData(sheetName, cacheKey, expirationInSeconds = 3600) { // Def
   return data;
 }
 
+function updateRespostesOrderStatus(uuids, newStatus) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Respostes");
+    
+    if (!sheet) {
+      return { success: false, error: "La hoja 'Respostes' no existe." };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) { // Only headers or empty
+      return { success: false, error: "No hay datos en la hoja 'Respostes' para actualizar." };
+    }
+
+    const headers = data[0];
+    // Find the correct column indices for Respostes sheet
+    const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+    const estatIndex = headers.findIndex(h => h === "Estat");
+    const dataEstatIndex = headers.findIndex(h => h === "Data_Estat");
+
+    if (idPedidoIndex === -1 && idItemIndex === -1) {
+      return { success: false, error: "No se encontraron las columnas de ID en la hoja 'Respostes'." };
+    }
+    if (estatIndex === -1) {
+      return { success: false, error: "La columna 'Estat' no se encontró en la hoja 'Respostes'." };
+    }
+
+    let changesMade = 0;
+    const currentTimestamp = new Date();
+    
+    const updatedData = data.map((row, index) => {
+      if (index === 0) return row; // Skip headers
+
+      const rowIdPedido = row[idPedidoIndex];
+      const rowIdItem = row[idItemIndex];
+      
+      // Check if any of the provided UUIDs match either ID_Pedido or ID_Item
+      const matchesUuid = uuids.some(uuid => 
+        uuid === rowIdPedido || uuid === rowIdItem || 
+        rowIdPedido?.includes(uuid) || rowIdItem?.includes(uuid)
+      );
+      
+      if (matchesUuid) {
+        if (row[estatIndex] !== newStatus) {
+          row[estatIndex] = newStatus;
+          if (dataEstatIndex !== -1) {
+            row[dataEstatIndex] = currentTimestamp;
+          }
+          changesMade++;
+        }
+      }
+      return row;
+    });
+
+    if (changesMade > 0) {
+      sheet.getDataRange().setValues(updatedData);
+      return { 
+        success: true, 
+        changesMade: changesMade,
+        message: `S'han actualitzat ${changesMade} elements a l'estat: ${newStatus}`
+      };
+    } else {
+      return { 
+        success: true, 
+        changesMade: 0, 
+        message: "No s'han trobat elements per actualitzar amb els IDs proporcionats." 
+      };
+    }
+    
+  } catch (error) {
+    console.error('Error updating Respostes order status:', error);
+    return {
+      success: false,
+      error: 'Error actualitzant l\'estat: ' + error.toString()
+    };
+  }
+}
+
+// Legacy function - keep for backward compatibility
 function updateOrderStatus(uuids, newStatus) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Comandes");
