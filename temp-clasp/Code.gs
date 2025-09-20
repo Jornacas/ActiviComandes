@@ -63,7 +63,7 @@ function handleApiRequest(e, method) {
 
     switch (action) {
       case 'loadData':
-        result = loadData();
+        result = loadRespostesData();
         break;
       case 'processFormResponses':
         result = processFormResponses();
@@ -1203,6 +1203,82 @@ function createMultipleSollicitud(data) {
     return {
       success: false,
       error: `Error processant la sol·licitud múltiple: ${error.toString()}`
+    };
+  }
+}
+
+function loadRespostesData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName("Respostes");
+    
+    // If Respostes sheet doesn't exist, create it
+    if (!sheet) {
+      sheet = ss.insertSheet("Respostes");
+      setupRespostesHeaders(sheet);
+      return {
+        success: true,
+        data: {
+          headers: [
+            "timestamp", "idPedido", "idItem", "nomCognoms", "dataNecessitat",
+            "escola", "activitat", "material", "esMaterialPersonalitzat", "unitats",
+            "comentarisGenerals", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
+          ],
+          rows: [],
+          estadisticas: { total: 0, pendents: 0, enProces: 0, preparats: 0, entregats: 0 }
+        }
+      };
+    }
+    
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    
+    if (values.length < 2) {
+      // Only headers exist
+      return {
+        success: true,
+        data: {
+          headers: [
+            "timestamp", "idPedido", "idItem", "nomCognoms", "dataNecessitat",
+            "escola", "activitat", "material", "esMaterialPersonalitzat", "unitats",
+            "comentarisGenerals", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
+          ],
+          rows: [],
+          estadisticas: { total: 0, pendents: 0, enProces: 0, preparats: 0, entregats: 0 }
+        }
+      };
+    }
+    
+    // Remove headers row
+    const rows = values.slice(1);
+    
+    // Calculate statistics
+    const stats = {
+      total: rows.length,
+      pendents: rows.filter(row => row[11] === 'Pendent').length,
+      enProces: rows.filter(row => row[11] === 'En proces').length,
+      preparats: rows.filter(row => row[11] === 'Preparat').length,
+      entregats: rows.filter(row => row[11] === 'Entregat').length
+    };
+    
+    return {
+      success: true,
+      data: {
+        headers: [
+          "timestamp", "idPedido", "idItem", "nomCognoms", "dataNecessitat",
+          "escola", "activitat", "material", "esMaterialPersonalitzat", "unitats",
+          "comentarisGenerals", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
+        ],
+        rows: rows,
+        estadisticas: stats
+      }
+    };
+    
+  } catch (error) {
+    console.error('Error loading Respostes data:', error);
+    return {
+      success: false,
+      error: 'Error carregant dades: ' + error.toString()
     };
   }
 }
