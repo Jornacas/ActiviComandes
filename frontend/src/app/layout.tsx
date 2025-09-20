@@ -6,8 +6,11 @@ import CustomThemeProvider from '../components/ThemeProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Comanda de Materiales',
-  description: 'Sistema de gestión de pedidos de materiales educativos',
+  title: 'Panel d\'Administració - Comandes de Materials',
+  description: 'Sistema de gestió de comandes de materials educatius - Eixos Creativa',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({
@@ -16,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es">
+    <html lang="ca">
       <body className={inter.className}>
         <CustomThemeProvider>
           <Container maxWidth="xl" sx={{ py: 4 }}>
