@@ -18,7 +18,32 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  return handleApiRequest(e, 'POST');
+  const response = handleApiRequest(e, 'POST');
+  
+  // Add CORS headers for POST requests
+  const responseData = JSON.parse(response.getContent());
+  return ContentService
+    .createTextOutput(JSON.stringify(responseData))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400'
+    });
+}
+
+// Handle preflight OPTIONS requests for CORS
+function doOptions(e) {
+  return ContentService
+    .createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400'
+    });
 }
 
 function handleApiRequest(e, method) {
