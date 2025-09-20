@@ -202,7 +202,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false
   return (
     <Box sx={{ p: 3, border: 1, borderColor: 'divider', borderRadius: 2, mb: 3 }}>
       <Typography variant="h6" gutterBottom color="primary">
-        ➕ Afegir Material al Carrito
+        ➕ Afegir Material al Carret
       </Typography>
 
       {error && (
@@ -328,12 +328,13 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false
             fullWidth
             type="number"
             label="Unitats *"
-            value={formData.unitats}
-            onChange={(e) => handleInputChange('unitats')(parseInt(e.target.value) || 1)}
-            inputProps={{ min: 1 }}
-            InputProps={{
-              startAdornment: <Numbers color="action" sx={{ mr: 1 }} />,
+            value={formData.unitats === 1 ? '' : formData.unitats}
+            onChange={(e) => {
+              const value = e.target.value;
+              handleInputChange('unitats')(value === '' ? 1 : parseInt(value) || 1);
             }}
+            inputProps={{ min: 1, placeholder: "1" }}
+            placeholder="Introdueix la quantitat"
           />
         </Grid>
 
@@ -363,7 +364,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false
             startIcon={<Add />}
             sx={{ py: 1.5 }}
           >
-            Afegir al Carrito
+            Afegir al Carret
           </Button>
         </Grid>
       </Grid>
