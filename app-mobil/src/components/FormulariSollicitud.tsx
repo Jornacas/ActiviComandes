@@ -135,18 +135,28 @@ const FormulariSollicitud: React.FC = () => {
   }
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', p: 2 }}>
-      <Card sx={{ mb: 3 }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Box sx={{ mb: 2 }}>
+    <Box sx={{ width: '100%', minHeight: '100vh' }}>
+      <Card sx={{ mb: { xs: 2, sm: 3 }, borderRadius: { xs: 0, sm: 2 } }}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Box sx={{ textAlign: 'center', mb: { xs: 2, sm: 3 } }}>
+            <Box sx={{ mb: { xs: 1, sm: 2 } }}>
               <img 
                 src="https://www.eixoscreativa.com/wp-content/uploads/2024/01/Eixos-creativa.png.webp" 
                 alt="Eixos Creativa" 
-                style={{ height: '50px', objectFit: 'contain' }}
+                style={{ 
+                  height: '40px', 
+                  objectFit: 'contain',
+                  maxWidth: '100%'
+                }}
               />
             </Box>
-            <Typography variant="h4" component="h1" color="primary" gutterBottom>
+            <Typography 
+              variant="h5" 
+              component="h1" 
+              color="primary" 
+              gutterBottom
+              sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
+            >
               Sol·licitud de Materials
             </Typography>
           </Box>
@@ -170,8 +180,8 @@ const FormulariSollicitud: React.FC = () => {
           )}
 
           {/* Datos comunes del usuario */}
-          <Card variant="outlined" sx={{ mb: 3 }}>
-            <CardContent>
+          <Card variant="outlined" sx={{ mb: { xs: 2, sm: 3 }, borderRadius: { xs: 1, sm: 2 } }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
               <Typography variant="h6" gutterBottom color="primary">
                 👤 Dades del Sol·licitant
               </Typography>

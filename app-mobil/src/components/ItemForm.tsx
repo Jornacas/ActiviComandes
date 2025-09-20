@@ -200,8 +200,20 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false
   const isCustomMaterial = formData.material === 'Altres materials';
 
   return (
-    <Box sx={{ p: 3, border: 1, borderColor: 'divider', borderRadius: 2, mb: 3 }}>
-      <Typography variant="h6" gutterBottom color="primary">
+    <Box sx={{ 
+      p: { xs: 2, sm: 3 }, 
+      border: 1, 
+      borderColor: 'divider', 
+      borderRadius: { xs: 1, sm: 2 }, 
+      mb: { xs: 2, sm: 3 },
+      backgroundColor: 'background.paper'
+    }}>
+      <Typography 
+        variant="h6" 
+        gutterBottom 
+        color="primary"
+        sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+      >
         ➕ Afegir Material al Carret
       </Typography>
 

@@ -78,17 +78,32 @@ const CartView: React.FC<CartViewProps> = ({
   const totalUnits = items.reduce((sum, item) => sum + item.unitats, 0);
 
   return (
-    <Card sx={{ mb: 3 }}>
-      <CardContent>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Typography variant="h6" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+    <Card sx={{ mb: { xs: 2, sm: 3 }, borderRadius: { xs: 1, sm: 2 } }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          alignItems={{ xs: 'flex-start', sm: 'center' }} 
+          justifyContent="space-between" 
+          sx={{ mb: 2, gap: { xs: 1, sm: 0 } }}
+        >
+          <Typography 
+            variant="h6" 
+            color="primary" 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              fontSize: { xs: '1.1rem', sm: '1.25rem' }
+            }}
+          >
             <ShoppingCart />
             Carret ({totalItems} materials)
           </Typography>
           <Chip 
             label={`${totalUnits} unitats total`} 
             color="primary" 
-            variant="outlined" 
+            variant="outlined"
+            size="small"
           />
         </Stack>
 
