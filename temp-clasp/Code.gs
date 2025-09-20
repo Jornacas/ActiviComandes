@@ -128,24 +128,29 @@ function handleApiRequest(e, method) {
       case 'createMultipleSollicitud':
         // Handle multiple items sollicitud from cart
         let multipleSollicitudData;
-        if (e.postData) {
-          try {
+        try {
+          if (e.parameter.data) {
+            // New approach: JSON data in URL parameter
+            multipleSollicitudData = JSON.parse(e.parameter.data);
+            console.log('DEBUG: JSON data from URL parameter parsed successfully:', JSON.stringify(multipleSollicitudData));
+          } else if (e.postData) {
+            // Fallback: POST data
             multipleSollicitudData = JSON.parse(e.postData.contents);
             console.log('DEBUG: POST data parsed successfully:', JSON.stringify(multipleSollicitudData));
-          } catch (parseError) {
-            console.error('ERROR: Failed to parse POST data:', parseError);
-            result = { success: false, error: 'Dades POST no vàlides' };
-            break;
+          } else {
+            // Legacy fallback: individual URL parameters
+            console.log('DEBUG: Using individual URL parameters:', JSON.stringify(e.parameter));
+            multipleSollicitudData = {
+              nomCognoms: e.parameter.nomCognoms || '',
+              dataNecessitat: e.parameter.dataNecessitat || '',
+              items: e.parameter.items ? JSON.parse(e.parameter.items) : [],
+              altresMaterials: e.parameter.altresMaterials || ''
+            };
           }
-        } else {
-          // Try to get from URL parameters as fallback
-          console.log('DEBUG: No POST data, trying URL parameters:', JSON.stringify(e.parameter));
-          multipleSollicitudData = {
-            nomCognoms: e.parameter.nomCognoms || '',
-            dataNecessitat: e.parameter.dataNecessitat || '',
-            items: e.parameter.items ? JSON.parse(e.parameter.items) : [],
-            altresMaterials: e.parameter.altresMaterials || ''
-          };
+        } catch (parseError) {
+          console.error('ERROR: Failed to parse data:', parseError);
+          result = { success: false, error: 'Error parseant les dades: ' + parseError.toString() };
+          break;
         }
         result = createMultipleSollicitud(multipleSollicitudData);
         break;

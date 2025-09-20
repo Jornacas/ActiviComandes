@@ -157,11 +157,12 @@ class ApiClient {
       let method = 'GET';
       let body: string | undefined = undefined;
 
-      // Use POST for complex data structures
+      // Use GET with JSON parameter for complex data structures to avoid CORS issues
       if (action === 'createMultipleSollicitud') {
-        method = 'POST';
-        body = JSON.stringify(data);
-        console.log(`📤 POST body for ${action}:`, body);
+        method = 'GET';
+        const jsonData = JSON.stringify(data);
+        url.searchParams.append('data', jsonData);
+        console.log(`📤 GET with JSON data for ${action}:`, jsonData);
       } else if (action === 'createSollicitud' && data?.sollicitud) {
         // For simple createSollicitud, flatten the data to URL params
         const sollicitud = data.sollicitud;
@@ -390,8 +391,8 @@ class ApiClient {
   }
 
   async createMultipleSollicitud(data: SollicitudMultiple): Promise<ApiResponse<any>> {
-    console.log('🎯 createMultipleSollicitud called with POST method');
-    return this.request('createMultipleSollicitud', data, 'POST');
+    console.log('🎯 createMultipleSollicitud called with GET method (JSON in URL param)');
+    return this.request('createMultipleSollicitud', data, 'GET');
   }
 }
 
