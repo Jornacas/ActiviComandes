@@ -6,7 +6,7 @@ import CustomThemeProvider from '../components/ThemeProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Panel d\'Administració - Comandes de Materials',
+  title: 'Panell d\'Administració - Comandes de Materials',
   description: 'Sistema de gestió de comandes de materials educatius - Eixos Creativa',
   icons: {
     icon: '/favicon.ico',

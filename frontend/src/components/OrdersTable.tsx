@@ -314,7 +314,7 @@ export default function OrdersTable() {
         </Box>
         <Box sx={{ flex: 1, textAlign: 'center' }}>
           <Typography variant="h4" component="h1" color="primary" sx={{ fontWeight: 600 }}>
-            Panel d'Administració - Comandes de Materials
+            Panell d'Administració - Comandes de Materials
           </Typography>
           <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1 }}>
             Gestió i seguiment de sol·licituds
