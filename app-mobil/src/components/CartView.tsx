@@ -55,7 +55,7 @@ const CartView: React.FC<CartViewProps> = ({
         <CardContent sx={{ textAlign: 'center', py: 4 }}>
           <ShoppingCart sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" color="text.secondary">
-            El carrito està buit
+            El carret està buit
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Afegeix materials utilitzant el formulari de dalt
@@ -83,7 +83,7 @@ const CartView: React.FC<CartViewProps> = ({
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
           <Typography variant="h6" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <ShoppingCart />
-            Carrito ({totalItems} materials)
+            Carret ({totalItems} materials)
           </Typography>
           <Chip 
             label={`${totalUnits} unitats total`} 

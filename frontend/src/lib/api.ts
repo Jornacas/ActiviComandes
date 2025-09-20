@@ -10,26 +10,47 @@ export interface ApiResponse<T = any> {
 }
 
 export interface Order {
-  uuid: string;
+  uuid?: string;
   id: string;
-  nombre: string;
-  fecha: string;
-  escuela: string;
-  actividad: string;
-  material: string;
-  unidades: string;
-  otrosMateriales: string;
-  centroEntrega: string;
-  diaEntrega: string;
-  estado: string;
+  timestamp?: string;
+  idPedido?: string;
+  idItem?: string;
+  nomCognoms?: string;
+  dataNecessitat?: string;
+  escola?: string;
+  activitat?: string;
+  material?: string;
+  esMaterialPersonalitzat?: string;
+  unitats?: number;
+  comentarisGenerals?: string;
+  estat?: string;
+  dataEstat?: string;
+  responsablePreparacio?: string;
+  notesInternes?: string;
+  // Legacy fields for backward compatibility
+  nombre?: string;
+  fecha?: string;
+  escuela?: string;
+  actividad?: string;
+  unidades?: string;
+  otrosMateriales?: string;
+  centroEntrega?: string;
+  diaEntrega?: string;
+  estado?: string;
 }
 
 export interface Stats {
   total: number;
-  pendientes: number;
-  preparados: number;
-  entregados: number;
-  enProceso: number;
+  // Catalan names (new)
+  pendents?: number;
+  enProces?: number;
+  preparats?: number;
+  entregats?: number;
+  // Spanish names (legacy)
+  pendientes?: number;
+  enProceso?: number;
+  preparados?: number;
+  entregados?: number;
 }
 
 class ApiClient {
@@ -121,7 +142,7 @@ class ApiClient {
       }
     };
 
-    return Promise.resolve(mockData[action] || { success: false, error: 'Mock action not found' });
+    return Promise.resolve(mockData[action as keyof typeof mockData] || { success: false, error: 'Mock action not found' });
   }
 
   async loadData(): Promise<ApiResponse<{ headers: string[], rows: any[][], estadisticas: Stats }>> {

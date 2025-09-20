@@ -41,6 +41,10 @@ const formatSentenceCase = (text: string | null | undefined): string => {
 };
 
 const statusColors = {
+  'Pendent': 'default',
+  'En proces': 'warning', 
+  'Preparat': 'info',
+  'Entregat': 'success',
   'Pendiente': 'default',
   'En proceso': 'warning',
   'Preparado': 'info',
@@ -49,6 +53,10 @@ const statusColors = {
 } as const;
 
 const statusIcons = {
+  'Pendent': <Pending />,
+  'En proces': <HourglassEmpty />,
+  'Preparat': <CheckCircle />,
+  'Entregat': <LocalShipping />,
   'Pendiente': <Pending />,
   'En proceso': <HourglassEmpty />,
   'Preparado': <CheckCircle />,
@@ -67,20 +75,45 @@ export default function OrdersTable() {
 
   const columns: GridColDef[] = [
     {
-      field: 'nombre',
-      headerName: 'Monitor',
-      width: 200,
-      editable: false,
+      field: 'timestamp',
+      headerName: 'Data Comanda',
+      width: 130,
+      type: 'dateTime',
+      valueFormatter: (params) => {
+        if (!params.value) return '';
+        const date = new Date(params.value);
+        return date.toLocaleDateString('ca-ES') + ' ' + date.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
+      },
     },
     {
-      field: 'fecha',
-      headerName: 'Fecha',
+      field: 'nomCognoms',
+      headerName: 'Sol·licitant',
       width: 150,
     },
     {
-      field: 'escuela',
-      headerName: 'Escuela',
-      width: 200,
+      field: 'dataNecessitat',
+      headerName: 'Necessari Per',
+      width: 180,
+      type: 'date',
+      valueFormatter: (params) => {
+        if (!params.value) return '';
+        const date = new Date(params.value);
+        return date.toLocaleDateString('ca-ES', { 
+          weekday: 'long', 
+          day: 'numeric', 
+          month: 'long' 
+        });
+      },
+    },
+    {
+      field: 'escola',
+      headerName: 'Escola',
+      width: 130,
+    },
+    {
+      field: 'activitat',
+      headerName: 'Activitat',
+      width: 100,
     },
     {
       field: 'material',
@@ -89,20 +122,31 @@ export default function OrdersTable() {
       valueFormatter: (params) => formatSentenceCase(params.value as string),
     },
     {
-      field: 'unidades',
-      headerName: 'Unidades',
+      field: 'esMaterialPersonalitzat',
+      headerName: 'Personalitzat',
       width: 100,
+      renderCell: (params) => (
+        params.value === 'TRUE' ? 
+          <Chip label="SÍ" size="small" color="warning" /> : 
+          null
+      ),
     },
     {
-      field: 'estado',
-      headerName: 'Estado',
-      width: 150,
+      field: 'unitats',
+      headerName: 'Quantitat',
+      width: 80,
+      type: 'number',
+    },
+    {
+      field: 'estat',
+      headerName: 'Estat',
+      width: 130,
       renderCell: (params) => {
         const normalized = formatSentenceCase(params.value as string);
         return (
           <Chip
             icon={statusIcons[normalized as keyof typeof statusIcons] || statusIcons['']}
-            label={normalized || 'Pendiente'}
+            label={normalized || 'Pendent'}
             color={statusColors[normalized as keyof typeof statusColors] || 'default'}
             size="small"
           />
@@ -110,15 +154,10 @@ export default function OrdersTable() {
       },
     },
     {
-      field: 'centroEntrega',
-      headerName: 'Centro Entrega',
-      width: 150,
-      valueFormatter: (params) => formatSentenceCase(params.value as string),
-    },
-    {
-      field: 'diaEntrega',
-      headerName: 'Día Entrega',
-      width: 150,
+      field: 'responsablePreparacio',
+      headerName: 'Responsable',
+      width: 120,
+      editable: true,
     },
   ];
 
@@ -230,9 +269,35 @@ export default function OrdersTable() {
 
   return (
     <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Comanda de Materiales
-      </Typography>
+      {/* Header con logo y título */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        mb: 4, 
+        gap: 4,
+        borderBottom: '1px solid #e0e0e0',
+        pb: 2
+      }}>
+        <Box sx={{ flexShrink: 0 }}>
+          <img
+            src="https://www.eixoscreativa.com/wp-content/uploads/2024/01/Eixos-creativa.png.webp"
+            alt="Eixos Creativa"
+            style={{ 
+              height: '60px', 
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+            }}
+          />
+        </Box>
+        <Box sx={{ flex: 1, textAlign: 'center' }}>
+          <Typography variant="h4" component="h1" color="primary" sx={{ fontWeight: 600 }}>
+            Panel d'Administració - Comandes de Materials
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1 }}>
+            Gestió i seguiment de sol·licituds
+          </Typography>
+        </Box>
+      </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -244,14 +309,14 @@ export default function OrdersTable() {
         <Card sx={{ mb: 2 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Estadísticas
+              Estadístiques
             </Typography>
             <Stack direction="row" spacing={2}>
               <Chip label={`Total: ${stats.total}`} />
-              <Chip label={`Pendientes: ${stats.pendientes}`} color="default" />
-              <Chip label={`En Proceso: ${stats.enProceso}`} color="warning" />
-              <Chip label={`Preparados: ${stats.preparados}`} color="info" />
-              <Chip label={`Entregados: ${stats.entregados}`} color="success" />
+              <Chip label={`Pendents: ${stats.pendientes || stats.pendents || 0}`} color="default" />
+              <Chip label={`En Procés: ${stats.enProceso || stats.enProces || 0}`} color="warning" />
+              <Chip label={`Preparats: ${stats.preparados || stats.preparats || 0}`} color="info" />
+              <Chip label={`Entregats: ${stats.entregados || stats.entregats || 0}`} color="success" />
             </Stack>
           </CardContent>
         </Card>
@@ -264,7 +329,7 @@ export default function OrdersTable() {
           onClick={syncFormResponses}
           disabled={updating}
         >
-          Sincronizar Formulario
+          Sincronitzar Formulari
         </Button>
 
         <Button
@@ -273,21 +338,21 @@ export default function OrdersTable() {
           onClick={updateDelivery}
           disabled={updating}
         >
-          Actualizar Entregas
+          Actualitzar Lliuraments
         </Button>
 
         {selectedRows.length > 0 && (
           <>
             <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Nuevo Estado</InputLabel>
+              <InputLabel>Nou Estat</InputLabel>
               <Select
                 value={newStatus}
-                label="Nuevo Estado"
+                label="Nou Estat"
                 onChange={(e) => setNewStatus(e.target.value)}
               >
-                <MenuItem value="En proceso">En proceso</MenuItem>
-                <MenuItem value="Preparado">Preparado</MenuItem>
-                <MenuItem value="Entregado">Entregado</MenuItem>
+                <MenuItem value="En proces">En procés</MenuItem>
+                <MenuItem value="Preparat">Preparat</MenuItem>
+                <MenuItem value="Entregat">Entregat</MenuItem>
               </Select>
             </FormControl>
 
@@ -297,7 +362,7 @@ export default function OrdersTable() {
               onClick={updateStatus}
               disabled={!newStatus || updating}
             >
-              Actualizar ({selectedRows.length})
+              Actualitzar ({selectedRows.length})
             </Button>
           </>
         )}

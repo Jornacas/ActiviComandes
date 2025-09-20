@@ -105,6 +105,10 @@ function handleApiRequest(e, method) {
         const multipleSollicitudData = e.postData ? JSON.parse(e.postData.contents) : {};
         result = createMultipleSollicitud(multipleSollicitudData);
         break;
+      case 'createRespostesSheet':
+        // Create Respostes sheet with optimized headers
+        result = createRespostesSheet();
+        break;
       case 'getStats':
         const filters = e.parameter.filters ? JSON.parse(e.parameter.filters) :
                        (e.postData ? JSON.parse(e.postData.contents).filters : {});
@@ -1060,25 +1064,7 @@ function createMultipleSollicitud(data) {
   // If Respostes sheet doesn't exist, create it with optimized headers
   if (!sheet) {
     sheet = ss.insertSheet("Respostes");
-    // Set optimized headers for cart system
-    const headers = [
-      "Timestamp",
-      "ID_Pedido",
-      "ID_Item", 
-      "Nom_Cognoms",
-      "Data_Necessitat",
-      "Escola",
-      "Activitat",
-      "Material",
-      "Es_Material_Personalitzat",
-      "Unitats",
-      "Comentaris_Generals",
-      "Estat",
-      "Data_Estat",
-      "Responsable_Preparacio",
-      "Notes_Internes"
-    ];
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    setupRespostesHeaders(sheet);
   }
 
   const timestamp = new Date();
@@ -1143,6 +1129,85 @@ function createMultipleSollicitud(data) {
       error: `Error processant la sol·licitud múltiple: ${error.toString()}`
     };
   }
+}
+
+function setupRespostesHeaders(sheet) {
+  // Set optimized headers for cart system
+  const headers = [
+    "Timestamp",
+    "ID_Pedido",
+    "ID_Item", 
+    "Nom_Cognoms",
+    "Data_Necessitat",
+    "Escola",
+    "Activitat",
+    "Material",
+    "Es_Material_Personalitzat",
+    "Unitats",
+    "Comentaris_Generals",
+    "Estat",
+    "Data_Estat",
+    "Responsable_Preparacio",
+    "Notes_Internes"
+  ];
+  
+  // Set headers in first row
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  
+  // Format headers
+  const headerRange = sheet.getRange(1, 1, 1, headers.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#4285f4');
+  headerRange.setFontColor('#ffffff');
+  headerRange.setHorizontalAlignment('center');
+  
+  // Set column widths for better readability
+  sheet.setColumnWidth(1, 150);  // Timestamp
+  sheet.setColumnWidth(2, 120);  // ID_Pedido
+  sheet.setColumnWidth(3, 120);  // ID_Item
+  sheet.setColumnWidth(4, 150);  // Nom_Cognoms
+  sheet.setColumnWidth(5, 120);  // Data_Necessitat
+  sheet.setColumnWidth(6, 120);  // Escola
+  sheet.setColumnWidth(7, 100);  // Activitat
+  sheet.setColumnWidth(8, 150);  // Material
+  sheet.setColumnWidth(9, 80);   // Es_Material_Personalitzat
+  sheet.setColumnWidth(10, 80);  // Unitats
+  sheet.setColumnWidth(11, 200); // Comentaris_Generals
+  sheet.setColumnWidth(12, 100); // Estat
+  sheet.setColumnWidth(13, 150); // Data_Estat
+  sheet.setColumnWidth(14, 150); // Responsable_Preparacio
+  sheet.setColumnWidth(15, 200); // Notes_Internes
+  
+  // Freeze header row
+  sheet.setFrozenRows(1);
+  
+  return sheet;
+}
+
+function createRespostesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Check if Respostes sheet already exists
+  let sheet = ss.getSheetByName("Respostes");
+  if (sheet) {
+    return { 
+      success: false, 
+      error: "La hoja 'Respostes' ya existe. Elimínala primero si quieres recrearla." 
+    };
+  }
+  
+  // Create new sheet
+  sheet = ss.insertSheet("Respostes");
+  setupRespostesHeaders(sheet);
+  
+  return { 
+    success: true, 
+    data: { 
+      message: "Hoja 'Respostes' creada correctamente con encabezados optimizados.",
+      sheetName: "Respostes",
+      headers: 15
+    } 
+  };
 }
 
 // Función para normalizar nombres (como en Python)
