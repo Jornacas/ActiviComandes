@@ -102,7 +102,26 @@ function handleApiRequest(e, method) {
         break;
       case 'createMultipleSollicitud':
         // Handle multiple items sollicitud from cart
-        const multipleSollicitudData = e.postData ? JSON.parse(e.postData.contents) : {};
+        let multipleSollicitudData;
+        if (e.postData) {
+          try {
+            multipleSollicitudData = JSON.parse(e.postData.contents);
+            console.log('DEBUG: POST data parsed successfully:', JSON.stringify(multipleSollicitudData));
+          } catch (parseError) {
+            console.error('ERROR: Failed to parse POST data:', parseError);
+            result = { success: false, error: 'Dades POST no vàlides' };
+            break;
+          }
+        } else {
+          // Try to get from URL parameters as fallback
+          console.log('DEBUG: No POST data, trying URL parameters:', JSON.stringify(e.parameter));
+          multipleSollicitudData = {
+            nomCognoms: e.parameter.nomCognoms || '',
+            dataNecessitat: e.parameter.dataNecessitat || '',
+            items: e.parameter.items ? JSON.parse(e.parameter.items) : [],
+            altresMaterials: e.parameter.altresMaterials || ''
+          };
+        }
         result = createMultipleSollicitud(multipleSollicitudData);
         break;
       case 'createRespostesSheet':
@@ -1058,6 +1077,8 @@ function createSollicitud(sollicitudData) {
 }
 
 function createMultipleSollicitud(data) {
+  console.log('DEBUG createMultipleSollicitud - Data received:', JSON.stringify(data));
+  
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName("Respostes");
 
@@ -1065,6 +1086,31 @@ function createMultipleSollicitud(data) {
   if (!sheet) {
     sheet = ss.insertSheet("Respostes");
     setupRespostesHeaders(sheet);
+  }
+
+  // Validate input data
+  if (!data || typeof data !== 'object') {
+    console.error('ERROR: data is not valid object:', data);
+    return {
+      success: false,
+      error: 'Dades no vàlides rebudes'
+    };
+  }
+
+  if (!data.items || !Array.isArray(data.items)) {
+    console.error('ERROR: data.items is not valid array:', data.items);
+    return {
+      success: false,
+      error: 'Llista d\'ítems no vàlida'
+    };
+  }
+
+  if (data.items.length === 0) {
+    console.error('ERROR: No items in cart');
+    return {
+      success: false,
+      error: 'No hi ha ítems al carret'
+    };
   }
 
   const timestamp = new Date();
