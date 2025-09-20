@@ -37,6 +37,7 @@ export interface SollicitudMultiple {
 
 class ApiClient {
   private async request<T>(action: string, data?: any, method: 'GET' | 'POST' = 'GET'): Promise<ApiResponse<T>> {
+    console.log(`🔧 request() called with method: ${method} for action: ${action}`);
     // DEBUG: Check environment variables
     console.log('🔍 DEBUG API CLIENT:');
     console.log('API_BASE_URL:', API_BASE_URL);
@@ -389,6 +390,7 @@ class ApiClient {
   }
 
   async createMultipleSollicitud(data: SollicitudMultiple): Promise<ApiResponse<any>> {
+    console.log('🎯 createMultipleSollicitud called with POST method');
     return this.request('createMultipleSollicitud', data, 'POST');
   }
 }
