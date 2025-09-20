@@ -1057,21 +1057,26 @@ function createMultipleSollicitud(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName("Respostes");
 
-  // If Respostes sheet doesn't exist, create it
+  // If Respostes sheet doesn't exist, create it with optimized headers
   if (!sheet) {
     sheet = ss.insertSheet("Respostes");
-    // Set headers for the mobile app solicitud
+    // Set optimized headers for cart system
     const headers = [
-      "Marca temporal",
-      "Nom i cognoms",
-      "Data de necessitat", 
+      "Timestamp",
+      "ID_Pedido",
+      "ID_Item", 
+      "Nom_Cognoms",
+      "Data_Necessitat",
       "Escola",
       "Activitat",
-      "Material principal",
+      "Material",
+      "Es_Material_Personalitzat",
       "Unitats",
-      "Altres materials",
-      "UUID",
-      "Estat"
+      "Comentaris_Generals",
+      "Estat",
+      "Data_Estat",
+      "Responsable_Preparacio",
+      "Notes_Internes"
     ];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
@@ -1083,31 +1088,39 @@ function createMultipleSollicitud(data) {
   try {
     // Process each item in the cart
     data.items.forEach((item, index) => {
-      const itemUuid = `${baseUuid}-${index + 1}`;
+      const itemUuid = `${baseUuid}-${String(index + 1).padStart(3, '0')}`;
       
-      // Determine material name (handle custom materials)
+      // Determine material name and if it's custom
       const materialName = item.customMaterial || item.material;
+      const isCustomMaterial = item.customMaterial ? "TRUE" : "FALSE";
       
-      // Create row for each item
+      // Create row for each item with new structure
       const newRow = [
-        timestamp,
-        data.nomCognoms || '',
-        data.dataNecessitat || '',
-        item.escola || '',
-        item.activitat || '',
-        materialName,
-        item.unitats || 0,
-        data.altresMaterials || '', // General comments
-        itemUuid,
-        'Pendent' // Default status
+        timestamp,                    // A: Timestamp
+        baseUuid,                     // B: ID_Pedido (common for all items)
+        itemUuid,                     // C: ID_Item (unique per item)
+        data.nomCognoms || '',        // D: Nom_Cognoms
+        data.dataNecessitat || '',    // E: Data_Necessitat
+        item.escola || '',            // F: Escola
+        item.activitat || '',         // G: Activitat
+        materialName,                 // H: Material
+        isCustomMaterial,             // I: Es_Material_Personalitzat
+        item.unitats || 0,            // J: Unitats
+        data.altresMaterials || '',   // K: Comentaris_Generals
+        'Pendent',                    // L: Estat
+        timestamp,                    // M: Data_Estat
+        '',                           // N: Responsable_Preparacio
+        ''                            // O: Notes_Internes
       ];
 
       sheet.appendRow(newRow);
       addedItems.push({
-        id: itemUuid,
+        idPedido: baseUuid,
+        idItem: itemUuid,
         escola: item.escola,
         activitat: item.activitat,
         material: materialName,
+        isCustom: isCustomMaterial === "TRUE",
         unitats: item.unitats
       });
     });
@@ -1116,10 +1129,11 @@ function createMultipleSollicitud(data) {
       success: true,
       data: {
         message: `Sol·licitud múltiple enviada correctament! ${data.items.length} materials sol·licitats.`,
-        baseId: baseUuid,
+        idPedido: baseUuid,
         items: addedItems,
         totalItems: data.items.length,
-        totalUnits: data.items.reduce((sum, item) => sum + (item.unitats || 0), 0)
+        totalUnits: data.items.reduce((sum, item) => sum + (item.unitats || 0), 0),
+        timestamp: timestamp
       }
     };
 
