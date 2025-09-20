@@ -1,77 +1,128 @@
-# Aplicación de Comanda de Materiales
+# ActiviComandes
 
-Esta es una aplicación de Google Apps Script que gestiona pedidos de materiales para centros educativos.
+## Sistema de Gestión de Solicitudes de Materiales Educativos
 
-## Características
+Esta es una aplicación completa que gestiona pedidos de materiales para centros educativos, desarrollada con React/Next.js y Google Apps Script.
 
-- Sincronización automática con respuestas de formulario
-- Gestión de estados de preparación de materiales
-- Asignación automática de centros de entrega y días de entrega
-- Interfaz de usuario intuitiva y responsiva
+## 🏗️ Arquitectura
 
-## Estructura de archivos
+- **Frontend Admin**: Panel de administración para gestión de pedidos
+- **App Móvil**: Aplicación responsive para realizar solicitudes  
+- **Backend**: Google Apps Script integrado con Google Sheets
+- **Base de Datos**: Google Sheets con múltiples hojas especializadas
 
-- `Code.gs`: Contiene toda la lógica del servidor
-- `Index.html`: Página principal de la interfaz de usuario
-- `style.html`: Estilos CSS para la aplicación
-- `script.html`: Scripts JavaScript para la funcionalidad del cliente
+## ✅ Características Implementadas
 
-## Configuración inicial
+### Frontend de Solicitudes (`app-mobil/`)
+- ✅ Selección cascada: Escuela → Actividades → Materiales
+- ✅ Filtrado dinámico de materiales por actividad
+- ✅ Formateo inteligente de texto (materiales en sentence case)
+- ✅ Ordenación personalizada (elementos "SOBRE" primero)
+- ✅ Autocompletado con búsqueda
 
-1. Crea una hoja de cálculo de Google Sheets
-2. Crea las siguientes hojas dentro del documento:
-   - "prova": Para almacenar los pedidos principales
-   - "dades": Para configuración de la aplicación
-   - "ordre_distancia_escoles": Para la asignación de centros de entrega
-   - Una hoja para las respuestas del formulario
+### Panel de Administración (`frontend/`)
+- ✅ Tabla de pedidos con DataGrid avanzada
+- ✅ Gestión de estados de preparación
+- ✅ Sincronización con formularios de Google
+- ✅ Estadísticas en tiempo real
+- ✅ Actualización masiva de estados
 
-3. Configura un formulario de Google Forms conectado a la hoja de cálculo
+### Backend (Google Apps Script)
+- ✅ API RESTful para operaciones CRUD
+- ✅ Integración con Google Sheets
+- ✅ Filtrado dinámico por escuela y actividad
+- ✅ Procesamiento automático de formularios
 
-4. Despliega este proyecto con Google Apps Script:
+## 🛠️ Stack Tecnológico
 
-   ```bash
-   # Instala clasp si no lo tienes
-   npm install -g @google/clasp
-   
-   # Inicia sesión en Google
-   clasp login
-   
-   # Crea un nuevo proyecto (o usa uno existente)
-   clasp create --title "Comanda de Materiales" --rootDir ./ComandaApp
-   
-   # O vincula a un proyecto existente editando el archivo .clasp.json
-   # con tu ID de script de Google Apps Script
-   
-   # Sube los archivos
-   clasp push
-   
-   # Abre el editor de scripts
-   clasp open
-   ```
+- **Frontend**: React + Next.js + Material-UI + TypeScript
+- **Backend**: Google Apps Script + Google Sheets
+- **Despliegue**: Vercel (frontend) + Google Apps Script (backend)
 
-5. Publica la aplicación como aplicación web:
-   - En el editor de scripts, ve a Publicar > Implementar como aplicación web
-   - Establece "¿Quién puede acceder a la aplicación?" como "Cualquier persona"
-   - Haz clic en "Implementar"
+## 📁 Estructura del Proyecto
 
-## Uso
+```
+ActiviComandes/
+├── app-mobil/          # App para realizar solicitudes
+│   ├── src/
+│   │   ├── components/ # Formulario de solicitudes
+│   │   ├── lib/        # Cliente API
+│   │   └── app/        # Páginas Next.js
+├── frontend/           # Panel de administración  
+│   ├── src/
+│   │   ├── components/ # Tabla de pedidos
+│   │   ├── lib/        # Cliente API
+│   │   └── app/        # Páginas Next.js
+├── Code.gs            # Backend Google Apps Script
+└── appsscript.json    # Configuración del proyecto
+```
 
-1. Abre la URL de la aplicación web desplegada
-2. Usa el botón "Sincronizar entradas" para obtener las nuevas solicitudes del formulario
-3. Selecciona una fila y usa los botones de estado para actualizar su progreso
-4. El botón "Actualizar centros de entrega" asigna automáticamente los centros y días de entrega
+## 🚀 Configuración e Instalación
 
-## Personalización
+### 1. Google Sheets Setup
+Crea las siguientes hojas en tu documento:
+- `Dades`: Datos maestros (Escuelas, Actividades)  
+- `MatCO`, `MatDX1`, `MatDX2`, `MatHC`, `MatTC`: Materiales por actividad
+- `Responses`: Respuestas del formulario (opcional)
 
-- Modifica `Code.gs` para ajustar la lógica de negocio
-- Personaliza los estilos en `style.html` para cambiar la apariencia
-- Ajusta las columnas y la lógica de visualización en `script.html`
+### 2. Backend (Google Apps Script)
+```bash
+# Configurar clasp
+npm install -g @google/clasp
+clasp login
 
-## Mantenimiento
+# Desplegar backend
+clasp push
+clasp deploy
+```
 
-Para mantener la aplicación:
+### 3. Frontend de Solicitudes
+```bash
+cd app-mobil
+npm install
+npm run dev # http://localhost:3003
+```
 
-1. Edita los archivos localmente
-2. Sube los cambios con `clasp push`
-3. Si es necesario, crea una nueva versión con `clasp version 'descripción'`
-4. Vuelve a implementar la aplicación web con la nueva versión 
+### 4. Panel de Administración  
+```bash
+cd frontend
+npm install
+npm run dev # http://localhost:3000
+```
+
+## 🌐 URLs en Producción
+
+- **Backend API**: https://script.google.com/macros/s/[SCRIPT_ID]/exec
+- **App Móvil**: Desplegar en Vercel
+- **Panel Admin**: Desplegar en Vercel
+
+## 📊 Flujo de Datos
+
+```
+1. Usuario selecciona ESCUELA
+   ↓
+2. Frontend carga ACTIVIDADES para esa escuela
+   ↓  
+3. Usuario selecciona ACTIVIDAD
+   ↓
+4. Frontend carga MATERIALES para esa actividad
+   ↓
+5. Usuario completa solicitud → Backend → Google Sheets
+```
+
+## 🔧 Próximas Funcionalidades
+
+- [ ] Sistema de carrito multi-item
+- [ ] Campo "Altres materials" personalizable
+- [ ] Notificaciones automáticas
+- [ ] Exportación de reportes
+- [ ] Gestión de inventario
+
+## 📝 Estado Actual
+
+✅ **FUNCIONAL**: Cascada Escuela→Actividades→Materiales operativa  
+🔄 **EN DESARROLLO**: Sistema de carrito para múltiples solicitudes
+
+---
+
+*Desarrollado para la gestión eficiente de materiales educativos*
