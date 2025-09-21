@@ -2347,7 +2347,8 @@ function getPreparatedOrders() {
 }
 
 /**
- * Obtenir opcions d'entrega per comandes seleccionades
+ * Motor d'optimització intel·ligent per opcions d'entrega
+ * Genera múltiples alternatives optimitzades considerant distàncies, dies i rutes de monitors
  */
 function getDeliveryOptions(selectedOrders) {
   try {
@@ -2358,26 +2359,80 @@ function getDeliveryOptions(selectedOrders) {
       };
     }
 
-    // Obtenir dades de la hoja "Dades" per trobar monitors
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const dadesSheet = ss.getSheetByName("Dades");
+    const ordreDistanciaSheet = ss.getSheetByName("ordre_distancia_escoles");
 
     if (!dadesSheet) {
-      return {
-        success: false,
-        error: "La hoja 'Dades' no existe."
-      };
+      return { success: false, error: "La hoja 'Dades' no existe." };
     }
 
+    // Carregar dades dels monitors i escoles
     const dadesValues = dadesSheet.getDataRange().getValues();
     const dadesHeaders = dadesValues[0];
-
     const escolaIdx = dadesHeaders.findIndex(h => h === "ESCOLA");
     const monitoraIdx = dadesHeaders.findIndex(h => h === "MONITORA");
     const diaIdx = dadesHeaders.findIndex(h => h === "DIA");
     const adreçaIdx = dadesHeaders.findIndex(h => h === "ADREÇA");
 
-    // Agrupar comandes per escola
+    // Carregar dades d'ordre de distància (proximitat a Eixos Creativa)
+    let distanceOrder = [];
+    if (ordreDistanciaSheet) {
+      const ordreValues = ordreDistanciaSheet.getDataRange().getValues();
+      if (ordreValues.length > 1) {
+        const ordreHeaders = ordreValues[0];
+        const escolaDistIdx = ordreHeaders.findIndex(h => h === "ESCOLA" || h === "Escola");
+        const distanciaIdx = ordreHeaders.findIndex(h => h === "DISTANCIA" || h === "Distancia");
+
+        for (let i = 1; i < ordreValues.length; i++) {
+          if (ordreValues[i][escolaDistIdx] && ordreValues[i][distanciaIdx]) {
+            distanceOrder.push({
+              escola: ordreValues[i][escolaDistIdx],
+              distancia: ordreValues[i][distanciaIdx]
+            });
+          }
+        }
+      }
+    }
+
+    // Crear mapa de tots els monitors i les seves rutes
+    const allMonitors = new Map();
+    for (let i = 1; i < dadesValues.length; i++) {
+      const row = dadesValues[i];
+      const escola = row[escolaIdx];
+      const monitora = row[monitoraIdx];
+      const dia = row[diaIdx];
+      const adreça = row[adreçaIdx];
+
+      if (monitora && escola && dia) {
+        if (!allMonitors.has(monitora)) {
+          allMonitors.set(monitora, {
+            nom: monitora,
+            escoles: new Map(),
+            adreça: adreça
+          });
+        }
+
+        const monitor = allMonitors.get(monitora);
+        if (!monitor.escoles.has(escola)) {
+          monitor.escoles.set(escola, {
+            escola: escola,
+            dies: [],
+            adreça: adreça
+          });
+        }
+
+        const escolaData = monitor.escoles.get(escola);
+        if (!escolaData.dies.includes(dia)) {
+          escolaData.dies.push(dia);
+        }
+      }
+    }
+
+    // Generar opcions optimitzades per cada comanda
+    const deliveryOptions = [];
+
+    // Agrupar per escola solicitant per facilitar l'anàlisi
     const ordersBySchool = {};
     selectedOrders.forEach(order => {
       if (!ordersBySchool[order.escola]) {
@@ -2386,50 +2441,138 @@ function getDeliveryOptions(selectedOrders) {
       ordersBySchool[order.escola].push(order);
     });
 
-    const deliveryOptions = [];
+    Object.keys(ordersBySchool).forEach(targetSchool => {
+      const schoolOrders = ordersBySchool[targetSchool];
+      const optimizedOptions = [];
 
-    // Per cada escola, buscar monitors disponibles
-    Object.keys(ordersBySchool).forEach(escola => {
-      const schoolOrders = ordersBySchool[escola];
-      const availableMonitors = [];
-
-      // Buscar monitors en aquesta escola a la hoja Dades
-      for (let i = 1; i < dadesValues.length; i++) {
-        const row = dadesValues[i];
-        const rowEscola = row[escolaIdx];
-        const monitora = row[monitoraIdx];
-        const dia = row[diaIdx];
-        const adreça = row[adreçaIdx];
-
-        if (rowEscola === escola && monitora) {
-          // Verificar si el monitor ja està a la llista
-          const existingMonitor = availableMonitors.find(m => m.nom === monitora);
-          if (!existingMonitor) {
-            availableMonitors.push({
-              nom: monitora,
-              escola: escola,
-              dies: [dia],
-              adreça: adreça
-            });
-          } else {
-            // Afegir dia si no existeix
-            if (!existingMonitor.dies.includes(dia)) {
-              existingMonitor.dies.push(dia);
-            }
-          }
-        }
-      }
-
-      deliveryOptions.push({
-        escola: escola,
-        comandes: schoolOrders,
-        monitorsDisponibles: availableMonitors,
-        adreça: availableMonitors.length > 0 ? availableMonitors[0].adreça : '',
-        opcions: {
-          directa: true, // Sempre es pot entregar directament
-          intermediari: availableMonitors.length > 0
+      // OPCIÓ 1: Entrega directa (sempre disponible)
+      const directMonitors = [];
+      allMonitors.forEach(monitor => {
+        if (monitor.escoles.has(targetSchool)) {
+          const escolaInfo = monitor.escoles.get(targetSchool);
+          directMonitors.push({
+            nom: monitor.nom,
+            escola: targetSchool,
+            dies: escolaInfo.dies,
+            adreça: escolaInfo.adreça,
+            tipus: "directa"
+          });
         }
       });
+
+      optimizedOptions.push({
+        tipus: "Entrega Directa",
+        prioritat: 3, // Prioritat baixa (menys eficient)
+        escola: targetSchool,
+        comandes: schoolOrders,
+        monitorsDisponibles: directMonitors,
+        descripció: `Entrega directa a ${targetSchool}`,
+        eficiencia: "Baixa",
+        notes: "Entrega directa sense optimització de ruta"
+      });
+
+      // OPCIÓ 2: Escoles més properes a Eixos Creativa (optimització de proximitat)
+      const nearbySchools = distanceOrder
+        .filter(item => item.escola !== targetSchool)
+        .slice(0, 3) // Top 3 escoles més properes
+        .map(item => {
+          const intermediateMonitors = [];
+
+          allMonitors.forEach(monitor => {
+            // Monitors que van a l'escola intermèdia
+            if (monitor.escoles.has(item.escola)) {
+              const escolaIntermediaInfo = monitor.escoles.get(item.escola);
+              // I també van a l'escola destí
+              if (monitor.escoles.has(targetSchool)) {
+                const escolaDestiInfo = monitor.escoles.get(targetSchool);
+
+                intermediateMonitors.push({
+                  nom: monitor.nom,
+                  escola: item.escola,
+                  dies: escolaIntermediaInfo.dies,
+                  adreça: escolaIntermediaInfo.adreça,
+                  tipus: "intermèdia",
+                  destinoFinal: {
+                    escola: targetSchool,
+                    dies: escolaDestiInfo.dies
+                  }
+                });
+              }
+            }
+          });
+
+          return {
+            tipus: "Entrega Optimitzada",
+            prioritat: 1, // Prioritat alta (més eficient)
+            escola: item.escola,
+            escolaDestino: targetSchool,
+            comandes: schoolOrders,
+            monitorsDisponibles: intermediateMonitors,
+            descripció: `Entrega a ${item.escola} (més propera a Eixos) → Monitor porta a ${targetSchool}`,
+            eficiencia: "Alta",
+            distanciaAcademia: item.distancia,
+            notes: `Estalvi de ${item.distancia} en transport des d'Eixos Creativa`
+          };
+        })
+        .filter(option => option.monitorsDisponibles.length > 0);
+
+      optimizedOptions.push(...nearbySchools);
+
+      // OPCIÓ 3: Monitors multicentre (optimització de rutes)
+      const multiCenterMonitors = [];
+      allMonitors.forEach(monitor => {
+        if (monitor.escoles.size > 1 && monitor.escoles.has(targetSchool)) {
+          const escolesList = Array.from(monitor.escoles.keys());
+          const alternativeSchools = escolesList.filter(escola => escola !== targetSchool);
+
+          alternativeSchools.forEach(altSchool => {
+            const altEscolaInfo = monitor.escoles.get(altSchool);
+            const targetEscolaInfo = monitor.escoles.get(targetSchool);
+
+            // Buscar si l'escola alternativa està més propera
+            const altSchoolDistance = distanceOrder.find(item => item.escola === altSchool);
+
+            if (altSchoolDistance) {
+              multiCenterMonitors.push({
+                nom: monitor.nom,
+                escola: altSchool,
+                dies: altEscolaInfo.dies,
+                adreça: altEscolaInfo.adreça,
+                tipus: "multicentre",
+                destinoFinal: {
+                  escola: targetSchool,
+                  dies: targetEscolaInfo.dies
+                },
+                distanciaAcademia: altSchoolDistance.distancia
+              });
+            }
+          });
+        }
+      });
+
+      if (multiCenterMonitors.length > 0) {
+        // Ordenar per proximitat a Eixos
+        multiCenterMonitors.sort((a, b) =>
+          (a.distanciaAcademia || 999) - (b.distanciaAcademia || 999)
+        );
+
+        optimizedOptions.push({
+          tipus: "Ruta Multicentre",
+          prioritat: 2, // Prioritat mitjana
+          escola: multiCenterMonitors[0].escola,
+          escolaDestino: targetSchool,
+          comandes: schoolOrders,
+          monitorsDisponibles: multiCenterMonitors.slice(0, 5), // Top 5
+          descripció: `Monitor multicentre: entrega a ${multiCenterMonitors[0].escola} → transporta a ${targetSchool}`,
+          eficiencia: "Mitjana-Alta",
+          notes: "Monitor que visita múltiples centres, optimitza la ruta"
+        });
+      }
+
+      // Ordenar opcions per prioritat (1=més eficient, 3=menys eficient)
+      optimizedOptions.sort((a, b) => a.prioritat - b.prioritat);
+
+      deliveryOptions.push(...optimizedOptions);
     });
 
     return {
@@ -2441,7 +2584,7 @@ function getDeliveryOptions(selectedOrders) {
     console.error("Error en getDeliveryOptions:", error);
     return {
       success: false,
-      error: "Error obtenint opcions d'entrega: " + error.toString()
+      error: "Error en motor d'optimització: " + error.toString()
     };
   }
 }

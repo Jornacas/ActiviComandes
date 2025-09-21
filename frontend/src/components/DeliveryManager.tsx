@@ -41,6 +41,9 @@ import {
   CheckCircle,
   AccessTime,
   DirectionsCar,
+  TrendingUp,
+  Speed,
+  Route,
 } from '@mui/icons-material';
 
 // Types
@@ -56,16 +59,29 @@ interface PreparatedOrder {
 }
 
 interface DeliveryOption {
+  tipus: string;
+  prioritat: number;
   escola: string;
+  escolaDestino?: string;
   comandes: PreparatedOrder[];
   monitorsDisponibles: Array<{
     nom: string;
     escola: string;
     dies: string[];
     adreça: string;
+    tipus?: string;
+    destinoFinal?: {
+      escola: string;
+      dies: string[];
+    };
+    distanciaAcademia?: string;
   }>;
-  adreça: string;
-  opcions: {
+  descripció: string;
+  eficiencia: string;
+  distanciaAcademia?: string;
+  notes?: string;
+  adreça?: string;
+  opcions?: {
     directa: boolean;
     intermediari: boolean;
   };
@@ -347,50 +363,119 @@ export default function DeliveryManager() {
                 Resum de comandes seleccionades:
               </Typography>
 
-              {deliveryOptions.map((option, index) => (
-                <Card key={index} sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <School />
-                      {option.escola}
-                    </Typography>
+              {deliveryOptions.map((option, index) => {
+                // Definir icones per tipus d'opció
+                const getOptionIcon = (tipus: string) => {
+                  switch (tipus) {
+                    case 'Entrega Optimitzada': return <TrendingUp color="success" />;
+                    case 'Ruta Multicentre': return <Route color="warning" />;
+                    case 'Entrega Directa': return <DirectionsCar color="action" />;
+                    default: return <School />;
+                  }
+                };
 
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      {option.comandes.length} comandes • {option.adreça}
-                    </Typography>
+                const getEfficiencyColor = (eficiencia: string) => {
+                  switch (eficiencia) {
+                    case 'Alta': return 'success';
+                    case 'Mitjana-Alta': return 'warning';
+                    case 'Baixa': return 'default';
+                    default: return 'default';
+                  }
+                };
 
-                    <List dense>
-                      {option.comandes.map((comanda) => (
-                        <ListItem key={comanda.idItem}>
-                          <ListItemText
-                            primary={`${comanda.material} (${comanda.quantitat})`}
-                            secondary={`${comanda.solicitant} • ${formatDate(comanda.dataNecessitat)}`}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
+                return (
+                  <Card
+                    key={index}
+                    sx={{
+                      mb: 2,
+                      border: option.prioritat === 1 ? '2px solid #4caf50' : 'none',
+                      backgroundColor: option.prioritat === 1 ? '#f8fff8' : 'inherit'
+                    }}
+                  >
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {getOptionIcon(option.tipus)}
+                          {option.tipus}
+                          {option.prioritat === 1 && (
+                            <Chip
+                              label="RECOMANAT"
+                              size="small"
+                              color="success"
+                              sx={{ ml: 1 }}
+                            />
+                          )}
+                        </Typography>
+                        <Chip
+                          label={`Eficiència: ${option.eficiencia}`}
+                          size="small"
+                          color={getEfficiencyColor(option.eficiencia) as any}
+                        />
+                      </Box>
 
-                    {option.monitorsDisponibles.length > 0 && (
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        {option.descripció}
+                      </Typography>
+
+                      {option.notes && (
+                        <Typography variant="caption" sx={{
+                          color: option.prioritat === 1 ? 'success.main' : 'text.secondary',
+                          fontWeight: option.prioritat === 1 ? 'bold' : 'normal'
+                        }}>
+                          💡 {option.notes}
+                        </Typography>
+                      )}
+
                       <Box sx={{ mt: 2 }}>
                         <Typography variant="subtitle2" gutterBottom>
-                          Monitors disponibles:
+                          📍 Escola d'entrega: <strong>{option.escola}</strong>
+                          {option.escolaDestino && (
+                            <span> → Destí final: <strong>{option.escolaDestino}</strong></span>
+                          )}
                         </Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap">
-                          {option.monitorsDisponibles.map((monitor, idx) => (
-                            <Chip
-                              key={idx}
-                              icon={<Person />}
-                              label={`${monitor.nom} (${monitor.dies.join(', ')})`}
-                              size="small"
-                              variant="outlined"
-                            />
-                          ))}
-                        </Stack>
+
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          {option.comandes.length} comandes
+                          {option.distanciaAcademia && (
+                            <span> • Distància des d'Eixos: {option.distanciaAcademia}</span>
+                          )}
+                        </Typography>
                       </Box>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+
+                      <List dense sx={{ mt: 1 }}>
+                        {option.comandes.map((comanda) => (
+                          <ListItem key={comanda.idItem} sx={{ py: 0.5 }}>
+                            <ListItemText
+                              primary={`${comanda.material} (${comanda.quantitat})`}
+                              secondary={`${comanda.solicitant} • ${formatDate(comanda.dataNecessitat)}`}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+
+                      {option.monitorsDisponibles && option.monitorsDisponibles.length > 0 && (
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="subtitle2" gutterBottom>
+                            Monitors disponibles:
+                          </Typography>
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            {option.monitorsDisponibles.map((monitor, idx) => (
+                              <Chip
+                                key={idx}
+                                icon={<Person />}
+                                label={`${monitor.nom} (${monitor.dies?.join(', ') || 'N/A'})`}
+                                size="small"
+                                variant={monitor.tipus === 'directa' ? 'filled' : 'outlined'}
+                                color={monitor.tipus === 'intermèdia' ? 'success' : 'default'}
+                              />
+                            ))}
+                          </Stack>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
 
               <Divider sx={{ my: 3 }} />
 
