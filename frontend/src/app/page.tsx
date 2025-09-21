@@ -1,5 +1,5 @@
-import OrdersTable from '../components/OrdersTable';
+import AdminTabs from '../components/AdminTabs';
 
 export default function Home() {
-  return <OrdersTable />;
+  return <AdminTabs />;
 }

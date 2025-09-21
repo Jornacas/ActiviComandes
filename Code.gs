@@ -163,6 +163,27 @@ function handleApiRequest(e, method) {
                        (e.postData ? JSON.parse(e.postData.contents).filters : {});
         result = obtenerEstadisticasDashboard(filters);
         break;
+      case 'getPreparatedOrders':
+        // Get orders ready for delivery assignment
+        result = getPreparatedOrders();
+        break;
+      case 'getDeliveryOptions':
+        // Get delivery options for selected orders
+        const selectedOrders = e.parameter.orders ? JSON.parse(e.parameter.orders) :
+                             (e.postData ? JSON.parse(e.postData.contents).orders : []);
+        result = getDeliveryOptions(selectedOrders);
+        break;
+      case 'createDelivery':
+        // Create delivery assignment
+        const deliveryData = e.postData ? JSON.parse(e.postData.contents).deliveryData : {};
+        result = createDelivery(deliveryData);
+        break;
+      case 'calculateDistances':
+        // Calculate distances from Eixos Creativa
+        const addresses = e.parameter.addresses ? JSON.parse(e.parameter.addresses) :
+                         (e.postData ? JSON.parse(e.postData.contents).addresses : []);
+        result = calculateDistances(addresses);
+        break;
       default:
         // If no API action specified, serve the HTML interface (legacy mode)
         if (!action) {
@@ -2243,4 +2264,327 @@ function obtenerEstadisticasDashboard(filtros) {
       message: 'Error al generar estadísticas: ' + e.toString()
     };
   }
-} 
+}
+
+// =====================================================
+// FUNCIONS PER ENTREGAS OPTIMITZADES - FASE 3
+// =====================================================
+
+/**
+ * Obtenir comandes en estat "Preparat" per assignar entrega
+ */
+function getPreparatedOrders() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Respostes");
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: "La hoja 'Respostes' no existe."
+      };
+    }
+
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+
+    if (values.length < 2) {
+      return {
+        success: true,
+        data: [],
+        message: "No hi ha comandes preparades."
+      };
+    }
+
+    const headers = values[0];
+    const estatIndex = headers.findIndex(h => h === "Estat");
+    const escolaIndex = headers.findIndex(h => h === "Escola");
+    const dataNecessitatIndex = headers.findIndex(h => h === "Data_Necessitat");
+    const solicitantIndex = headers.findIndex(h => h === "Nom_Cognoms");
+    const materialIndex = headers.findIndex(h => h === "Material");
+    const quantitatIndex = headers.findIndex(h => h === "Unitats");
+    const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+
+    const preparatedOrders = [];
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const estat = row[estatIndex];
+
+      if (estat === "Preparat") {
+        preparatedOrders.push({
+          idPedido: row[idPedidoIndex],
+          idItem: row[idItemIndex],
+          solicitant: row[solicitantIndex],
+          escola: row[escolaIndex],
+          dataNecessitat: row[dataNecessitatIndex],
+          material: row[materialIndex],
+          quantitat: row[quantitatIndex],
+          rowIndex: i + 1 // Per actualitzar després
+        });
+      }
+    }
+
+    return {
+      success: true,
+      data: preparatedOrders
+    };
+
+  } catch (error) {
+    console.error("Error en getPreparatedOrders:", error);
+    return {
+      success: false,
+      error: "Error obtenint comandes preparades: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Obtenir opcions d'entrega per comandes seleccionades
+ */
+function getDeliveryOptions(selectedOrders) {
+  try {
+    if (!selectedOrders || selectedOrders.length === 0) {
+      return {
+        success: false,
+        error: "No s'han proporcionat comandes seleccionades"
+      };
+    }
+
+    // Obtenir dades de la hoja "Dades" per trobar monitors
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const dadesSheet = ss.getSheetByName("Dades");
+
+    if (!dadesSheet) {
+      return {
+        success: false,
+        error: "La hoja 'Dades' no existe."
+      };
+    }
+
+    const dadesValues = dadesSheet.getDataRange().getValues();
+    const dadesHeaders = dadesValues[0];
+
+    const escolaIdx = dadesHeaders.findIndex(h => h === "ESCOLA");
+    const monitoraIdx = dadesHeaders.findIndex(h => h === "MONITORA");
+    const diaIdx = dadesHeaders.findIndex(h => h === "DIA");
+    const adreçaIdx = dadesHeaders.findIndex(h => h === "ADREÇA");
+
+    // Agrupar comandes per escola
+    const ordersBySchool = {};
+    selectedOrders.forEach(order => {
+      if (!ordersBySchool[order.escola]) {
+        ordersBySchool[order.escola] = [];
+      }
+      ordersBySchool[order.escola].push(order);
+    });
+
+    const deliveryOptions = [];
+
+    // Per cada escola, buscar monitors disponibles
+    Object.keys(ordersBySchool).forEach(escola => {
+      const schoolOrders = ordersBySchool[escola];
+      const availableMonitors = [];
+
+      // Buscar monitors en aquesta escola a la hoja Dades
+      for (let i = 1; i < dadesValues.length; i++) {
+        const row = dadesValues[i];
+        const rowEscola = row[escolaIdx];
+        const monitora = row[monitoraIdx];
+        const dia = row[diaIdx];
+        const adreça = row[adreçaIdx];
+
+        if (rowEscola === escola && monitora) {
+          // Verificar si el monitor ja està a la llista
+          const existingMonitor = availableMonitors.find(m => m.nom === monitora);
+          if (!existingMonitor) {
+            availableMonitors.push({
+              nom: monitora,
+              escola: escola,
+              dies: [dia],
+              adreça: adreça
+            });
+          } else {
+            // Afegir dia si no existeix
+            if (!existingMonitor.dies.includes(dia)) {
+              existingMonitor.dies.push(dia);
+            }
+          }
+        }
+      }
+
+      deliveryOptions.push({
+        escola: escola,
+        comandes: schoolOrders,
+        monitorsDisponibles: availableMonitors,
+        adreça: availableMonitors.length > 0 ? availableMonitors[0].adreça : '',
+        opcions: {
+          directa: true, // Sempre es pot entregar directament
+          intermediari: availableMonitors.length > 0
+        }
+      });
+    });
+
+    return {
+      success: true,
+      data: deliveryOptions
+    };
+
+  } catch (error) {
+    console.error("Error en getDeliveryOptions:", error);
+    return {
+      success: false,
+      error: "Error obtenint opcions d'entrega: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Crear assignació d'entrega
+ */
+function createDelivery(deliveryData) {
+  try {
+    if (!deliveryData || !deliveryData.orderIds || !deliveryData.modalitat) {
+      return {
+        success: false,
+        error: "Dades d'entrega incompletes"
+      };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Respostes");
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: "La hoja 'Respostes' no existe."
+      };
+    }
+
+    // Ampliar headers si no existeixen les noves columnes
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const newColumns = [
+      "Modalitat_Entrega",
+      "Monitor_Intermediari",
+      "Data_Entrega_Prevista",
+      "Distancia_Academia",
+      "Notes_Entrega"
+    ];
+
+    let headersUpdated = false;
+    newColumns.forEach(col => {
+      if (!headers.includes(col)) {
+        headers.push(col);
+        headersUpdated = true;
+      }
+    });
+
+    if (headersUpdated) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+
+    // Obtenir índexs de columnes
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+    const modalitатIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
+    const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista");
+    const estatIndex = headers.findIndex(h => h === "Estat");
+
+    // Actualitzar files corresponents
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    let updatedRows = 0;
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const idItem = row[idItemIndex];
+
+      if (deliveryData.orderIds.includes(idItem)) {
+        // Actualitzar dades d'entrega
+        row[modalittatIndex] = deliveryData.modalitat;
+        row[monitorIndex] = deliveryData.monitorIntermediaria || '';
+        row[dataEntregaIndex] = deliveryData.dataEntrega || '';
+        row[estatIndex] = "Assignat"; // Nou estat
+        updatedRows++;
+      }
+    }
+
+    if (updatedRows > 0) {
+      sheet.getDataRange().setValues(values);
+    }
+
+    return {
+      success: true,
+      updatedRows: updatedRows,
+      message: `S'han assignat ${updatedRows} comandes per entrega ${deliveryData.modalitat.toLowerCase()}`
+    };
+
+  } catch (error) {
+    console.error("Error en createDelivery:", error);
+    return {
+      success: false,
+      error: "Error creant assignació d'entrega: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Calcular distàncies des d'Eixos Creativa
+ */
+function calculateDistances(addresses) {
+  try {
+    if (!addresses || addresses.length === 0) {
+      return {
+        success: false,
+        error: "No s'han proporcionat adreces"
+      };
+    }
+
+    const origin = "Eixos Creativa";
+    const results = [];
+
+    addresses.forEach(address => {
+      try {
+        const response = Maps.newDistanceMatrixService()
+          .getDistanceMatrix(origin, address, Maps.Mode.DRIVING);
+
+        if (response.rows && response.rows[0] && response.rows[0].elements && response.rows[0].elements[0]) {
+          const element = response.rows[0].elements[0];
+          if (element.status === "OK") {
+            results.push({
+              address: address,
+              distance: element.distance.text,
+              distanceValue: element.distance.value, // metres
+              duration: element.duration.text,
+              durationValue: element.duration.value // segons
+            });
+          } else {
+            results.push({
+              address: address,
+              error: "No s'ha pogut calcular la distància"
+            });
+          }
+        }
+      } catch (addressError) {
+        console.error("Error calculant distància per " + address + ":", addressError);
+        results.push({
+          address: address,
+          error: "Error en el càlcul: " + addressError.toString()
+        });
+      }
+    });
+
+    return {
+      success: true,
+      data: results
+    };
+
+  } catch (error) {
+    console.error("Error en calculateDistances:", error);
+    return {
+      success: false,
+      error: "Error calculant distàncies: " + error.toString()
+    };
+  }
+}

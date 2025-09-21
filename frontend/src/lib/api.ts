@@ -185,6 +185,23 @@ class ApiClient {
   async getStats(filters?: any): Promise<ApiResponse<any>> {
     return this.request('getStats', { filters });
   }
+
+  // New delivery management methods
+  async getPreparatedOrders(): Promise<ApiResponse<any[]>> {
+    return this.request('getPreparatedOrders');
+  }
+
+  async getDeliveryOptions(orders: any[]): Promise<ApiResponse<any[]>> {
+    return this.request('getDeliveryOptions', { orders }, 'POST');
+  }
+
+  async createDelivery(deliveryData: any): Promise<ApiResponse<{ updatedRows: number; message: string }>> {
+    return this.request('createDelivery', { deliveryData }, 'POST');
+  }
+
+  async calculateDistances(addresses: string[]): Promise<ApiResponse<any[]>> {
+    return this.request('calculateDistances', { addresses }, 'POST');
+  }
 }
 
 export const apiClient = new ApiClient();

@@ -42,12 +42,14 @@ const formatSentenceCase = (text: string | null | undefined): string => {
 
 const statusColors = {
   'Pendent': 'default',
-  'En proces': 'warning', 
+  'En proces': 'warning',
   'Preparat': 'info',
+  'Assignat': 'secondary',
   'Entregat': 'success',
   'Pendiente': 'default',
   'En proceso': 'warning',
   'Preparado': 'info',
+  'Asignado': 'secondary',
   'Entregado': 'success',
   '': 'default',
 } as const;
@@ -56,6 +58,7 @@ const statusIcons = {
   'Pendent': <Pending />,
   'En proces': <HourglassEmpty />,
   'Preparat': <CheckCircle />,
+  'Assignat': <LocalShipping />,
   'Entregat': <LocalShipping />,
   'Pendiente': <Pending />,
   'En proceso': <HourglassEmpty />,
@@ -375,6 +378,7 @@ export default function OrdersTable() {
               >
                 <MenuItem value="En proces">En procés</MenuItem>
                 <MenuItem value="Preparat">Preparat</MenuItem>
+                <MenuItem value="Assignat">Assignat</MenuItem>
                 <MenuItem value="Entregat">Entregat</MenuItem>
               </Select>
             </FormControl>
