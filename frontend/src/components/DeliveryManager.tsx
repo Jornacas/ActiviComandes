@@ -277,38 +277,11 @@ export default function DeliveryManager() {
           </Alert>
         )}
 
-        <Card
-          sx={{
-            mb: 3,
-            borderRadius: 3,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            border: '1px solid rgba(0,0,0,0.05)'
-          }}
-        >
+        <Card sx={{ mb: 3 }}>
           <CardContent>
-          <Typography
-            variant="h5"
-            gutterBottom
-            sx={{
-              fontWeight: 600,
-              color: '#374151',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
-            }}
-          >
-            <CheckCircle sx={{ color: '#10b981' }} />
-            Comandes Preparades
-            <Chip
-              label={preparatedOrders.length}
-              size="small"
-              sx={{
-                ml: 1,
-                bgcolor: '#e0f2fe',
-                color: '#0277bd',
-                fontWeight: 600
-              }}
-            />
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CheckCircle color="success" />
+            Comandes Preparades ({preparatedOrders.length})
           </Typography>
 
           {preparatedOrders.length === 0 ? (
@@ -329,64 +302,26 @@ export default function DeliveryManager() {
                   </Typography>
                   <Button
                     variant="contained"
+                    color="primary"
                     onClick={getDeliveryOptionsForSelected}
                     disabled={selectedOrders.length === 0 || loading}
                     startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <DirectionsCar />}
-                    sx={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      borderRadius: 2,
-                      px: 3,
-                      py: 1.5,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                      '&:hover': {
-                        boxShadow: '0 6px 20px rgba(102, 126, 234, 0.4)',
-                        transform: 'translateY(-1px)'
-                      },
-                      '&:disabled': {
-                        background: '#e5e7eb',
-                        color: '#9ca3af'
-                      }
-                    }}
                   >
                     Planificar Entrega
                   </Button>
                 </Stack>
               </Box>
 
-              <TableContainer
-                component={Paper}
-                sx={{
-                  borderRadius: 2,
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-                  border: '1px solid rgba(0,0,0,0.05)'
-                }}
-              >
-                <Table>
+              <TableContainer component={Paper}>
+                <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                      <TableCell
-                        padding="checkbox"
-                        sx={{ fontWeight: 600, color: '#374151' }}
-                      >
-                        Sel.
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
-                        Sol·licitant
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
-                        Escola
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
-                        Material
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
-                        Quantitat
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
-                        Data Necessitat
-                      </TableCell>
+                    <TableRow>
+                      <TableCell padding="checkbox">Sel.</TableCell>
+                      <TableCell>Sol·licitant</TableCell>
+                      <TableCell>Escola</TableCell>
+                      <TableCell>Material</TableCell>
+                      <TableCell>Quantitat</TableCell>
+                      <TableCell>Data Necessitat</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
