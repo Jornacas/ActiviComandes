@@ -249,34 +249,6 @@ export default function DeliveryManager() {
 
   return (
     <Box>
-      {/* Header Section */}
-      <Box sx={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        borderRadius: '12px 12px 0 0',
-        p: 4,
-        color: 'white'
-      }}>
-        <Typography
-          variant="h4"
-          gutterBottom
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-            fontWeight: 700,
-            textShadow: '0 2px 4px rgba(0,0,0,0.2)'
-          }}
-        >
-          <LocalShipping sx={{ fontSize: '2.5rem' }} />
-          Gestió d'Entregas
-        </Typography>
-        <Typography variant="body1" sx={{ opacity: 0.9, fontSize: '1.1rem' }}>
-          Optimitza les entregas agrupant comandes per escoles i monitors
-        </Typography>
-      </Box>
-
-      {/* Content Section */}
-      <Box sx={{ p: 4 }}>
         {error && (
           <Alert
             severity="error"
@@ -313,7 +285,7 @@ export default function DeliveryManager() {
             border: '1px solid rgba(0,0,0,0.05)'
           }}
         >
-          <CardContent sx={{ p: 4 }}>
+          <CardContent>
           <Typography
             variant="h5"
             gutterBottom
