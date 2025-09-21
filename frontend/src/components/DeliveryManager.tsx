@@ -249,7 +249,7 @@ export default function DeliveryManager() {
 
   return (
     <Box>
-        {error && (
+      {error && (
           <Alert
             severity="error"
             sx={{
@@ -277,8 +277,8 @@ export default function DeliveryManager() {
           </Alert>
         )}
 
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
           <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CheckCircle color="success" />
             Comandes Preparades ({preparatedOrders.length})
