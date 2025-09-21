@@ -75,6 +75,11 @@ function handleApiRequest(e, method) {
                          (e.postData ? JSON.parse(e.postData.contents).newStatus : '');
         result = updateRespostesOrderStatus(uuids, newStatus);
         break;
+      case 'deleteOrders':
+        const deleteUuids = e.parameter.uuids ? e.parameter.uuids.split(',') :
+                            (e.postData ? JSON.parse(e.postData.contents).uuids : []);
+        result = deleteOrdersFromSheet(deleteUuids);
+        break;
       case 'updateDeliveryInfo':
         result = actualizarCentrosDeEntregaYDia();
         break;
@@ -2586,6 +2591,74 @@ function calculateDistances(addresses) {
     return {
       success: false,
       error: "Error calculant distàncies: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Delete orders from the Respostes sheet
+ * @param {string[]} uuids - Array of UUIDs to delete
+ * @returns {Object} Result object with success status and deleted count
+ */
+function deleteOrdersFromSheet(uuids) {
+  try {
+    if (!uuids || uuids.length === 0) {
+      return { success: false, error: "No s'han proporcionat UUIDs per eliminar" };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetRespostes = ss.getSheetByName("Respostes");
+
+    if (!sheetRespostes) {
+      return { success: false, error: "Falta la hoja 'Respostes'" };
+    }
+
+    const data = sheetRespostes.getDataRange().getValues();
+    if (data.length <= 1) {
+      return { success: false, error: "No hi ha dades per eliminar" };
+    }
+
+    const headers = data[0];
+
+    // Find UUID column (could be ID Pedido, ID Item, UUID, etc.)
+    let uuidColumnIndex = -1;
+    const possibleUuidColumns = ['ID Pedido', 'ID Item', 'UUID', 'uuid', 'id', 'Id'];
+
+    for (const colName of possibleUuidColumns) {
+      uuidColumnIndex = headers.findIndex(h => h === colName);
+      if (uuidColumnIndex !== -1) break;
+    }
+
+    if (uuidColumnIndex === -1) {
+      return { success: false, error: "No s'ha trobat la columna d'identificador" };
+    }
+
+    // Find rows to delete (from bottom to top to avoid index shifting)
+    const rowsToDelete = [];
+    for (let i = data.length - 1; i >= 1; i--) {
+      const rowUuid = data[i][uuidColumnIndex];
+      if (uuids.includes(String(rowUuid))) {
+        rowsToDelete.push(i + 1); // +1 because sheet rows are 1-indexed
+      }
+    }
+
+    // Delete rows
+    let deletedCount = 0;
+    for (const rowIndex of rowsToDelete) {
+      sheetRespostes.deleteRow(rowIndex);
+      deletedCount++;
+    }
+
+    return {
+      success: true,
+      data: { deletedCount }
+    };
+
+  } catch (error) {
+    console.error("Error eliminant sol·licituds:", error);
+    return {
+      success: false,
+      error: "Error eliminant sol·licituds: " + error.toString()
     };
   }
 }

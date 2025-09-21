@@ -24,11 +24,11 @@ import {
 } from '@mui/material';
 import {
   Sync,
-  Update,
   CheckCircle,
   Pending,
   LocalShipping,
   HourglassEmpty,
+  Delete,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
 
@@ -75,6 +75,7 @@ export default function OrdersTable() {
   const [selectedRows, setSelectedRows] = useState<GridRowSelectionModel>([]);
   const [newStatus, setNewStatus] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const columns: GridColDef[] = [
     {
@@ -264,20 +265,32 @@ export default function OrdersTable() {
     }
   };
 
-  const updateDelivery = async () => {
-    setUpdating(true);
+  const deleteSelectedOrders = async () => {
+    if (selectedRows.length === 0) return;
+
+    const confirmed = window.confirm(`Estàs segur que vols eliminar ${selectedRows.length} sol·licitud${selectedRows.length > 1 ? 's' : ''}? Aquesta acció no es pot desfer.`);
+    if (!confirmed) return;
+
+    setDeleting(true);
     try {
-      const response = await apiClient.updateDeliveryInfo();
+      // Get UUIDs of selected orders
+      const selectedUuids = selectedRows.map(rowId => {
+        const order = orders.find(o => o.id === rowId);
+        return order?.idPedido || order?.idItem || order?.uuid || '';
+      }).filter(uuid => uuid);
+
+      const response = await apiClient.deleteOrders(selectedUuids);
       if (response.success) {
         await loadData(); // Reload data
+        setSelectedRows([]);
         setError(null);
       } else {
-        setError(response.error || 'Error al actualizar entregas');
+        setError(response.error || 'Error al eliminar sol·licituds');
       }
     } catch (err) {
-      setError('Error al actualizar información de entrega');
+      setError('Error al eliminar sol·licituds');
     } finally {
-      setUpdating(false);
+      setDeleting(false);
     }
   };
 
@@ -329,14 +342,6 @@ export default function OrdersTable() {
           Sincronitzar Respostes
         </Button>
 
-        <Button
-          variant="outlined"
-          startIcon={<Update />}
-          onClick={updateDelivery}
-          disabled={updating}
-        >
-          Actualitzar Lliuraments
-        </Button>
 
         {selectedRows.length > 0 && (
           <>
@@ -347,6 +352,7 @@ export default function OrdersTable() {
                 label="Nou Estat"
                 onChange={(e) => setNewStatus(e.target.value)}
               >
+                <MenuItem value="Pendent">Pendent</MenuItem>
                 <MenuItem value="En proces">En procés</MenuItem>
                 <MenuItem value="Preparat">Preparat</MenuItem>
                 <MenuItem value="Assignat">Assignat</MenuItem>
@@ -361,6 +367,16 @@ export default function OrdersTable() {
               disabled={!newStatus || updating}
             >
               Actualitzar ({selectedRows.length})
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<Delete />}
+              onClick={deleteSelectedOrders}
+              disabled={deleting}
+            >
+              Eliminar ({selectedRows.length})
             </Button>
           </>
         )}

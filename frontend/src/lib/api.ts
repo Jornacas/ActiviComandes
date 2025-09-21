@@ -162,6 +162,10 @@ class ApiClient {
     return this.request('updateOrderStatus', { uuids: uuids.join(','), newStatus }, 'GET');
   }
 
+  async deleteOrders(uuids: string[]): Promise<ApiResponse<{ deletedCount: number }>> {
+    return this.request('deleteOrders', { uuids: uuids.join(',') }, 'GET');
+  }
+
   async updateDeliveryInfo(): Promise<ApiResponse<{ cambiosAplicados: number }>> {
     return this.request('updateDeliveryInfo', {}, 'GET');
   }
