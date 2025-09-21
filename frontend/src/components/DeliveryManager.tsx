@@ -250,32 +250,16 @@ export default function DeliveryManager() {
   return (
     <Box>
       {error && (
-          <Alert
-            severity="error"
-            sx={{
-              mb: 3,
-              borderRadius: 2,
-              '& .MuiAlert-icon': { fontSize: '1.5rem' }
-            }}
-            onClose={() => setError(null)}
-          >
-            {error}
-          </Alert>
-        )}
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
-        {success && (
-          <Alert
-            severity="success"
-            sx={{
-              mb: 3,
-              borderRadius: 2,
-              '& .MuiAlert-icon': { fontSize: '1.5rem' }
-            }}
-            onClose={() => setSuccess(null)}
-          >
-            {success}
-          </Alert>
-        )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
@@ -482,7 +466,6 @@ export default function DeliveryManager() {
           </Button>
         </DialogActions>
       </Dialog>
-      </Box>
     </Box>
   );
 }
