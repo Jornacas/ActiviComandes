@@ -144,16 +144,12 @@ export default function DeliveryManager() {
         selectedOrders.includes(order.idItem)
       );
 
-      const response = await fetch(`${API_BASE_URL}?action=getDeliveryOptions&token=${API_TOKEN}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          orders: selectedOrdersData
-        })
-      });
+      const url = new URL(API_BASE_URL);
+      url.searchParams.append('action', 'getDeliveryOptions');
+      url.searchParams.append('token', API_TOKEN);
+      url.searchParams.append('orders', JSON.stringify(selectedOrdersData));
 
+      const response = await fetch(url.toString());
       const result = await response.json();
 
       if (result.success) {
@@ -192,16 +188,12 @@ export default function DeliveryManager() {
         dataEntrega: dataEntrega
       };
 
-      const response = await fetch(`${API_BASE_URL}?action=createDelivery&token=${API_TOKEN}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deliveryData
-        })
-      });
+      const url = new URL(API_BASE_URL);
+      url.searchParams.append('action', 'createDelivery');
+      url.searchParams.append('token', API_TOKEN);
+      url.searchParams.append('deliveryData', JSON.stringify(deliveryData));
 
+      const response = await fetch(url.toString());
       const result = await response.json();
 
       if (result.success) {

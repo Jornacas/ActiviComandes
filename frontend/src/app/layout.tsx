@@ -22,9 +22,7 @@ export default function RootLayout({
     <html lang="ca">
       <body className={inter.className}>
         <CustomThemeProvider>
-          <Container maxWidth="xl" sx={{ py: 4 }}>
-            {children}
-          </Container>
+          {children}
         </CustomThemeProvider>
       </body>
     </html>

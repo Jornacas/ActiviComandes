@@ -7,10 +7,15 @@ import {
   Tab,
   Paper,
   Badge,
+  AppBar,
+  Toolbar,
+  Typography,
+  Container,
 } from '@mui/material';
 import {
   TableChart,
   LocalShipping,
+  Business,
 } from '@mui/icons-material';
 
 import OrdersTable from './OrdersTable';
@@ -54,35 +59,58 @@ export default function AdminTabs() {
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Paper sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs
-          value={value}
-          onChange={handleChange}
-          aria-label="admin tabs"
-          variant="fullWidth"
-        >
-          <Tab
-            label="Sol·licituds"
-            icon={<TableChart />}
-            iconPosition="start"
-            {...a11yProps(0)}
-          />
-          <Tab
-            label="Entregas"
-            icon={<LocalShipping />}
-            iconPosition="start"
-            {...a11yProps(1)}
-          />
-        </Tabs>
-      </Paper>
+      {/* Header fixed */}
+      <AppBar position="static" sx={{ mb: 3 }}>
+        <Toolbar>
+          <Business sx={{ mr: 2 }} />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Panell d'Administració - Eixos Creativa
+          </Typography>
+        </Toolbar>
+      </AppBar>
 
-      <TabPanel value={value} index={0}>
-        <OrdersTable />
-      </TabPanel>
+      {/* Navigation tabs */}
+      <Container maxWidth="xl">
+        <Paper sx={{ mb: 3 }}>
+          <Tabs
+            value={value}
+            onChange={handleChange}
+            aria-label="admin tabs"
+            variant="fullWidth"
+            sx={{
+              borderBottom: 1,
+              borderColor: 'divider',
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontSize: '1rem',
+                fontWeight: 500
+              }
+            }}
+          >
+            <Tab
+              label="Sol·licituds"
+              icon={<TableChart />}
+              iconPosition="start"
+              {...a11yProps(0)}
+            />
+            <Tab
+              label="Entregas"
+              icon={<LocalShipping />}
+              iconPosition="start"
+              {...a11yProps(1)}
+            />
+          </Tabs>
+        </Paper>
 
-      <TabPanel value={value} index={1}>
-        <DeliveryManager />
-      </TabPanel>
+        {/* Content panels */}
+        <TabPanel value={value} index={0}>
+          <OrdersTable />
+        </TabPanel>
+
+        <TabPanel value={value} index={1}>
+          <DeliveryManager />
+        </TabPanel>
+      </Container>
     </Box>
   );
 }

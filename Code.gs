@@ -175,7 +175,8 @@ function handleApiRequest(e, method) {
         break;
       case 'createDelivery':
         // Create delivery assignment
-        const deliveryData = e.postData ? JSON.parse(e.postData.contents).deliveryData : {};
+        const deliveryData = e.parameter.deliveryData ? JSON.parse(e.parameter.deliveryData) :
+                           (e.postData ? JSON.parse(e.postData.contents).deliveryData : {});
         result = createDelivery(deliveryData);
         break;
       case 'calculateDistances':
