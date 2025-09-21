@@ -295,7 +295,6 @@ export default function OrdersTable() {
 
   return (
     <Box>
-      {/* Header con logo y título */}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

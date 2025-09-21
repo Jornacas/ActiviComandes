@@ -6,16 +6,11 @@ import {
   Tabs,
   Tab,
   Paper,
-  Badge,
-  AppBar,
-  Toolbar,
   Typography,
-  Container,
 } from '@mui/material';
 import {
   TableChart,
   LocalShipping,
-  Business,
 } from '@mui/icons-material';
 
 import OrdersTable from './OrdersTable';
@@ -58,76 +53,91 @@ export default function AdminTabs() {
   };
 
   return (
-    <Box sx={{ width: '100%', minHeight: '100vh', bgcolor: '#f5f7fa' }}>
-      {/* Header original simple */}
-      <AppBar position="static" sx={{ mb: 0 }}>
-        <Toolbar>
-          <Business sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+    <Box sx={{ width: '100%' }}>
+      {/* Header amb logo i títol */}
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        mb: 4,
+        gap: 4,
+        borderBottom: '1px solid #e0e0e0',
+        pb: 2
+      }}>
+        <Box sx={{ flexShrink: 0 }}>
+          <img
+            src="https://www.eixoscreativa.com/wp-content/uploads/2024/01/Eixos-creativa.png.webp"
+            alt="Eixos Creativa"
+            style={{
+              height: '60px',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+            }}
+          />
+        </Box>
+        <Box sx={{ flex: 1, textAlign: 'center' }}>
+          <Typography variant="h4" component="h1" color="primary" sx={{ fontWeight: 600 }}>
             Panell d'Administració - Comandes de Materials
           </Typography>
-          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+          <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1 }}>
             Gestió i seguiment de sol·licituds
           </Typography>
-        </Toolbar>
-      </AppBar>
-
-      {/* Navigation tabs - directament sota el header */}
-      <Container maxWidth="xl" sx={{ px: 0 }}>
-        <Paper elevation={1} sx={{ borderRadius: 0 }}>
-          <Tabs
-            value={value}
-            onChange={handleChange}
-            aria-label="admin tabs"
-            variant="fullWidth"
-            sx={{
-              minHeight: 48,
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontSize: '0.95rem',
-                fontWeight: 500,
-                py: 1.5,
-                minHeight: 48,
-                color: '#6b7280',
-                '&:hover': {
-                  color: '#1976d2',
-                  backgroundColor: 'rgba(25, 118, 210, 0.04)'
-                },
-                '&.Mui-selected': {
-                  color: '#1976d2'
-                }
-              },
-              '& .MuiTabs-indicator': {
-                height: 3
-              }
-            }}
-          >
-            <Tab
-              label="Sol·licituds"
-              icon={<TableChart />}
-              iconPosition="start"
-              {...a11yProps(0)}
-            />
-            <Tab
-              label="Entregas"
-              icon={<LocalShipping />}
-              iconPosition="start"
-              {...a11yProps(1)}
-            />
-          </Tabs>
-        </Paper>
-
-        {/* Content panels */}
-        <Box sx={{ p: 3 }}>
-          <TabPanel value={value} index={0}>
-            <OrdersTable />
-          </TabPanel>
-
-          <TabPanel value={value} index={1}>
-            <DeliveryManager />
-          </TabPanel>
         </Box>
-      </Container>
+      </Box>
+
+      {/* Navigation tabs */}
+      <Paper elevation={1} sx={{ borderRadius: 0 }}>
+        <Tabs
+          value={value}
+          onChange={handleChange}
+          aria-label="admin tabs"
+          variant="fullWidth"
+          sx={{
+            minHeight: 48,
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontSize: '0.95rem',
+              fontWeight: 500,
+              py: 1.5,
+              minHeight: 48,
+              color: '#6b7280',
+              '&:hover': {
+                color: '#1976d2',
+                backgroundColor: 'rgba(25, 118, 210, 0.04)'
+              },
+              '&.Mui-selected': {
+                color: '#1976d2'
+              }
+            },
+            '& .MuiTabs-indicator': {
+              height: 3
+            }
+          }}
+        >
+          <Tab
+            label="Sol·licituds"
+            icon={<TableChart />}
+            iconPosition="start"
+            {...a11yProps(0)}
+          />
+          <Tab
+            label="Entregas"
+            icon={<LocalShipping />}
+            iconPosition="start"
+            {...a11yProps(1)}
+          />
+        </Tabs>
+      </Paper>
+
+      {/* Content panels */}
+      <Box sx={{ p: 3 }}>
+        <TabPanel value={value} index={0}>
+          <OrdersTable />
+        </TabPanel>
+
+        <TabPanel value={value} index={1}>
+          <DeliveryManager />
+        </TabPanel>
+      </Box>
     </Box>
   );
 }
