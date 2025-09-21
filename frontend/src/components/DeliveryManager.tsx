@@ -248,28 +248,95 @@ export default function DeliveryManager() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <LocalShipping />
-        Gestió d'Entregas
-      </Typography>
+    <Box>
+      {/* Header Section */}
+      <Box sx={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        borderRadius: '12px 12px 0 0',
+        p: 4,
+        color: 'white'
+      }}>
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            fontWeight: 700,
+            textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          }}
+        >
+          <LocalShipping sx={{ fontSize: '2.5rem' }} />
+          Gestió d'Entregas
+        </Typography>
+        <Typography variant="body1" sx={{ opacity: 0.9, fontSize: '1.1rem' }}>
+          Optimitza les entregas agrupant comandes per escoles i monitors
+        </Typography>
+      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      {/* Content Section */}
+      <Box sx={{ p: 4 }}>
+        {error && (
+          <Alert
+            severity="error"
+            sx={{
+              mb: 3,
+              borderRadius: 2,
+              '& .MuiAlert-icon': { fontSize: '1.5rem' }
+            }}
+            onClose={() => setError(null)}
+          >
+            {error}
+          </Alert>
+        )}
 
-      {success && (
-        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess(null)}>
-          {success}
-        </Alert>
-      )}
+        {success && (
+          <Alert
+            severity="success"
+            sx={{
+              mb: 3,
+              borderRadius: 2,
+              '& .MuiAlert-icon': { fontSize: '1.5rem' }
+            }}
+            onClose={() => setSuccess(null)}
+          >
+            {success}
+          </Alert>
+        )}
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Comandes Preparades ({preparatedOrders.length})
+        <Card
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            border: '1px solid rgba(0,0,0,0.05)'
+          }}
+        >
+          <CardContent sx={{ p: 4 }}>
+          <Typography
+            variant="h5"
+            gutterBottom
+            sx={{
+              fontWeight: 600,
+              color: '#374151',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}
+          >
+            <CheckCircle sx={{ color: '#10b981' }} />
+            Comandes Preparades
+            <Chip
+              label={preparatedOrders.length}
+              size="small"
+              sx={{
+                ml: 1,
+                bgcolor: '#e0f2fe',
+                color: '#0277bd',
+                fontWeight: 600
+              }}
+            />
           </Typography>
 
           {preparatedOrders.length === 0 ? (
@@ -290,26 +357,64 @@ export default function DeliveryManager() {
                   </Typography>
                   <Button
                     variant="contained"
-                    color="primary"
                     onClick={getDeliveryOptionsForSelected}
                     disabled={selectedOrders.length === 0 || loading}
-                    startIcon={<DirectionsCar />}
+                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <DirectionsCar />}
+                    sx={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      borderRadius: 2,
+                      px: 3,
+                      py: 1.5,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                      '&:hover': {
+                        boxShadow: '0 6px 20px rgba(102, 126, 234, 0.4)',
+                        transform: 'translateY(-1px)'
+                      },
+                      '&:disabled': {
+                        background: '#e5e7eb',
+                        color: '#9ca3af'
+                      }
+                    }}
                   >
                     Planificar Entrega
                   </Button>
                 </Stack>
               </Box>
 
-              <TableContainer component={Paper}>
-                <Table size="small">
+              <TableContainer
+                component={Paper}
+                sx={{
+                  borderRadius: 2,
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                  border: '1px solid rgba(0,0,0,0.05)'
+                }}
+              >
+                <Table>
                   <TableHead>
-                    <TableRow>
-                      <TableCell padding="checkbox">Sel.</TableCell>
-                      <TableCell>Sol·licitant</TableCell>
-                      <TableCell>Escola</TableCell>
-                      <TableCell>Material</TableCell>
-                      <TableCell>Quantitat</TableCell>
-                      <TableCell>Data Necessitat</TableCell>
+                    <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                      <TableCell
+                        padding="checkbox"
+                        sx={{ fontWeight: 600, color: '#374151' }}
+                      >
+                        Sel.
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
+                        Sol·licitant
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
+                        Escola
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
+                        Material
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
+                        Quantitat
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#374151' }}>
+                        Data Necessitat
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
