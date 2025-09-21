@@ -61,7 +61,8 @@ export default function AdminTabs() {
         mb: 4,
         gap: 4,
         borderBottom: '1px solid #e0e0e0',
-        pb: 2
+        pb: 2,
+        px: 3
       }}>
         <Box sx={{ flexShrink: 0 }}>
           <img
