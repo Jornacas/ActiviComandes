@@ -296,34 +296,6 @@ export default function OrdersTable() {
   return (
     <Box>
       {/* Header con logo y título */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        mb: 4, 
-        gap: 4,
-        borderBottom: '1px solid #e0e0e0',
-        pb: 2
-      }}>
-        <Box sx={{ flexShrink: 0 }}>
-          <img
-            src="https://www.eixoscreativa.com/wp-content/uploads/2024/01/Eixos-creativa.png.webp"
-            alt="Eixos Creativa"
-            style={{ 
-              height: '60px', 
-              objectFit: 'contain',
-              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
-            }}
-          />
-        </Box>
-        <Box sx={{ flex: 1, textAlign: 'center' }}>
-          <Typography variant="h4" component="h1" color="primary" sx={{ fontWeight: 600 }}>
-            Panell d'Administració - Comandes de Materials
-          </Typography>
-          <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1 }}>
-            Gestió i seguiment de sol·licituds
-          </Typography>
-        </Box>
-      </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
