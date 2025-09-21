@@ -575,6 +575,7 @@ export default function DeliveryManager() {
           </Button>
         </DialogActions>
       </Dialog>
+      </Box>
     </Box>
   );
 }
