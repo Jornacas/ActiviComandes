@@ -150,6 +150,10 @@ class ApiClient {
     return this.request('loadData');
   }
 
+  async loadDataFast(): Promise<ApiResponse<{ headers: string[], rows: any[][], estadisticas: Stats }>> {
+    return this.request('loadDataFast');
+  }
+
   async processFormResponses(): Promise<ApiResponse<{ 
     nuevosRegistros: number;
     message?: string;

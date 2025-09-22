@@ -65,6 +65,10 @@ function handleApiRequest(e, method) {
       case 'loadData':
         result = loadRespostesData();
         break;
+      case 'loadDataFast':
+        // Load only last 100 entries for quick refresh after operations
+        result = loadRespostesData(100);
+        break;
       case 'processFormResponses':
         result = processRespostesData();
         break;
@@ -1492,7 +1496,7 @@ function createMultipleSollicitud(data) {
   }
 }
 
-function loadRespostesData() {
+function loadRespostesData(limit = null) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName("Respostes");
@@ -1535,15 +1539,21 @@ function loadRespostesData() {
     }
     
     // Remove headers row
-    const rows = values.slice(1);
+    let rows = values.slice(1);
     
-    // Calculate statistics
+    // Apply limit if specified (for performance)
+    if (limit && limit > 0) {
+      rows = rows.slice(0, limit);
+    }
+    
+    // Calculate statistics from all data (not limited)
+    const allRows = values.slice(1);
     const stats = {
-      total: rows.length,
-      pendents: rows.filter(row => row[11] === 'Pendent').length,
-      enProces: rows.filter(row => row[11] === 'En proces').length,
-      preparats: rows.filter(row => row[11] === 'Preparat').length,
-      entregats: rows.filter(row => row[11] === 'Entregat').length
+      total: allRows.length,
+      pendents: allRows.filter(row => row[11] === 'Pendent').length,
+      enProces: allRows.filter(row => row[11] === 'En proces').length,
+      preparats: allRows.filter(row => row[11] === 'Preparat').length,
+      entregats: allRows.filter(row => row[11] === 'Entregat').length
     };
     
     return {
@@ -2931,6 +2941,25 @@ function deleteOrdersFromSheet(uuids) {
       sheetRespostes.deleteRow(rowIndex);
       deletedCount++;
     }
+
+    // Clear cache after deletion to ensure fresh data on next load
+    const cache = CacheService.getScriptCache();
+    const cacheKeys = [
+      'cache_respostes_data',
+      'cache_dades_schools_by_monitor',
+      'cache_dades_activities_by_monitor_school',
+      'cache_dades_activities_by_school'
+    ];
+    
+    cacheKeys.forEach(key => {
+      try {
+        cache.remove(key);
+      } catch (e) {
+        console.log('Cache key not found:', key);
+      }
+    });
+
+    console.log(`Successfully deleted ${deletedCount} rows and cleared cache`);
 
     return {
       success: true,

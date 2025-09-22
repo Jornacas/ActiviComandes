@@ -210,6 +210,51 @@ export default function OrdersTable() {
     }
   };
 
+  const loadDataFast = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiClient.loadDataFast();
+
+      if (response.success && response.data) {
+        const { headers, rows, estadisticas } = response.data;
+
+        // Transform raw data to Order objects (same as loadData)
+        const transformedOrders = rows.map((row, index) => {
+          const order: any = { id: index };
+          headers.forEach((header, headerIndex) => {
+            // Convert header to camelCase
+            let key = header.toLowerCase().replace(/\s+/g, '');
+            // Special handling for common field names
+            if (key === 'idpedido') key = 'idPedido';
+            if (key === 'iditem') key = 'idItem';
+            if (key === 'nomcognoms') key = 'nomCognoms';
+            if (key === 'datanecessitat') key = 'dataNecessitat';
+            if (key === 'esmaterialpersonalitzat') key = 'esMaterialPersonalitzat';
+            if (key === 'comentarisgenerals') key = 'comentarisGenerals';
+            if (key === 'dataestat') key = 'dataEstat';
+            if (key === 'responsablepreparacio') key = 'responsablePreparacio';
+            if (key === 'notesinternes') key = 'notesInternes';
+            
+            order[key] = row[headerIndex] || '';
+          });
+          return order;
+        });
+
+        setOrders(transformedOrders);
+        setStats(estadisticas);
+      } else {
+        setError(response.error || 'Error desconocido al cargar datos');
+      }
+    } catch (err) {
+      setError('Error de conexión con el servidor');
+      console.error('Load data fast error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const syncFormResponses = async () => {
     setUpdating(true);
     try {
@@ -281,7 +326,14 @@ export default function OrdersTable() {
 
       const response = await apiClient.deleteOrders(selectedUuids);
       if (response.success) {
-        await loadData(); // Reload data
+        // Use fast reload for better performance after deletion
+        try {
+          await loadDataFast();
+        } catch (fastError) {
+          // Fallback to full reload if fast reload fails
+          console.warn('Fast reload failed, falling back to full reload:', fastError);
+          await loadData();
+        }
         setSelectedRows([]);
         setError(null);
       } else {
