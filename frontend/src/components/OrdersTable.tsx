@@ -217,9 +217,6 @@ export default function OrdersTable() {
       if (response.success && response.data) {
         const { headers, rows, estadisticas } = response.data;
 
-        // Debug headers
-        console.log('🔍 DEBUG HEADERS:', headers);
-
         // Transform raw data to Order objects
         const transformedOrders = rows.map((row, index) => {
           const order: any = { id: index };
@@ -239,11 +236,6 @@ export default function OrdersTable() {
             if (key === 'notesinternes') key = 'notesInternes';
             
             order[key] = row[headerIndex] || '';
-            
-            // Debug específico para el campo estat
-            if (header === 'estat' || key === 'estat') {
-              console.log(`🔍 DEBUG ESTAT - Row ${index}: Header: ${header}, Value: "${row[headerIndex]}", Key: ${key}, Final order[${key}]: "${order[key]}"`);
-            }
           });
           return order;
         });
@@ -290,11 +282,6 @@ export default function OrdersTable() {
             if (key === 'notesinternes') key = 'notesInternes';
             
             order[key] = row[headerIndex] || '';
-            
-            // Debug específico para el campo estat
-            if (header === 'estat' || key === 'estat') {
-              console.log(`🔍 DEBUG ESTAT FAST - Row ${index}: Header: ${header}, Value: "${row[headerIndex]}", Key: ${key}, Final order[${key}]: "${order[key]}"`);
-            }
           });
           return order;
         });

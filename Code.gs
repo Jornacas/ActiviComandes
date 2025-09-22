@@ -1557,6 +1557,12 @@ function loadRespostesData(limit = null) {
       entregats: allRows.filter(row => row[12] === 'Entregat').length
     };
     
+    // Debug: Log some sample estat values
+    console.log('DEBUG Backend - Sample estat values from sheet:');
+    allRows.slice(0, 3).forEach((row, idx) => {
+      console.log(`Row ${idx}: Position [12] = "${row[12]}", Position [13] = "${row[13]}"`);
+    });
+    
     return {
       success: true,
       data: {
