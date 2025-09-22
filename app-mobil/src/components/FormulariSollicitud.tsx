@@ -217,9 +217,24 @@ const FormulariSollicitud: React.FC = () => {
                       }));
                     }}
                     freeSolo={false} // Only allow selection from list
-                    selectOnFocus
+                    autoComplete
+                    autoHighlight
+                    autoSelect
+                    blurOnSelect
                     clearOnBlur
                     handleHomeEndKeys
+                    openOnFocus={false} // Don't open on focus
+                    disablePortal
+                    slotProps={{
+                      popper: {
+                        sx: {
+                          '& .MuiAutocomplete-listbox': {
+                            maxHeight: '120px', // Smaller dropdown
+                            fontSize: '0.875rem'
+                          }
+                        }
+                      }
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -228,19 +243,19 @@ const FormulariSollicitud: React.FC = () => {
                         InputProps={{
                           ...params.InputProps,
                           startAdornment: <Person color="action" sx={{ mr: 1 }} />,
+                          endAdornment: null, // Remove the arrow icon
                         }}
                       />
                     )}
                     renderOption={(props, option) => {
                       const { key, ...otherProps } = props;
                       return (
-                        <Box component="li" key={key} {...otherProps}>
-                          <Person sx={{ mr: 1, color: 'text.secondary' }} />
+                        <Box component="li" key={key} {...otherProps} sx={{ py: 0.5, fontSize: '0.875rem' }}>
                           {option}
                         </Box>
                       );
                     }}
-                    noOptionsText="No s'ha trobat cap monitor amb aquest nom"
+                    noOptionsText="No s'ha trobat cap monitor"
                     getOptionLabel={(option) => option}
                     isOptionEqualToValue={(option, value) => option === value}
                   />
