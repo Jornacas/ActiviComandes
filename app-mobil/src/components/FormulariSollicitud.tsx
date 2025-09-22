@@ -11,10 +11,14 @@ import {
   CircularProgress,
   Grid,
   Autocomplete,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   CalendarToday,
   Person,
+  AdminPanelSettings,
+  OpenInNew,
 } from '@mui/icons-material';
 import { apiClient, type SollicitudMultiple, type CartItem } from '../lib/api';
 import ItemForm from './ItemForm';
@@ -156,7 +160,33 @@ const FormulariSollicitud: React.FC = () => {
     <Box sx={{ width: '100%', minHeight: '100vh' }}>
       <Card sx={{ mb: { xs: 2, sm: 3 }, borderRadius: { xs: 0, sm: 2 } }}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Box sx={{ textAlign: 'center', mb: { xs: 2, sm: 3 } }}>
+          <Box sx={{ position: 'relative', textAlign: 'center', mb: { xs: 2, sm: 3 } }}>
+            {/* Botón Admin en la esquina superior derecha */}
+            <Box sx={{ 
+              position: 'absolute', 
+              top: 0, 
+              right: 0,
+              zIndex: 1
+            }}>
+              <Tooltip title="Panell d'Administració">
+                <IconButton
+                  color="primary"
+                  onClick={() => window.open('https://activi-comandes-admin.vercel.app', '_blank')}
+                  sx={{
+                    backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(25, 118, 210, 0.2)',
+                      transform: 'scale(1.1)'
+                    },
+                    transition: 'all 0.2s ease-in-out'
+                  }}
+                >
+                  <AdminPanelSettings />
+                  <OpenInNew sx={{ fontSize: '0.8rem', ml: 0.5 }} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+
             <Box sx={{ mb: { xs: 1, sm: 2 } }}>
               <img 
                 src="https://www.eixoscreativa.com/wp-content/uploads/2024/01/Eixos-creativa.png.webp" 

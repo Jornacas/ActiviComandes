@@ -7,10 +7,14 @@ import {
   Tab,
   Paper,
   Typography,
+  Button,
+  Tooltip,
 } from '@mui/material';
 import {
   TableChart,
   LocalShipping,
+  PhoneAndroid,
+  OpenInNew,
 } from '@mui/icons-material';
 
 import OrdersTable from './OrdersTable';
@@ -54,7 +58,7 @@ export default function AdminTabs() {
 
   return (
     <Box sx={{ width: '100%' }}>
-      {/* Header amb logo i títol */}
+      {/* Header amb logo, títol i botó app móvil */}
       <Box sx={{
         display: 'flex',
         alignItems: 'center',
@@ -82,6 +86,33 @@ export default function AdminTabs() {
           <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1 }}>
             Gestió i seguiment de sol·licituds
           </Typography>
+        </Box>
+        <Box sx={{ flexShrink: 0 }}>
+          <Tooltip title="Obrir App Móvil per crear sol·licituds">
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<PhoneAndroid />}
+              endIcon={<OpenInNew />}
+              onClick={() => window.open('https://activicomandes-mobil.vercel.app', '_blank')}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                py: 1.5,
+                borderRadius: 2,
+                boxShadow: '0 4px 12px rgba(156, 39, 176, 0.2)',
+                background: 'linear-gradient(45deg, #9c27b0 30%, #e91e63 90%)',
+                '&:hover': {
+                  boxShadow: '0 6px 16px rgba(156, 39, 176, 0.3)',
+                  transform: 'translateY(-1px)'
+                },
+                transition: 'all 0.2s ease-in-out'
+              }}
+            >
+              App Móvil
+            </Button>
+          </Tooltip>
         </Box>
       </Box>
 
