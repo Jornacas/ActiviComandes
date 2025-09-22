@@ -1154,6 +1154,18 @@ function getMaterialsByActivity(activityCode) {
     return { success: false, error: "Codi d'activitat no reconegut: " + activityCode };
   }
 
+  // Special case for TC activities - return empty array to force manual entry
+  if (baseActivity === 'TC') {
+    return {
+      success: true,
+      data: [], // Empty array will trigger manual entry mode in frontend
+      activityCode: activityCode,
+      baseActivity: baseActivity,
+      requiresManualEntry: true,
+      message: "Activitat TC requereix entrada manual de materials"
+    };
+  }
+
   // Map activity to sheet and column
   const sheetConfig = getSheetConfigForActivity(baseActivity);
 

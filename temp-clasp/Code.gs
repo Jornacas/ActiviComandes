@@ -75,6 +75,11 @@ function handleApiRequest(e, method) {
                          (e.postData ? JSON.parse(e.postData.contents).newStatus : '');
         result = updateRespostesOrderStatus(uuids, newStatus);
         break;
+      case 'deleteOrders':
+        const deleteUuids = e.parameter.uuids ? e.parameter.uuids.split(',') :
+                            (e.postData ? JSON.parse(e.postData.contents).uuids : []);
+        result = deleteOrdersFromSheet(deleteUuids);
+        break;
       case 'updateDeliveryInfo':
         result = actualizarCentrosDeEntregaYDia();
         break;
@@ -162,6 +167,28 @@ function handleApiRequest(e, method) {
         const filters = e.parameter.filters ? JSON.parse(e.parameter.filters) :
                        (e.postData ? JSON.parse(e.postData.contents).filters : {});
         result = obtenerEstadisticasDashboard(filters);
+        break;
+      case 'getPreparatedOrders':
+        // Get orders ready for delivery assignment
+        result = getPreparatedOrders();
+        break;
+      case 'getDeliveryOptions':
+        // Get delivery options for selected orders
+        const selectedOrders = e.parameter.orders ? JSON.parse(e.parameter.orders) :
+                             (e.postData ? JSON.parse(e.postData.contents).orders : []);
+        result = getDeliveryOptions(selectedOrders);
+        break;
+      case 'createDelivery':
+        // Create delivery assignment
+        const deliveryData = e.parameter.deliveryData ? JSON.parse(e.parameter.deliveryData) :
+                           (e.postData ? JSON.parse(e.postData.contents).deliveryData : {});
+        result = createDelivery(deliveryData);
+        break;
+      case 'calculateDistances':
+        // Calculate distances from Eixos Creativa
+        const addresses = e.parameter.addresses ? JSON.parse(e.parameter.addresses) :
+                         (e.postData ? JSON.parse(e.postData.contents).addresses : []);
+        result = calculateDistances(addresses);
         break;
       default:
         // If no API action specified, serve the HTML interface (legacy mode)
@@ -1125,6 +1152,18 @@ function getMaterialsByActivity(activityCode) {
 
   if (!baseActivity) {
     return { success: false, error: "Codi d'activitat no reconegut: " + activityCode };
+  }
+
+  // Special case for TC activities - return empty array to force manual entry
+  if (baseActivity === 'TC') {
+    return {
+      success: true,
+      data: [], // Empty array will trigger manual entry mode in frontend
+      activityCode: activityCode,
+      baseActivity: baseActivity,
+      requiresManualEntry: true,
+      message: "Activitat TC requereix entrada manual de materials"
+    };
   }
 
   // Map activity to sheet and column
@@ -2243,4 +2282,571 @@ function obtenerEstadisticasDashboard(filtros) {
       message: 'Error al generar estadísticas: ' + e.toString()
     };
   }
-} 
+}
+
+// =====================================================
+// FUNCIONS PER ENTREGAS OPTIMITZADES - FASE 3
+// =====================================================
+
+/**
+ * Obtenir comandes en estat "Preparat" per assignar entrega
+ */
+function getPreparatedOrders() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Respostes");
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: "La hoja 'Respostes' no existe."
+      };
+    }
+
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+
+    if (values.length < 2) {
+      return {
+        success: true,
+        data: [],
+        message: "No hi ha comandes preparades."
+      };
+    }
+
+    const headers = values[0];
+    const estatIndex = headers.findIndex(h => h === "Estat");
+    const escolaIndex = headers.findIndex(h => h === "Escola");
+    const dataNecessitatIndex = headers.findIndex(h => h === "Data_Necessitat");
+    const solicitantIndex = headers.findIndex(h => h === "Nom_Cognoms");
+    const materialIndex = headers.findIndex(h => h === "Material");
+    const quantitatIndex = headers.findIndex(h => h === "Unitats");
+    const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+
+    const preparatedOrders = [];
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const estat = row[estatIndex];
+
+      if (estat === "Preparat") {
+        preparatedOrders.push({
+          idPedido: row[idPedidoIndex],
+          idItem: row[idItemIndex],
+          solicitant: row[solicitantIndex],
+          escola: row[escolaIndex],
+          dataNecessitat: row[dataNecessitatIndex],
+          material: row[materialIndex],
+          quantitat: row[quantitatIndex],
+          rowIndex: i + 1 // Per actualitzar després
+        });
+      }
+    }
+
+    return {
+      success: true,
+      data: preparatedOrders
+    };
+
+  } catch (error) {
+    console.error("Error en getPreparatedOrders:", error);
+    return {
+      success: false,
+      error: "Error obtenint comandes preparades: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Motor d'opcions d'entrega simplificat - NOMÉS amb dades reals
+ * Genera opcions basades únicament en la hoja "Dades" existent
+ */
+function getDeliveryOptions(selectedOrders) {
+  try {
+    if (!selectedOrders || selectedOrders.length === 0) {
+      return {
+        success: false,
+        error: "No s'han proporcionat comandes seleccionades"
+      };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const dadesSheet = ss.getSheetByName("Dades");
+
+    if (!dadesSheet) {
+      return { success: false, error: "La hoja 'Dades' no existe." };
+    }
+
+    // Carregar NOMÉS dades dels monitors i escoles que tenim realment
+    const dadesValues = dadesSheet.getDataRange().getValues();
+    const dadesHeaders = dadesValues[0];
+    const escolaIdx = dadesHeaders.findIndex(h => h === "ESCOLA");
+    const monitoraIdx = dadesHeaders.findIndex(h => h === "MONITORA");
+    const diaIdx = dadesHeaders.findIndex(h => h === "DIA");
+    const adreçaIdx = dadesHeaders.findIndex(h => h === "ADREÇA");
+
+    if (escolaIdx === -1 || monitoraIdx === -1) {
+      return {
+        success: false,
+        error: "No s'han trobat les columnes necessàries a la hoja 'Dades'"
+      };
+    }
+
+    // Crear mapa de tots els monitors i les seves rutes REALS
+    const allMonitors = new Map();
+    for (let i = 1; i < dadesValues.length; i++) {
+      const row = dadesValues[i];
+      const escola = row[escolaIdx];
+      const monitora = row[monitoraIdx];
+      const dia = row[diaIdx] || '';
+      const adreça = row[adreçaIdx] || '';
+
+      if (monitora && escola) {
+        if (!allMonitors.has(monitora)) {
+          allMonitors.set(monitora, {
+            nom: monitora,
+            escoles: new Map(),
+            adreça: adreça
+          });
+        }
+
+        const monitor = allMonitors.get(monitora);
+        if (!monitor.escoles.has(escola)) {
+          monitor.escoles.set(escola, {
+            escola: escola,
+            dies: [],
+            adreça: adreça
+          });
+        }
+
+        const escolaData = monitor.escoles.get(escola);
+        if (dia && !escolaData.dies.includes(dia)) {
+          escolaData.dies.push(dia);
+        }
+      }
+    }
+
+    // Calcular distàncies reals des d'Eixos Creativa per totes les escoles
+    const allSchools = Array.from(new Set([
+      ...selectedOrders.map(order => order.escola),
+      ...Array.from(allMonitors.values()).flatMap(monitor => Array.from(monitor.escoles.keys()))
+    ]));
+
+    let schoolDistances = new Map();
+    try {
+      const distanceResponse = calculateDistances(allSchools);
+      if (distanceResponse.success && distanceResponse.data) {
+        distanceResponse.data.forEach(result => {
+          if (!result.error && result.distanceValue) {
+            schoolDistances.set(result.address, {
+              distance: result.distance,
+              distanceValue: result.distanceValue, // metres
+              duration: result.duration,
+              durationValue: result.durationValue // segons
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Error calculant distàncies:", error);
+      // Continuar sense distàncies si falla l'API
+    }
+
+    // Agrupar comandes per escola
+    const ordersBySchool = {};
+    selectedOrders.forEach(order => {
+      if (!ordersBySchool[order.escola]) {
+        ordersBySchool[order.escola] = [];
+      }
+      ordersBySchool[order.escola].push(order);
+    });
+
+    const deliveryOptions = [];
+
+    Object.keys(ordersBySchool).forEach(targetSchool => {
+      const schoolOrders = ordersBySchool[targetSchool];
+
+      // OPCIÓ 1: Entrega directa a l'escola solicitant
+      const directMonitors = [];
+      allMonitors.forEach(monitor => {
+        if (monitor.escoles.has(targetSchool)) {
+          const escolaInfo = monitor.escoles.get(targetSchool);
+          directMonitors.push({
+            nom: monitor.nom,
+            escola: targetSchool,
+            dies: escolaInfo.dies,
+            adreça: escolaInfo.adreça,
+            tipus: "directa"
+          });
+        }
+      });
+
+      if (directMonitors.length > 0) {
+        deliveryOptions.push({
+          tipus: "Entrega Directa",
+          prioritat: 2,
+          escola: targetSchool,
+          comandes: schoolOrders,
+          monitorsDisponibles: directMonitors,
+          descripció: `Entrega directa a ${targetSchool}`,
+          eficiencia: "Standard",
+          notes: "Entrega directa a l'escola solicitant"
+        });
+      }
+
+      // OPCIÓ 2: Entrega optimitzada per proximitat (escoles més properes a Eixos)
+      const nearbySchoolOptions = [];
+
+      // Trobar escoles alternatives més properes que l'escola destí
+      const targetDistance = schoolDistances.get(targetSchool);
+
+      allMonitors.forEach(monitor => {
+        if (monitor.escoles.size > 1 && monitor.escoles.has(targetSchool)) {
+          const escolesList = Array.from(monitor.escoles.keys());
+
+          escolesList.forEach(altSchool => {
+            if (altSchool !== targetSchool) {
+              const altDistance = schoolDistances.get(altSchool);
+              const altEscolaInfo = monitor.escoles.get(altSchool);
+              const targetEscolaInfo = monitor.escoles.get(targetSchool);
+
+              // Si tenim distàncies i l'escola alternativa està més propera
+              const isCloser = altDistance && targetDistance ?
+                altDistance.distanceValue < targetDistance.distanceValue : false;
+
+              nearbySchoolOptions.push({
+                nom: monitor.nom,
+                escola: altSchool,
+                dies: altEscolaInfo.dies,
+                adreça: altEscolaInfo.adreça,
+                tipus: "optimitzada",
+                destinoFinal: {
+                  escola: targetSchool,
+                  dies: targetEscolaInfo.dies
+                },
+                distanceInfo: altDistance,
+                isCloserToEixos: isCloser,
+                estalviDistancia: isCloser && targetDistance ?
+                  targetDistance.distanceValue - altDistance.distanceValue : 0
+              });
+            }
+          });
+        }
+      });
+
+      // Ordenar per proximitat a Eixos (més proper primer)
+      nearbySchoolOptions.sort((a, b) => {
+        const aDistance = a.distanceInfo ? a.distanceInfo.distanceValue : 999999;
+        const bDistance = b.distanceInfo ? b.distanceInfo.distanceValue : 999999;
+        return aDistance - bDistance;
+      });
+
+      // Agrupar per escola i crear opcions
+      const groupedNearby = {};
+      nearbySchoolOptions.forEach(option => {
+        if (!groupedNearby[option.escola]) {
+          groupedNearby[option.escola] = [];
+        }
+        groupedNearby[option.escola].push(option);
+      });
+
+      // Crear opcions d'entrega optimitzades
+      Object.keys(groupedNearby).slice(0, 3).forEach(intermediateSchool => { // Top 3 escoles
+        const monitors = groupedNearby[intermediateSchool];
+        const firstMonitor = monitors[0];
+        const distanceInfo = firstMonitor.distanceInfo;
+
+        const eficiencia = firstMonitor.isCloserToEixos ? "Alta" : "Mitjana";
+        const prioritat = firstMonitor.isCloserToEixos ? 1 : 2;
+
+        let notes = "Monitor multicentre";
+        if (firstMonitor.isCloserToEixos && firstMonitor.estalviDistancia > 0) {
+          const estalviKm = (firstMonitor.estalviDistancia / 1000).toFixed(1);
+          notes = `Estalvia ${estalviKm}km respecte entrega directa`;
+        }
+
+        deliveryOptions.push({
+          tipus: firstMonitor.isCloserToEixos ? "Entrega Optimitzada" : "Entrega amb Intermediari",
+          prioritat: prioritat,
+          escola: intermediateSchool,
+          escolaDestino: targetSchool,
+          comandes: schoolOrders,
+          monitorsDisponibles: monitors,
+          descripció: `Entrega a ${intermediateSchool}${distanceInfo ? ` (${distanceInfo.distance})` : ''} → Monitor transporta a ${targetSchool}`,
+          eficiencia: eficiencia,
+          distanciaAcademia: distanceInfo ? distanceInfo.distance : 'N/A',
+          tempsAcademia: distanceInfo ? distanceInfo.duration : 'N/A',
+          notes: notes
+        });
+      });
+
+      // Si no hi ha opcions optimitzades, crear una opció genèrica amb tots els monitors
+      if (Object.keys(groupedNearby).length === 0 && directMonitors.length === 0) {
+        // Buscar QUALSEVOL monitor que pugui fer la entrega
+        const anyMonitors = [];
+        allMonitors.forEach(monitor => {
+          const monitorSchools = Array.from(monitor.escoles.keys());
+          if (monitorSchools.length > 0) {
+            const firstSchool = monitorSchools[0];
+            const schoolInfo = monitor.escoles.get(firstSchool);
+
+            anyMonitors.push({
+              nom: monitor.nom,
+              escola: firstSchool,
+              dies: schoolInfo.dies,
+              adreça: schoolInfo.adreça,
+              tipus: "flexible"
+            });
+          }
+        });
+
+        if (anyMonitors.length > 0) {
+          deliveryOptions.push({
+            tipus: "Entrega Flexible",
+            prioritat: 3,
+            escola: "Diversos centres",
+            escolaDestino: targetSchool,
+            comandes: schoolOrders,
+            monitorsDisponibles: anyMonitors.slice(0, 10), // Limitar a 10
+            descripció: `Entrega flexible - coordinar amb monitor disponible`,
+            eficiencia: "Variable",
+            notes: "Qualsevol monitor pot coordinar la entrega"
+          });
+        }
+      }
+    });
+
+    // Ordenar per prioritat
+    deliveryOptions.sort((a, b) => a.prioritat - b.prioritat);
+
+    return {
+      success: true,
+      data: deliveryOptions
+    };
+
+  } catch (error) {
+    console.error("Error en getDeliveryOptions:", error);
+    return {
+      success: false,
+      error: "Error generant opcions d'entrega: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Crear assignació d'entrega
+ */
+function createDelivery(deliveryData) {
+  try {
+    if (!deliveryData || !deliveryData.orderIds || !deliveryData.modalitat) {
+      return {
+        success: false,
+        error: "Dades d'entrega incompletes"
+      };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Respostes");
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: "La hoja 'Respostes' no existe."
+      };
+    }
+
+    // Ampliar headers si no existeixen les noves columnes
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const newColumns = [
+      "Modalitat_Entrega",
+      "Monitor_Intermediari",
+      "Data_Entrega_Prevista",
+      "Distancia_Academia",
+      "Notes_Entrega"
+    ];
+
+    let headersUpdated = false;
+    newColumns.forEach(col => {
+      if (!headers.includes(col)) {
+        headers.push(col);
+        headersUpdated = true;
+      }
+    });
+
+    if (headersUpdated) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+
+    // Obtenir índexs de columnes
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+    const modalitатIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
+    const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista");
+    const estatIndex = headers.findIndex(h => h === "Estat");
+
+    // Actualitzar files corresponents
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    let updatedRows = 0;
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const idItem = row[idItemIndex];
+
+      if (deliveryData.orderIds.includes(idItem)) {
+        // Actualitzar dades d'entrega
+        row[modalittatIndex] = deliveryData.modalitat;
+        row[monitorIndex] = deliveryData.monitorIntermediaria || '';
+        row[dataEntregaIndex] = deliveryData.dataEntrega || '';
+        row[estatIndex] = "Assignat"; // Nou estat
+        updatedRows++;
+      }
+    }
+
+    if (updatedRows > 0) {
+      sheet.getDataRange().setValues(values);
+    }
+
+    return {
+      success: true,
+      updatedRows: updatedRows,
+      message: `S'han assignat ${updatedRows} comandes per entrega ${deliveryData.modalitat.toLowerCase()}`
+    };
+
+  } catch (error) {
+    console.error("Error en createDelivery:", error);
+    return {
+      success: false,
+      error: "Error creant assignació d'entrega: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Calcular distàncies des d'Eixos Creativa
+ */
+function calculateDistances(addresses) {
+  try {
+    if (!addresses || addresses.length === 0) {
+      return {
+        success: false,
+        error: "No s'han proporcionat adreces"
+      };
+    }
+
+    const origin = "Eixos Creativa";
+    const results = [];
+
+    addresses.forEach(address => {
+      try {
+        const response = Maps.newDistanceMatrixService()
+          .getDistanceMatrix(origin, address, Maps.Mode.DRIVING);
+
+        if (response.rows && response.rows[0] && response.rows[0].elements && response.rows[0].elements[0]) {
+          const element = response.rows[0].elements[0];
+          if (element.status === "OK") {
+            results.push({
+              address: address,
+              distance: element.distance.text,
+              distanceValue: element.distance.value, // metres
+              duration: element.duration.text,
+              durationValue: element.duration.value // segons
+            });
+          } else {
+            results.push({
+              address: address,
+              error: "No s'ha pogut calcular la distància"
+            });
+          }
+        }
+      } catch (addressError) {
+        console.error("Error calculant distància per " + address + ":", addressError);
+        results.push({
+          address: address,
+          error: "Error en el càlcul: " + addressError.toString()
+        });
+      }
+    });
+
+    return {
+      success: true,
+      data: results
+    };
+
+  } catch (error) {
+    console.error("Error en calculateDistances:", error);
+    return {
+      success: false,
+      error: "Error calculant distàncies: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Delete orders from the Respostes sheet
+ * @param {string[]} uuids - Array of UUIDs to delete
+ * @returns {Object} Result object with success status and deleted count
+ */
+function deleteOrdersFromSheet(uuids) {
+  try {
+    if (!uuids || uuids.length === 0) {
+      return { success: false, error: "No s'han proporcionat UUIDs per eliminar" };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetRespostes = ss.getSheetByName("Respostes");
+
+    if (!sheetRespostes) {
+      return { success: false, error: "Falta la hoja 'Respostes'" };
+    }
+
+    const data = sheetRespostes.getDataRange().getValues();
+    if (data.length <= 1) {
+      return { success: false, error: "No hi ha dades per eliminar" };
+    }
+
+    const headers = data[0];
+
+    // Find UUID column (could be ID Pedido, ID Item, UUID, etc.)
+    let uuidColumnIndex = -1;
+    const possibleUuidColumns = ['ID Pedido', 'ID Item', 'UUID', 'uuid', 'id', 'Id'];
+
+    for (const colName of possibleUuidColumns) {
+      uuidColumnIndex = headers.findIndex(h => h === colName);
+      if (uuidColumnIndex !== -1) break;
+    }
+
+    if (uuidColumnIndex === -1) {
+      return { success: false, error: "No s'ha trobat la columna d'identificador" };
+    }
+
+    // Find rows to delete (from bottom to top to avoid index shifting)
+    const rowsToDelete = [];
+    for (let i = data.length - 1; i >= 1; i--) {
+      const rowUuid = data[i][uuidColumnIndex];
+      if (uuids.includes(String(rowUuid))) {
+        rowsToDelete.push(i + 1); // +1 because sheet rows are 1-indexed
+      }
+    }
+
+    // Delete rows
+    let deletedCount = 0;
+    for (const rowIndex of rowsToDelete) {
+      sheetRespostes.deleteRow(rowIndex);
+      deletedCount++;
+    }
+
+    return {
+      success: true,
+      data: { deletedCount }
+    };
+
+  } catch (error) {
+    console.error("Error eliminant sol·licituds:", error);
+    return {
+      success: false,
+      error: "Error eliminant sol·licituds: " + error.toString()
+    };
+  }
+}

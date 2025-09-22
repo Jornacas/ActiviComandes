@@ -35,9 +35,12 @@ const sortMaterials = (materials: string[]): string[] => {
   
   const sobreMaterials: string[] = [];
   const otherMaterials: string[] = [];
+  const altresMaterials: string[] = [];
   
   materials.forEach(material => {
-    if (material.toUpperCase().startsWith('SOBRE')) {
+    if (material === 'Altres materials') {
+      altresMaterials.push(material);
+    } else if (material.toUpperCase().startsWith('SOBRE')) {
       sobreMaterials.push(material);
     } else {
       otherMaterials.push(material);
@@ -46,8 +49,8 @@ const sortMaterials = (materials: string[]): string[] => {
   
   otherMaterials.sort((a, b) => a.localeCompare(b, 'ca', { sensitivity: 'base' }));
   
-  // Añadir "Altres materials" al final
-  return [...sobreMaterials, ...otherMaterials, 'Altres materials'];
+  // Return materials with "Altres materials" at the end if present
+  return [...sobreMaterials, ...otherMaterials, ...altresMaterials];
 };
 
 interface ItemFormProps {
@@ -99,22 +102,24 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false
       return;
     }
 
+    // Check if it's a TC activity - force manual entry
+    const baseActivity = activity.match(/^([A-Z]+)/)?.[1] || '';
+    if (baseActivity === 'TC') {
+      setMaterials(['Altres materials']); // Only manual entry for TC
+      return;
+    }
+
     setLoadingMaterials(true);
     try {
       const response = await apiClient.getMaterialsByActivity(activity);
-      if (response.success && response.data) {
-        setMaterials(sortMaterials(response.data));
+      if (response.success && response.data && response.data.length > 0) {
+        // Add "Altres materials" option to allow custom materials
+        const materialsWithCustom = [...response.data, 'Altres materials'];
+        setMaterials(sortMaterials(materialsWithCustom));
       } else {
-        // Fallback materials
-        const mockMaterialsByActivity = {
-          'CO': ['Microscopi', 'Placa Petri', 'Pipeta', 'Vials'],
-          'DX': ['Ordinador', 'Tablet', 'Sensors', 'Cables'],
-          'HC': ['Pinzells', 'Aquarel·les', 'Paper', 'Llapis'],
-          'TC': ['Eines', 'Cargols', 'Cables', 'Resistències']
-        };
-        const baseActivity = activity.match(/^([A-Z]+)/)?.[1] || '';
-        const mockMaterials = mockMaterialsByActivity[baseActivity as keyof typeof mockMaterialsByActivity] || [];
-        setMaterials(sortMaterials(mockMaterials));
+        // If no materials found, allow manual entry
+        console.warn(`No materials found for activity ${activity}, allowing manual entry`);
+        setMaterials(['Altres materials']);
       }
     } catch (err) {
       console.error(`Error loading materials for ${activity}:`, err);
