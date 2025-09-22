@@ -448,35 +448,45 @@ function updateRespostesOrderStatus(uuids, newStatus) {
 // Legacy function - keep for backward compatibility
 function updateOrderStatus(uuids, newStatus) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Comandes");
+  const sheet = ss.getSheetByName("Respostes");
   if (!sheet) {
-    return { success: false, error: "La hoja 'Comandes' no existe." };
+    return { success: false, error: "La hoja 'Respostes' no existe." };
   }
 
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) { // Only headers or empty
-    return { success: false, error: "No hay datos en la hoja 'Comandes' para actualizar." };
+    return { success: false, error: "No hay datos en la hoja 'Respostes' para actualizar." };
   }
 
   const headers = data[0];
-  const uuidIndex = headers.findIndex(h => h === "UUID");
-  const estadoIndex = headers.findIndex(h => h === "Estado");
+  // Look for both ID_Pedido and ID_Item as possible UUID columns
+  const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
+  const idItemIndex = headers.findIndex(h => h === "ID_Item");
+  const estatIndex = headers.findIndex(h => h === "Estat");
 
-  if (uuidIndex === -1) {
-    return { success: false, error: "La columna 'UUID' no se encontró en la hoja 'Comandes'." };
+  if (idPedidoIndex === -1 && idItemIndex === -1) {
+    return { success: false, error: "No se encontraron columnas 'ID_Pedido' ni 'ID_Item' en la hoja 'Respostes'." };
   }
-  if (estadoIndex === -1) {
-    return { success: false, error: "La columna 'Estado' no se encontró en la hoja 'Comandes'." };
+  if (estatIndex === -1) {
+    return { success: false, error: "La columna 'Estat' no se encontró en la hoja 'Respostes'." };
   }
 
   let changesMade = 0;
   const updatedData = data.map((row, index) => {
     if (index === 0) return row; // Skip headers
 
-    const rowUUID = row[uuidIndex];
-    if (uuids.includes(rowUUID)) {
-      if (row[estadoIndex] !== newStatus) {
-        row[estadoIndex] = newStatus;
+    // Check both ID_Pedido and ID_Item for matches
+    const rowIdPedido = idPedidoIndex !== -1 ? row[idPedidoIndex] : '';
+    const rowIdItem = idItemIndex !== -1 ? row[idItemIndex] : '';
+    
+    if (uuids.includes(rowIdPedido) || uuids.includes(rowIdItem)) {
+      if (row[estatIndex] !== newStatus) {
+        row[estatIndex] = newStatus;
+        // Also update Data_Estat with current timestamp
+        const dataEstatIndex = headers.findIndex(h => h === "Data_Estat");
+        if (dataEstatIndex !== -1) {
+          row[dataEstatIndex] = new Date();
+        }
         changesMade++;
       }
     }
