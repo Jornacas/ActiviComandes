@@ -130,9 +130,10 @@ export default function OrdersTable() {
       field: 'esMaterialPersonalitzat',
       headerName: 'Altres',
       width: 60,
+      hide: true,
       renderCell: (params) => (
-        params.value === 'TRUE' ? 
-          <Chip label="SÍ" size="small" color="warning" sx={{ fontSize: '0.7rem' }} /> : 
+        params.value === 'TRUE' ?
+          <Chip label="SÍ" size="small" color="warning" sx={{ fontSize: '0.7rem' }} /> :
           null
       ),
     },
@@ -170,14 +171,14 @@ export default function OrdersTable() {
     {
       field: 'modalitatEntrega',
       headerName: 'Entrega',
-      width: 80,
+      width: 95,
       renderCell: (params) => (
         params.value === 'MANUAL' ?
           <Chip
             label="MANUAL"
             size="small"
-            color="warning"
-            sx={{ fontWeight: 'bold', fontSize: '0.65rem' }}
+            color="error"
+            sx={{ fontWeight: 'bold', fontSize: '0.7rem', minWidth: '70px' }}
           /> :
           null
       ),
