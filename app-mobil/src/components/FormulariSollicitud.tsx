@@ -92,9 +92,10 @@ const FormulariSollicitud: React.FC = () => {
       return;
     }
 
-    // Verificar que el nom sigui vàlid (està a la llista de monitors)
-    if (!monitors.includes(formData.nomCognoms.trim())) {
-      setError('Si us plau, selecciona un nom vàlid de la llista de monitors');
+    // Verificar que el nom sigui vàlid (està a la llista de monitors o és "eixos")
+    const isEixosAdmin = formData.nomCognoms.trim().toLowerCase() === 'eixos';
+    if (!isEixosAdmin && !monitors.includes(formData.nomCognoms.trim())) {
+      setError('Si us plau, selecciona un nom vàlid de la llista de monitors o escriu "eixos" per mode admin');
       return;
     }
 
@@ -216,7 +217,7 @@ const FormulariSollicitud: React.FC = () => {
                         nomCognoms: newValue || ''
                       }));
                     }}
-                    freeSolo={false} // Only allow selection from list
+                    freeSolo={true} // Allow free text for "eixos" admin mode
                     autoComplete
                     autoHighlight
                     autoSelect
@@ -239,7 +240,7 @@ const FormulariSollicitud: React.FC = () => {
                       <TextField
                         {...params}
                         label="Nom i cognoms *"
-                        placeholder="Comença a escriure el teu nom..."
+                        placeholder="Comença a escriure el teu nom o 'eixos' per mode admin..."
                         InputProps={{
                           ...params.InputProps,
                           startAdornment: <Person color="action" sx={{ mr: 1 }} />,
@@ -255,7 +256,7 @@ const FormulariSollicitud: React.FC = () => {
                         </Box>
                       );
                     }}
-                    noOptionsText="No s'ha trobat cap monitor"
+                    noOptionsText="No s'ha trobat cap monitor (prova 'eixos' per mode admin)"
                     getOptionLabel={(option) => option}
                     isOptionEqualToValue={(option, value) => option === value}
                   />

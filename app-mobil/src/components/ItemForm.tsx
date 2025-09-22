@@ -94,11 +94,23 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem
 
     setLoadingEscoles(true);
     try {
-      const response = await apiClient.getSchoolsByMonitor(monitor);
-      if (response.success && response.data) {
-        setFilteredEscoles(response.data);
+      // Special case: "eixos" admin mode - load all schools
+      if (monitor.toLowerCase() === 'eixos') {
+        console.log('🔑 Admin mode activated: eixos');
+        const response = await apiClient.getEscoles();
+        if (response.success && response.data) {
+          setFilteredEscoles(response.data);
+        } else {
+          setFilteredEscoles([]);
+        }
       } else {
-        setFilteredEscoles([]);
+        // Normal mode: filter schools by monitor
+        const response = await apiClient.getSchoolsByMonitor(monitor);
+        if (response.success && response.data) {
+          setFilteredEscoles(response.data);
+        } else {
+          setFilteredEscoles([]);
+        }
       }
     } catch (err) {
       console.error(`Error loading schools for monitor ${monitor}:`, err);
@@ -116,12 +128,23 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem
 
     setLoadingActivities(true);
     try {
-      // Use the new endpoint that filters by monitor and school
-      const response = await apiClient.getActivitiesByMonitorAndSchool(selectedMonitor, school);
-      if (response.success && response.data) {
-        setActivitats(response.data);
+      // Special case: "eixos" admin mode - load all activities for school
+      if (selectedMonitor.toLowerCase() === 'eixos') {
+        console.log('🔑 Admin mode: Loading all activities for school', school);
+        const response = await apiClient.getActivitiesBySchool(school);
+        if (response.success && response.data) {
+          setActivitats(response.data);
+        } else {
+          setActivitats([]);
+        }
       } else {
-        setActivitats([]);
+        // Normal mode: filter activities by monitor and school
+        const response = await apiClient.getActivitiesByMonitorAndSchool(selectedMonitor, school);
+        if (response.success && response.data) {
+          setActivitats(response.data);
+        } else {
+          setActivitats([]);
+        }
       }
     } catch (err) {
       console.error(`Error loading activities for monitor ${selectedMonitor} and school ${school}:`, err);
