@@ -221,21 +221,8 @@ export default function OrdersTable() {
         const transformedOrders = rows.map((row, index) => {
           const order: any = { id: index };
           headers.forEach((header, headerIndex) => {
-            // Convert header to camelCase (handle both styles: "Data_Necessitat" and "dataNecessitat")
-            let key = header.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
-            // Special handling for common field names
-            if (key === 'idpedido') key = 'idPedido';
-            if (key === 'iditem') key = 'idItem';
-            if (key === 'nomcognoms') key = 'nomCognoms';
-            if (key === 'datanecessitat') key = 'dataNecessitat';
-            if (key === 'esmaterialpersonalitzat') key = 'esMaterialPersonalitzat';
-            if (key === 'comentarisgenerals') key = 'comentarisGenerals';
-            if (key === 'entregamanual') key = 'entregaManual';
-            if (key === 'dataestat') key = 'dataEstat';
-            if (key === 'responsablepreparacio') key = 'responsablePreparacio';
-            if (key === 'notesinternes') key = 'notesInternes';
-            
-            order[key] = row[headerIndex] || '';
+            // Use headers as they come from backend (already normalized)
+            order[header] = row[headerIndex] || '';
           });
           return order;
         });
@@ -267,21 +254,8 @@ export default function OrdersTable() {
         const transformedOrders = rows.map((row, index) => {
           const order: any = { id: index };
           headers.forEach((header, headerIndex) => {
-            // Convert header to camelCase (handle both styles: "Data_Necessitat" and "dataNecessitat")
-            let key = header.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
-            // Special handling for common field names
-            if (key === 'idpedido') key = 'idPedido';
-            if (key === 'iditem') key = 'idItem';
-            if (key === 'nomcognoms') key = 'nomCognoms';
-            if (key === 'datanecessitat') key = 'dataNecessitat';
-            if (key === 'esmaterialpersonalitzat') key = 'esMaterialPersonalitzat';
-            if (key === 'comentarisgenerals') key = 'comentarisGenerals';
-            if (key === 'entregamanual') key = 'entregaManual';
-            if (key === 'dataestat') key = 'dataEstat';
-            if (key === 'responsablepreparacio') key = 'responsablePreparacio';
-            if (key === 'notesinternes') key = 'notesInternes';
-            
-            order[key] = row[headerIndex] || '';
+            // Use headers as they come from backend (already normalized)
+            order[header] = row[headerIndex] || '';
           });
           return order;
         });
@@ -340,7 +314,13 @@ export default function OrdersTable() {
 
       const response = await apiClient.updateOrderStatus(selectedUuids, newStatus);
       if (response.success) {
-        await loadData(); // Reload data
+        // Try fast reload first, fallback to full reload
+        try {
+          await loadDataFast();
+        } catch (fastError) {
+          console.warn('Fast reload failed, falling back to full reload:', fastError);
+          await loadData();
+        }
         setSelectedRows([]);
         setNewStatus('');
         setError(null);

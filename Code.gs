@@ -1549,18 +1549,18 @@ function loadRespostesData(limit = null) {
       };
     }
     
-    // Remove headers row
-    let rows = values.slice(1);
-    
+    // Derive headers from the sheet's first row and normalize
+    const headersRow = values[0];
+
+    // Remove headers row and ensure strict alignment with headers length
+    let rows = values.slice(1).map(row => row.slice(0, headersRow.length));
+
     // Apply limit if specified (for performance)
     if (limit && limit > 0) {
       rows = rows.slice(0, limit);
     }
-    
-    // Derive headers from the sheet's first row and normalize
-    const headersRow = values[0];
     const headers = headersRow.map(h => {
-      const map: any = {
+      const map = {
         'Timestamp': 'timestamp',
         'ID_Pedido': 'idPedido',
         'ID_Item': 'idItem',
