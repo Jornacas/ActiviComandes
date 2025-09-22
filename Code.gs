@@ -1585,6 +1585,27 @@ function loadRespostesData(limit = null) {
     const allRows = values.slice(1);
     const estatColIndex = headersRow.findIndex(h => h === 'Estat');
 
+    // DEBUG: Log header positions for debugging column alignment issues
+    const responsableColIndex = headersRow.findIndex(h => h === 'Responsable_Preparacio');
+    const dataEstatColIndex = headersRow.findIndex(h => h === 'Data_Estat');
+
+    console.log('DEBUG Headers mapping:', {
+      'Estat': estatColIndex,
+      'Data_Estat': dataEstatColIndex,
+      'Responsable_Preparacio': responsableColIndex,
+      'Total_Headers': headersRow.length
+    });
+
+    // ADDITIONAL DEBUG: Log sample data from first few rows
+    if (allRows.length > 0) {
+      console.log('DEBUG Sample row data:', {
+        'Row_0_Estat': allRows[0][estatColIndex],
+        'Row_0_Data_Estat': allRows[0][dataEstatColIndex],
+        'Row_0_Responsable': allRows[0][responsableColIndex],
+        'Row_Length': allRows[0].length
+      });
+    }
+
     const stats = {
       total: allRows.length,
       pendents: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Pendent').length : 0,
