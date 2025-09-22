@@ -18,9 +18,14 @@ export interface ValidacionFecha {
 export function validarPlazoPedido(fechaNecesidad: Date): ValidacionFecha {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0); // Normalizar a inicio del día
-  
+
   const fechaNecesidadNorm = new Date(fechaNecesidad);
   fechaNecesidadNorm.setHours(0, 0, 0, 0); // Normalizar a inicio del día
+
+  console.log('🔍 INPUT validarPlazoPedido:');
+  console.log('fechaNecesidad original:', fechaNecesidad);
+  console.log('fechaNecesidad toString:', fechaNecesidad.toString());
+  console.log('fechaNecesidad ISO:', fechaNecesidad.toISOString());
   
   // Calcular la fecha límite: miércoles de la semana anterior a la fecha de necesidad
   const fechaLimite = new Date(fechaNecesidadNorm);
@@ -129,4 +134,12 @@ export function testValidacion() {
   const testManual = validarPlazoPedido(fechaManual);
   console.log(`📅 Fecha manual: ${fechaManual.toLocaleDateString('ca-ES')} → Cumple plazo: ${testManual.cumplePlazo}`);
   console.log('🔍 Mensaje:', testManual.mensaje);
+
+  // Test con la fecha que ha probado el usuario: 25/09/2025
+  console.log('\n🎯 TEST USUARIO - 25/09/2025:');
+  const fechaUsuario = new Date('2025-09-25');
+  const testUsuario = validarPlazoPedido(fechaUsuario);
+  console.log(`📅 Fecha usuario: ${fechaUsuario.toLocaleDateString('ca-ES')} → Cumple plazo: ${testUsuario.cumplePlazo}`);
+  console.log('🔍 Mensaje:', testUsuario.mensaje);
+  console.log('🔍 Fecha límite era:', testUsuario.fechaLimite.toLocaleDateString('ca-ES'));
 } 
