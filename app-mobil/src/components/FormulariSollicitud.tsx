@@ -50,8 +50,10 @@ const FormulariSollicitud: React.FC = () => {
   // Carregar dades inicials
   useEffect(() => {
     loadInitialData();
-    // Test de validación (solo para desarrollo)
+    // Test de validación (solo para desarrollo) - FORZADO PARA DEBUG
+    console.log('🚀 INICIANDO TESTS DE VALIDACIÓN...');
     testValidacion();
+    console.log('🏁 TESTS DE VALIDACIÓN COMPLETADOS');
   }, []);
 
   const loadInitialData = async () => {

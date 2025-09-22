@@ -98,25 +98,35 @@ export function formatearFecha(fecha: Date): string {
  */
 export function testValidacion() {
   const hoy = new Date();
-  
+
   console.log('🧪 TESTS DE VALIDACIÓN:');
   console.log('Hoy es:', formatearFecha(hoy));
-  
+
   // Test 1: Pedido para mañana (debería fallar)
   const mañana = new Date();
   mañana.setDate(mañana.getDate() + 1);
   const test1 = validarPlazoPedido(mañana);
   console.log(`📅 Test 1 - Necesidad: ${formatearFecha(mañana)} → Cumple plazo: ${test1.cumplePlazo}`);
-  
+  console.log('🔍 Test 1 - Mensaje:', test1.mensaje);
+
   // Test 2: Pedido para dentro de 2 días (debería fallar)
   const enDosDias = new Date();
   enDosDias.setDate(enDosDias.getDate() + 2);
   const test2 = validarPlazoPedido(enDosDias);
   console.log(`📅 Test 2 - Necesidad: ${formatearFecha(enDosDias)} → Cumple plazo: ${test2.cumplePlazo}`);
-  
+  console.log('🔍 Test 2 - Mensaje:', test2.mensaje);
+
   // Test 3: Pedido para la próxima semana (debería pasar)
   const proximaSemana = new Date();
   proximaSemana.setDate(proximaSemana.getDate() + 10);
   const test3 = validarPlazoPedido(proximaSemana);
   console.log(`📅 Test 3 - Necesidad: ${formatearFecha(proximaSemana)} → Cumple plazo: ${test3.cumplePlazo}`);
+  console.log('🔍 Test 3 - Mensaje:', test3.mensaje);
+
+  // NUEVO: Test específico con fecha manual para depurar
+  console.log('\n🔧 TEST MANUAL - Fecha específica:');
+  const fechaManual = new Date('2025-09-23'); // Mañana si hoy es 22
+  const testManual = validarPlazoPedido(fechaManual);
+  console.log(`📅 Fecha manual: ${fechaManual.toLocaleDateString('ca-ES')} → Cumple plazo: ${testManual.cumplePlazo}`);
+  console.log('🔍 Mensaje:', testManual.mensaje);
 } 
