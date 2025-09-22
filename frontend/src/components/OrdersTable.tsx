@@ -168,17 +168,17 @@ export default function OrdersTable() {
       },
     },
     {
-      field: 'entregaManual',
+      field: 'modalitatEntrega',
       headerName: 'Entrega',
       width: 80,
       renderCell: (params) => (
-        params.value === 'TRUE' || params.value === true ? 
-          <Chip 
-            label="MANUAL" 
-            size="small" 
-            color="warning" 
+        params.value === 'MANUAL' ?
+          <Chip
+            label="MANUAL"
+            size="small"
+            color="warning"
             sx={{ fontWeight: 'bold', fontSize: '0.65rem' }}
-          /> : 
+          /> :
           null
       ),
     },

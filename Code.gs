@@ -1455,7 +1455,7 @@ function createMultipleSollicitud(data) {
       const materialName = item.customMaterial || item.material;
       const isCustomMaterial = item.customMaterial ? "TRUE" : "FALSE";
       
-      // Create row for each item with new structure
+      // Create row for each item with CORRECTED structure
       const newRow = [
         timestamp,                    // A: Timestamp
         baseUuid,                     // B: ID_Pedido (common for all items)
@@ -1468,11 +1468,15 @@ function createMultipleSollicitud(data) {
         isCustomMaterial,             // I: Es_Material_Personalitzat
         item.unitats || 0,            // J: Unitats
         data.altresMaterials || '',   // K: Comentaris_Generals
-        data.entregaManual ? 'TRUE' : 'FALSE', // L: Entrega_Manual
-        'Pendent',                    // M: Estat
-        timestamp,                    // N: Data_Estat
-        '',                           // O: Responsable_Preparacio
-        ''                            // P: Notes_Internes
+        'Pendent',                    // L: Estat
+        timestamp,                    // M: Data_Estat
+        '',                           // N: Responsable_Preparacio
+        '',                           // O: Notes_Internes
+        data.entregaManual ? 'MANUAL' : 'NORMAL', // P: Modalitat_Entrega
+        '',                           // Q: Monitor_Intermediari
+        '',                           // R: Data_Entrega_Prevista
+        '',                           // S: Distancia_Academia
+        ''                            // T: Notes_Entrega
       ];
 
       sheet.appendRow(newRow);
@@ -1572,11 +1576,15 @@ function loadRespostesData(limit = null) {
         'Es_Material_Personalitzat': 'esMaterialPersonalitzat',
         'Unitats': 'unitats',
         'Comentaris_Generals': 'comentarisGenerals',
-        'Entrega_Manual': 'entregaManual',
         'Estat': 'estat',
         'Data_Estat': 'dataEstat',
         'Responsable_Preparacio': 'responsablePreparacio',
-        'Notes_Internes': 'notesInternes'
+        'Notes_Internes': 'notesInternes',
+        'Modalitat_Entrega': 'modalitatEntrega',
+        'Monitor_Intermediari': 'monitorIntermediari',
+        'Data_Entrega_Prevista': 'dataEntregaPrevista',
+        'Distancia_Academia': 'distanciaAcademia',
+        'Notes_Entrega': 'notesEntrega'
       };
       return map[h] || String(h).toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
     });
@@ -1605,6 +1613,32 @@ function loadRespostesData(limit = null) {
         'Row_Length': allRows[0].length
       });
     }
+
+    // FIX: Clean corrupted data - ensure proper data types in columns
+    rows = rows.map(row => {
+      const cleanedRow = [...row]; // Create copy
+
+      // Fix Estat column: should only contain valid states
+      if (estatColIndex >= 0) {
+        const estat = cleanedRow[estatColIndex];
+        if (estat === 'TRUE' || estat === 'FALSE' || estat === true || estat === false) {
+          cleanedRow[estatColIndex] = 'Pendent'; // Default to Pendent if corrupted
+        }
+      }
+
+      // Fix Responsable column: should not contain dates
+      if (responsableColIndex >= 0) {
+        const responsable = cleanedRow[responsableColIndex];
+        // If looks like a date (contains numbers and dashes/slashes), clear it
+        if (responsable && typeof responsable === 'string' &&
+            (responsable.includes('-') || responsable.includes('/')) &&
+            /\d/.test(responsable)) {
+          cleanedRow[responsableColIndex] = ''; // Clear if it's a date
+        }
+      }
+
+      return cleanedRow;
+    });
 
     const stats = {
       total: allRows.length,
@@ -1637,7 +1671,7 @@ function setupRespostesHeaders(sheet) {
   const headers = [
     "Timestamp",
     "ID_Pedido",
-    "ID_Item", 
+    "ID_Item",
     "Nom_Cognoms",
     "Data_Necessitat",
     "Escola",
@@ -1646,11 +1680,15 @@ function setupRespostesHeaders(sheet) {
     "Es_Material_Personalitzat",
     "Unitats",
     "Comentaris_Generals",
-    "Entrega_Manual",
     "Estat",
     "Data_Estat",
     "Responsable_Preparacio",
-    "Notes_Internes"
+    "Notes_Internes",
+    "Modalitat_Entrega",
+    "Monitor_Intermediari",
+    "Data_Entrega_Prevista",
+    "Distancia_Academia",
+    "Notes_Entrega"
   ];
   
   // Set headers in first row

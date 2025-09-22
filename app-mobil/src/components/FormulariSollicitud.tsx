@@ -344,10 +344,13 @@ const FormulariSollicitud: React.FC = () => {
             submitting={submitting}
           />
 
-          {/* Informació adicional */}
+          {/* Informació adicional i recordatori de plazo */}
           <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-            <Typography variant="body2" color="text.secondary" align="center">
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 1 }}>
               💡 <strong>Consell:</strong> Pots afegir múltiples materials de diferents escoles i activitats al mateix carret abans d'enviar la sol·licitud
+            </Typography>
+            <Typography variant="body2" color="warning.main" align="center" sx={{ fontWeight: 'bold' }}>
+              ⏰ <strong>Recordatori:</strong> Per necessitat el dimarts, comanda màxim el dimecres anterior
             </Typography>
           </Box>
         </CardContent>
