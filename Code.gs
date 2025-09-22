@@ -2896,13 +2896,20 @@ function deleteOrdersFromSheet(uuids) {
 
     const headers = data[0];
 
-    // Find UUID column (could be ID Pedido, ID Item, UUID, etc.)
+    // Find UUID column (could be ID_Pedido, ID_Item, UUID, etc.)
     let uuidColumnIndex = -1;
-    const possibleUuidColumns = ['ID Pedido', 'ID Item', 'UUID', 'uuid', 'id', 'Id'];
+    const possibleUuidColumns = ['ID_Pedido', 'ID_Item', 'UUID', 'uuid', 'id', 'Id', 'ID Pedido', 'ID Item'];
 
     for (const colName of possibleUuidColumns) {
       uuidColumnIndex = headers.findIndex(h => h === colName);
       if (uuidColumnIndex !== -1) break;
+    }
+
+    // Debug: Log available headers and which column was found
+    console.log('Available headers:', headers);
+    console.log('UUID column found at index:', uuidColumnIndex);
+    if (uuidColumnIndex !== -1) {
+      console.log('Using column:', headers[uuidColumnIndex]);
     }
 
     if (uuidColumnIndex === -1) {
