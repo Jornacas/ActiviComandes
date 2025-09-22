@@ -10,6 +10,7 @@ import {
   Alert,
   CircularProgress,
   Grid,
+  Autocomplete,
 } from '@mui/material';
 import {
   CalendarToday,
@@ -26,6 +27,7 @@ const FormulariSollicitud: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [escoles, setEscoles] = useState<string[]>([]);
+  const [monitors, setMonitors] = useState<string[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   const [formData, setFormData] = useState({
@@ -42,9 +44,18 @@ const FormulariSollicitud: React.FC = () => {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const escolesResponse = await apiClient.getEscoles();
+      // Load schools and monitors in parallel
+      const [escolesResponse, monitorsResponse] = await Promise.all([
+        apiClient.getEscoles(),
+        apiClient.getMonitors()
+      ]);
+      
       if (escolesResponse.success && escolesResponse.data) {
         setEscoles(escolesResponse.data);
+      }
+      
+      if (monitorsResponse.success && monitorsResponse.data) {
+        setMonitors(monitorsResponse.data);
       }
     } catch (err) {
       setError('Error carregant les dades inicials');
@@ -77,7 +88,13 @@ const FormulariSollicitud: React.FC = () => {
 
     // Validació bàsica
     if (!formData.nomCognoms.trim()) {
-      setError('Si us plau, introdueix el teu nom i cognoms');
+      setError('Si us plau, selecciona el teu nom de la llista');
+      return;
+    }
+
+    // Verificar que el nom sigui vàlid (està a la llista de monitors)
+    if (!monitors.includes(formData.nomCognoms.trim())) {
+      setError('Si us plau, selecciona un nom vàlid de la llista de monitors');
       return;
     }
 
@@ -189,15 +206,43 @@ const FormulariSollicitud: React.FC = () => {
               <Grid container spacing={2}>
                 {/* Nom i cognoms */}
                 <Grid item xs={12} md={6}>
-                  <TextField
+                  <Autocomplete
                     fullWidth
-                    label="Nom i cognoms *"
-                    value={formData.nomCognoms}
-                    onChange={handleInputChange('nomCognoms')}
-                    InputProps={{
-                      startAdornment: <Person color="action" sx={{ mr: 1 }} />,
+                    options={monitors}
+                    value={formData.nomCognoms || null}
+                    onChange={(_, newValue) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        nomCognoms: newValue || ''
+                      }));
                     }}
-                    placeholder="Introdueix el teu nom complet"
+                    freeSolo={false} // Only allow selection from list
+                    selectOnFocus
+                    clearOnBlur
+                    handleHomeEndKeys
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Nom i cognoms *"
+                        placeholder="Comença a escriure el teu nom..."
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: <Person color="action" sx={{ mr: 1 }} />,
+                        }}
+                      />
+                    )}
+                    renderOption={(props, option) => {
+                      const { key, ...otherProps } = props;
+                      return (
+                        <Box component="li" key={key} {...otherProps}>
+                          <Person sx={{ mr: 1, color: 'text.secondary' }} />
+                          {option}
+                        </Box>
+                      );
+                    }}
+                    noOptionsText="No s'ha trobat cap monitor amb aquest nom"
+                    getOptionLabel={(option) => option}
+                    isOptionEqualToValue={(option, value) => option === value}
                   />
                 </Grid>
 

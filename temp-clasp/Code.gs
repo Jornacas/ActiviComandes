@@ -1109,18 +1109,18 @@ function getActivitiesBySchool(schoolName) {
 }
 
 function getMonitors() {
-  const data = getCachedData("dades", "cache_dades_monitors");
+  const data = getCachedData("Dades", "cache_dades_monitors");
   if (!data) {
-    return { success: false, error: "No se pudieron cargar los datos de monitores de la hoja 'dades'." };
+    return { success: false, error: "No s'han pogut carregar les dades de monitors de la hoja 'Dades'." };
   }
   
-  // Assuming monitors are in the second column of 'dades' (adjust if needed)
+  // Extract monitors from column B (MONITORA) of 'Dades' sheet
   const monitors = data.slice(1) // Skip headers
-                       .filter(row => row[1]) // Filter out empty rows
-                       .map(row => row[1].toString().trim()); // Get second column and trim
+                       .filter(row => row[1] && row[1].toString().trim() !== '') // Filter out empty rows (column B = index 1)
+                       .map(row => row[1].toString().trim()); // Get column B (MONITORA) and trim
   
-  // Remove duplicates
-  const uniqueMonitors = [...new Set(monitors)];
+  // Remove duplicates and sort alphabetically
+  const uniqueMonitors = [...new Set(monitors)].sort((a, b) => a.localeCompare(b, 'ca'));
   
   return { success: true, data: uniqueMonitors };
 }
