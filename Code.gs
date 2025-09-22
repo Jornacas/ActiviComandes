@@ -1200,8 +1200,16 @@ function getMaterialsByActivity(activityCode) {
 }
 
 function parseActivityCode(activityCode) {
-  // Remove any trailing letters/numbers to get base activity
-  // DX2A -> DX2, HC1B -> HC1, CO -> CO, etc.
+  // Parse activity code to get base activity
+  // CO1A, CO1, CO2 -> CO
+  // DX2A -> DX2, HC1B -> HC1, etc.
+  
+  // Special case for CO activities - all variants map to CO
+  if (activityCode.startsWith('CO')) {
+    return 'CO';
+  }
+  
+  // For other activities, extract base with numbers (DX2A -> DX2, HC1B -> HC1)
   const matches = activityCode.match(/^([A-Z]+\d*)/);
   return matches ? matches[1] : null;
 }
