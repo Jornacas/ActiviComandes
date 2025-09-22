@@ -29,14 +29,14 @@ export function validarPlazoPedido(fechaNecesidad: Date): ValidacionFecha {
   
   // Calcular la fecha límite: miércoles de la semana anterior a la fecha de necesidad
   const fechaLimite = new Date(fechaNecesidadNorm);
-  
+
   // Retroceder a la semana anterior (7 días)
   fechaLimite.setDate(fechaLimite.getDate() - 7);
-  
+
   // Encontrar el miércoles de esa semana
   const diaSemana = fechaLimite.getDay(); // 0=domingo, 3=miércoles
   let diasHastaMiercoles;
-  
+
   if (diaSemana <= 3) {
     // Si estamos en lunes, martes o miércoles, ir al miércoles de esta semana
     diasHastaMiercoles = 3 - diaSemana;
@@ -44,7 +44,7 @@ export function validarPlazoPedido(fechaNecesidad: Date): ValidacionFecha {
     // Si estamos en jueves, viernes, sábado o domingo, ir al miércoles de la semana siguiente
     diasHastaMiercoles = 7 - diaSemana + 3;
   }
-  
+
   fechaLimite.setDate(fechaLimite.getDate() + diasHastaMiercoles);
   
   // CORREGIDO: Cumple plazo si HOY es antes o igual que la fecha límite
