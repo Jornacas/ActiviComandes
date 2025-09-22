@@ -96,7 +96,7 @@ export default function OrdersTable() {
     },
     {
       field: 'dataNecessitat',
-      headerName: 'Necessari Per',
+      headerName: 'Quan ho necessito?',
       width: 180,
       type: 'date',
       valueFormatter: (params) => {
@@ -142,6 +142,30 @@ export default function OrdersTable() {
       type: 'number',
     },
     {
+      field: 'comentarisGenerals',
+      headerName: 'Comentaris',
+      width: 200,
+      renderCell: (params) => {
+        const comentaris = params.value as string;
+        if (!comentaris || comentaris.trim() === '') {
+          return <span style={{ color: '#999', fontStyle: 'italic' }}>Sense comentaris</span>;
+        }
+        return (
+          <div 
+            style={{ 
+              whiteSpace: 'nowrap', 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis',
+              maxWidth: '100%'
+            }}
+            title={comentaris}
+          >
+            {comentaris}
+          </div>
+        );
+      },
+    },
+    {
       field: 'estat',
       headerName: 'Estat',
       width: 130,
@@ -179,8 +203,8 @@ export default function OrdersTable() {
         const transformedOrders = rows.map((row, index) => {
           const order: any = { id: index };
           headers.forEach((header, headerIndex) => {
-            // Convert header to camelCase
-            let key = header.toLowerCase().replace(/\s+/g, '');
+            // Convert header to camelCase (handle both styles: "Data_Necessitat" and "dataNecessitat")
+            let key = header.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
             // Special handling for common field names
             if (key === 'idpedido') key = 'idPedido';
             if (key === 'iditem') key = 'idItem';
@@ -224,8 +248,8 @@ export default function OrdersTable() {
         const transformedOrders = rows.map((row, index) => {
           const order: any = { id: index };
           headers.forEach((header, headerIndex) => {
-            // Convert header to camelCase
-            let key = header.toLowerCase().replace(/\s+/g, '');
+            // Convert header to camelCase (handle both styles: "Data_Necessitat" and "dataNecessitat")
+            let key = header.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
             // Special handling for common field names
             if (key === 'idpedido') key = 'idPedido';
             if (key === 'iditem') key = 'idItem';
