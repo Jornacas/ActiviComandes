@@ -1557,30 +1557,46 @@ function loadRespostesData(limit = null) {
       rows = rows.slice(0, limit);
     }
     
-    // Calculate statistics from all data (not limited)
+    // Derive headers from the sheet's first row and normalize
+    const headersRow = values[0];
+    const headers = headersRow.map(h => {
+      const map = {
+        'Timestamp': 'timestamp',
+        'ID_Pedido': 'idPedido',
+        'ID_Item': 'idItem',
+        'Nom_Cognoms': 'nomCognoms',
+        'Data_Necessitat': 'dataNecessitat',
+        'Escola': 'escola',
+        'Activitat': 'activitat',
+        'Material': 'material',
+        'Es_Material_Personalitzat': 'esMaterialPersonalitzat',
+        'Unitats': 'unitats',
+        'Comentaris_Generals': 'comentarisGenerals',
+        'Entrega_Manual': 'entregaManual',
+        'Estat': 'estat',
+        'Data_Estat': 'dataEstat',
+        'Responsable_Preparacio': 'responsablePreparacio',
+        'Notes_Internes': 'notesInternes'
+      };
+      return map[h] || String(h).toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
+    });
+
+    // Calculate statistics using dynamic Estat column index
     const allRows = values.slice(1);
+    const estatColIndex = headersRow.findIndex(h => h === 'Estat');
+
     const stats = {
       total: allRows.length,
-      pendents: allRows.filter(row => row[12] === 'Pendent').length,
-      enProces: allRows.filter(row => row[12] === 'En proces').length,
-      preparats: allRows.filter(row => row[12] === 'Preparat').length,
-      entregats: allRows.filter(row => row[12] === 'Entregat').length
+      pendents: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Pendent').length : 0,
+      enProces: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'En proces').length : 0,
+      preparats: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Preparat').length : 0,
+      entregats: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Entregat').length : 0
     };
-    
-    // Debug: Log some sample estat values
-    console.log('DEBUG Backend - Sample estat values from sheet:');
-    allRows.slice(0, 3).forEach((row, idx) => {
-      console.log(`Row ${idx}: Position [12] = "${row[12]}", Position [13] = "${row[13]}"`);
-    });
-    
+
     return {
       success: true,
       data: {
-        headers: [
-          "timestamp", "idPedido", "idItem", "nomCognoms", "dataNecessitat",
-          "escola", "activitat", "material", "esMaterialPersonalitzat", "unitats",
-          "comentarisGenerals", "entregaManual", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
-        ],
+        headers: headers,
         rows: rows,
         estadisticas: stats
       }
