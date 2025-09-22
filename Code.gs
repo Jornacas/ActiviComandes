@@ -107,6 +107,18 @@ function handleApiRequest(e, method) {
                           (e.postData ? JSON.parse(e.postData.contents).school : '');
         result = getActivitiesBySchool(schoolName);
         break;
+      case 'getSchoolsByMonitor':
+        const monitorName = e.parameter.monitor ||
+                           (e.postData ? JSON.parse(e.postData.contents).monitor : '');
+        result = getSchoolsByMonitor(monitorName);
+        break;
+      case 'getActivitiesByMonitorAndSchool':
+        const monitorForActivities = e.parameter.monitor ||
+                                    (e.postData ? JSON.parse(e.postData.contents).monitor : '');
+        const schoolForActivities = e.parameter.school ||
+                                  (e.postData ? JSON.parse(e.postData.contents).school : '');
+        result = getActivitiesByMonitorAndSchool(monitorForActivities, schoolForActivities);
+        break;
       case 'createOrder':
         const orderData = e.postData ? JSON.parse(e.postData.contents).orderData : {};
         result = createOrder(orderData);
@@ -1123,6 +1135,74 @@ function getMonitors() {
   const uniqueMonitors = [...new Set(monitors)].sort((a, b) => a.localeCompare(b, 'ca'));
   
   return { success: true, data: uniqueMonitors };
+}
+
+function getSchoolsByMonitor(monitorName) {
+  if (!monitorName) {
+    return { success: false, error: "No s'ha proporcionat el nom del monitor" };
+  }
+
+  const data = getCachedData("Dades", "cache_dades_schools_by_monitor");
+  if (!data) {
+    return { success: false, error: "No es van poder carregar les dades de la hoja 'Dades'." };
+  }
+
+  // Extract schools for the specific monitor
+  // Column A (index 0) = Escola, Column B (index 1) = Monitora
+  const monitorSchools = data.slice(1) // Skip headers
+                            .filter(row => {
+                              const escola = row[0] ? row[0].toString().trim() : '';
+                              const monitora = row[1] ? row[1].toString().trim() : '';
+                              return monitora === monitorName && escola !== '';
+                            })
+                            .map(row => row[0].toString().trim()); // Get column A (escola) and trim
+
+  // Remove duplicates and sort alphabetically
+  const uniqueSchools = [...new Set(monitorSchools)].sort((a, b) => a.localeCompare(b, 'ca'));
+
+  return {
+    success: true,
+    data: uniqueSchools,
+    monitor: monitorName,
+    count: uniqueSchools.length
+  };
+}
+
+function getActivitiesByMonitorAndSchool(monitorName, schoolName) {
+  if (!monitorName) {
+    return { success: false, error: "No s'ha proporcionat el nom del monitor" };
+  }
+  
+  if (!schoolName) {
+    return { success: false, error: "No s'ha proporcionat el nom de l'escola" };
+  }
+
+  const data = getCachedData("Dades", "cache_dades_activities_by_monitor_school");
+  if (!data) {
+    return { success: false, error: "No es van poder carregar les dades de la hoja 'Dades'." };
+  }
+
+  // Extract activities for the specific monitor and school
+  // Column A (index 0) = Escola, Column B (index 1) = Monitora, Column F (index 5) = Activitat
+  const monitorSchoolActivities = data.slice(1) // Skip headers
+                                     .filter(row => {
+                                       const escola = row[0] ? row[0].toString().trim() : '';
+                                       const monitora = row[1] ? row[1].toString().trim() : '';
+                                       const activitat = row[5] ? row[5].toString().trim() : '';
+                                       return monitora === monitorName && escola === schoolName && activitat !== '';
+                                     })
+                                     .map(row => row[5].toString().trim()); // Get column F (activitat) and trim
+
+  // Remove duplicates and sort alphabetically
+  const uniqueActivities = [...new Set(monitorSchoolActivities)].sort((a, b) => a.localeCompare(b, 'ca'));
+
+  return {
+    success: true,
+    data: uniqueActivities,
+    monitor: monitorName,
+    school: schoolName,
+    count: uniqueActivities.length
+  };
 }
 
 function getMaterials() {

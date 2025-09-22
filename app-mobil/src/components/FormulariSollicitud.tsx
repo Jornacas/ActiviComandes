@@ -295,6 +295,7 @@ const FormulariSollicitud: React.FC = () => {
           {/* Formulario para añadir items */}
           <ItemForm 
             escoles={escoles}
+            selectedMonitor={formData.nomCognoms}
             onAddItem={handleAddItem}
             loading={submitting}
           />

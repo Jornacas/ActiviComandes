@@ -55,11 +55,12 @@ const sortMaterials = (materials: string[]): string[] => {
 
 interface ItemFormProps {
   escoles: string[];
+  selectedMonitor: string;
   onAddItem: (item: CartItem) => void;
   loading?: boolean;
 }
 
-const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false }) => {
+const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem, loading = false }) => {
   const [formData, setFormData] = useState({
     escola: '',
     activitat: '',
@@ -68,28 +69,62 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false
     unitats: 1,
   });
   
+  const [filteredEscoles, setFilteredEscoles] = useState<string[]>([]);
   const [activitats, setActivitats] = useState<string[]>([]);
   const [materials, setMaterials] = useState<string[]>([]);
+  const [loadingEscoles, setLoadingEscoles] = useState(false);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Load schools for the selected monitor
+  useEffect(() => {
+    if (selectedMonitor) {
+      loadSchoolsForMonitor(selectedMonitor);
+    } else {
+      setFilteredEscoles([]);
+    }
+  }, [selectedMonitor]);
+
+  const loadSchoolsForMonitor = async (monitor: string) => {
+    if (!monitor) {
+      setFilteredEscoles([]);
+      return;
+    }
+
+    setLoadingEscoles(true);
+    try {
+      const response = await apiClient.getSchoolsByMonitor(monitor);
+      if (response.success && response.data) {
+        setFilteredEscoles(response.data);
+      } else {
+        setFilteredEscoles([]);
+      }
+    } catch (err) {
+      console.error(`Error loading schools for monitor ${monitor}:`, err);
+      setFilteredEscoles([]);
+    } finally {
+      setLoadingEscoles(false);
+    }
+  };
+
   const loadActivitiesForSchool = async (school: string) => {
-    if (!school) {
+    if (!school || !selectedMonitor) {
       setActivitats([]);
       return;
     }
 
     setLoadingActivities(true);
     try {
-      const response = await apiClient.getActivitiesBySchool(school);
+      // Use the new endpoint that filters by monitor and school
+      const response = await apiClient.getActivitiesByMonitorAndSchool(selectedMonitor, school);
       if (response.success && response.data) {
         setActivitats(response.data);
       } else {
         setActivitats([]);
       }
     } catch (err) {
-      console.error(`Error loading activities for ${school}:`, err);
+      console.error(`Error loading activities for monitor ${selectedMonitor} and school ${school}:`, err);
       setActivitats([]);
     } finally {
       setLoadingActivities(false);
@@ -233,17 +268,25 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, onAddItem, loading = false
         <Grid item xs={12} md={6}>
           <Autocomplete
             fullWidth
-            options={escoles}
+            options={filteredEscoles}
             value={formData.escola || null}
             onChange={(_, newValue) => handleInputChange('escola')(newValue || '')}
+            loading={loadingEscoles}
+            disabled={!selectedMonitor}
             renderInput={(params) => (
               <TextField
                 {...params}
                 label="Escola *"
-                placeholder="Selecciona una escola..."
+                placeholder={selectedMonitor ? "Selecciona una escola..." : "Primer selecciona un monitor"}
                 InputProps={{
                   ...params.InputProps,
                   startAdornment: <School color="action" sx={{ mr: 1 }} />,
+                  endAdornment: (
+                    <>
+                      {loadingEscoles ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
                 }}
               />
             )}

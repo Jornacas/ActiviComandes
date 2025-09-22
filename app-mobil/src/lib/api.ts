@@ -386,6 +386,14 @@ class ApiClient {
     return this.request('getMonitors', {}, 'GET');
   }
 
+  async getSchoolsByMonitor(monitor: string): Promise<ApiResponse<string[]>> {
+    return this.request('getSchoolsByMonitor', { monitor }, 'GET');
+  }
+
+  async getActivitiesByMonitorAndSchool(monitor: string, school: string): Promise<ApiResponse<string[]>> {
+    return this.request('getActivitiesByMonitorAndSchool', { monitor, school }, 'GET');
+  }
+
   async getMaterialsByActivity(activity: string): Promise<ApiResponse<string[]>> {
     return this.request('getMaterialsByActivity', { activity }, 'GET');
   }
