@@ -23,7 +23,7 @@ import {
   Warning,
 } from '@mui/icons-material';
 import { apiClient, type SollicitudMultiple, type CartItem } from '../lib/api';
-import { validarPlazoPedido, type ValidacionFecha } from '../lib/dateValidation';
+import { validarPlazoPedido, testValidacion, type ValidacionFecha } from '../lib/dateValidation';
 import ItemForm from './ItemForm';
 import CartView from './CartView';
 
@@ -50,6 +50,8 @@ const FormulariSollicitud: React.FC = () => {
   // Carregar dades inicials
   useEffect(() => {
     loadInitialData();
+    // Test de validación (solo para desarrollo)
+    testValidacion();
   }, []);
 
   const loadInitialData = async () => {
@@ -86,13 +88,19 @@ const FormulariSollicitud: React.FC = () => {
 
     // Validar fecha si es el campo de fecha de necesidad
     if (field === 'dataNecessitat' && value) {
+      console.log('🔄 Validando fecha:', value);
       const fechaNecesidad = new Date(value);
       const validacion = validarPlazoPedido(fechaNecesidad);
       setValidacionFecha(validacion);
       
+      console.log('✅ Resultado validación:', validacion);
+      
       // Mostrar dialog si no cumple plazo
       if (!validacion.cumplePlazo) {
+        console.log('⚠️ MOSTRANDO DIALOG - Plazo vencido');
         setShowPlazoDialog(true);
+      } else {
+        console.log('✅ Plazo correcto - No se muestra dialog');
       }
     }
   };
