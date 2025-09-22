@@ -1511,7 +1511,7 @@ function loadRespostesData(limit = null) {
           headers: [
             "timestamp", "idPedido", "idItem", "nomCognoms", "dataNecessitat",
             "escola", "activitat", "material", "esMaterialPersonalitzat", "unitats",
-            "comentarisGenerals", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
+            "comentarisGenerals", "entregaManual", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
           ],
           rows: [],
           estadisticas: { total: 0, pendents: 0, enProces: 0, preparats: 0, entregats: 0 }
@@ -1530,7 +1530,7 @@ function loadRespostesData(limit = null) {
           headers: [
             "timestamp", "idPedido", "idItem", "nomCognoms", "dataNecessitat",
             "escola", "activitat", "material", "esMaterialPersonalitzat", "unitats",
-            "comentarisGenerals", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
+            "comentarisGenerals", "entregaManual", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
           ],
           rows: [],
           estadisticas: { total: 0, pendents: 0, enProces: 0, preparats: 0, entregats: 0 }
@@ -1550,10 +1550,10 @@ function loadRespostesData(limit = null) {
     const allRows = values.slice(1);
     const stats = {
       total: allRows.length,
-      pendents: allRows.filter(row => row[11] === 'Pendent').length,
-      enProces: allRows.filter(row => row[11] === 'En proces').length,
-      preparats: allRows.filter(row => row[11] === 'Preparat').length,
-      entregats: allRows.filter(row => row[11] === 'Entregat').length
+      pendents: allRows.filter(row => row[12] === 'Pendent').length,
+      enProces: allRows.filter(row => row[12] === 'En proces').length,
+      preparats: allRows.filter(row => row[12] === 'Preparat').length,
+      entregats: allRows.filter(row => row[12] === 'Entregat').length
     };
     
     return {
@@ -1562,7 +1562,7 @@ function loadRespostesData(limit = null) {
         headers: [
           "timestamp", "idPedido", "idItem", "nomCognoms", "dataNecessitat",
           "escola", "activitat", "material", "esMaterialPersonalitzat", "unitats",
-          "comentarisGenerals", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
+          "comentarisGenerals", "entregaManual", "estat", "dataEstat", "responsablePreparacio", "notesInternes"
         ],
         rows: rows,
         estadisticas: stats
@@ -1592,6 +1592,7 @@ function setupRespostesHeaders(sheet) {
     "Es_Material_Personalitzat",
     "Unitats",
     "Comentaris_Generals",
+    "Entrega_Manual",
     "Estat",
     "Data_Estat",
     "Responsable_Preparacio",
@@ -1620,10 +1621,11 @@ function setupRespostesHeaders(sheet) {
   sheet.setColumnWidth(9, 80);   // Es_Material_Personalitzat
   sheet.setColumnWidth(10, 80);  // Unitats
   sheet.setColumnWidth(11, 200); // Comentaris_Generals
-  sheet.setColumnWidth(12, 100); // Estat
-  sheet.setColumnWidth(13, 150); // Data_Estat
-  sheet.setColumnWidth(14, 150); // Responsable_Preparacio
-  sheet.setColumnWidth(15, 200); // Notes_Internes
+  sheet.setColumnWidth(12, 120); // Entrega_Manual
+  sheet.setColumnWidth(13, 100); // Estat
+  sheet.setColumnWidth(14, 150); // Data_Estat
+  sheet.setColumnWidth(15, 150); // Responsable_Preparacio
+  sheet.setColumnWidth(16, 200); // Notes_Internes
   
   // Freeze header row
   sheet.setFrozenRows(1);

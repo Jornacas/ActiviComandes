@@ -166,6 +166,21 @@ export default function OrdersTable() {
       },
     },
     {
+      field: 'entregaManual',
+      headerName: 'Entrega Manual',
+      width: 130,
+      renderCell: (params) => (
+        params.value === 'TRUE' || params.value === true ? 
+          <Chip 
+            label="MANUAL" 
+            size="small" 
+            color="warning" 
+            sx={{ fontWeight: 'bold' }}
+          /> : 
+          null
+      ),
+    },
+    {
       field: 'estat',
       headerName: 'Estat',
       width: 130,
@@ -212,6 +227,7 @@ export default function OrdersTable() {
             if (key === 'datanecessitat') key = 'dataNecessitat';
             if (key === 'esmaterialpersonalitzat') key = 'esMaterialPersonalitzat';
             if (key === 'comentarisgenerals') key = 'comentarisGenerals';
+            if (key === 'entregamanual') key = 'entregaManual';
             if (key === 'dataestat') key = 'dataEstat';
             if (key === 'responsablepreparacio') key = 'responsablePreparacio';
             if (key === 'notesinternes') key = 'notesInternes';
@@ -257,6 +273,7 @@ export default function OrdersTable() {
             if (key === 'datanecessitat') key = 'dataNecessitat';
             if (key === 'esmaterialpersonalitzat') key = 'esMaterialPersonalitzat';
             if (key === 'comentarisgenerals') key = 'comentarisGenerals';
+            if (key === 'entregamanual') key = 'entregaManual';
             if (key === 'dataestat') key = 'dataEstat';
             if (key === 'responsablepreparacio') key = 'responsablePreparacio';
             if (key === 'notesinternes') key = 'notesInternes';

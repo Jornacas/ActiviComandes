@@ -33,6 +33,7 @@ export interface SollicitudMultiple {
   dataNecessitat: string;
   items: CartItem[];
   altresMaterials?: string; // Comentarios adicionales generales
+  entregaManual?: boolean; // Indica si requiere entrega manual por plazo vencido
 }
 
 class ApiClient {

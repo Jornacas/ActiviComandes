@@ -11,12 +11,19 @@ import {
   CircularProgress,
   Grid,
   Autocomplete,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from '@mui/material';
 import {
   CalendarToday,
   Person,
+  Warning,
 } from '@mui/icons-material';
 import { apiClient, type SollicitudMultiple, type CartItem } from '../lib/api';
+import { validarPlazoPedido, type ValidacionFecha } from '../lib/dateValidation';
 import ItemForm from './ItemForm';
 import CartView from './CartView';
 
@@ -35,6 +42,10 @@ const FormulariSollicitud: React.FC = () => {
     dataNecessitat: '',
     altresMaterials: '',
   });
+
+  // Date validation
+  const [validacionFecha, setValidacionFecha] = useState<ValidacionFecha | null>(null);
+  const [showPlazoDialog, setShowPlazoDialog] = useState(false);
 
   // Carregar dades inicials
   useEffect(() => {
@@ -72,6 +83,18 @@ const FormulariSollicitud: React.FC = () => {
       ...prev,
       [field]: value
     }));
+
+    // Validar fecha si es el campo de fecha de necesidad
+    if (field === 'dataNecessitat' && value) {
+      const fechaNecesidad = new Date(value);
+      const validacion = validarPlazoPedido(fechaNecesidad);
+      setValidacionFecha(validacion);
+      
+      // Mostrar dialog si no cumple plazo
+      if (!validacion.cumplePlazo) {
+        setShowPlazoDialog(true);
+      }
+    }
   };
 
   const handleAddItem = (item: CartItem) => {
@@ -117,6 +140,7 @@ const FormulariSollicitud: React.FC = () => {
         dataNecessitat: formData.dataNecessitat,
         items: cartItems,
         altresMaterials: formData.altresMaterials.trim() || undefined,
+        entregaManual: validacionFecha?.requiereEntregaManual || false,
       };
 
       const response = await apiClient.createMultipleSollicitud(solicitudData);
@@ -130,6 +154,7 @@ const FormulariSollicitud: React.FC = () => {
           altresMaterials: '',
         });
         setCartItems([]);
+        setValidacionFecha(null);
 
         // Amagar missatge d'èxit després de 5 segons
         setTimeout(() => setSuccess(false), 5000);
@@ -317,6 +342,33 @@ const FormulariSollicitud: React.FC = () => {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Dialog de aviso de plazo vencido */}
+      <Dialog 
+        open={showPlazoDialog} 
+        onClose={() => setShowPlazoDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Warning color="warning" />
+          Plazo de pedido vencido
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+            {validacionFecha?.mensaje}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setShowPlazoDialog(false)} 
+            variant="contained" 
+            color="primary"
+          >
+            Entendido
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
