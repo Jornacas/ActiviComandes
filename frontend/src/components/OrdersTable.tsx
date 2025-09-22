@@ -127,8 +127,8 @@ export default function OrdersTable() {
     },
     {
       field: 'esMaterialPersonalitzat',
-      headerName: 'Personalitzat',
-      width: 100,
+      headerName: 'Altres materials',
+      width: 120,
       renderCell: (params) => (
         params.value === 'TRUE' ? 
           <Chip label="SÍ" size="small" color="warning" /> : 
