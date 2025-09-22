@@ -1,12 +1,12 @@
 {
-  "name": "Sol·licitud de Materials",
-  "short_name": "Materials",
-  "description": "Aplicació per sol·licitar materials educatius",
+  "name": "Panell d'Administració - Materials",
+  "short_name": "Admin Materials",
+  "description": "Sistema de gestió de comandes de materials educatius",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1976d2",
-  "orientation": "portrait",
+  "orientation": "any",
   "icons": [
     {
       "src": "/favicon.ico",
@@ -31,6 +31,6 @@
       "type": "image/png"
     }
   ],
-  "categories": ["education", "utilities"],
+  "categories": ["education", "utilities", "productivity"],
   "lang": "ca"
-}
+} 
