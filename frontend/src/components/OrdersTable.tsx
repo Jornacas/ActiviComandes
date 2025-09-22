@@ -241,7 +241,7 @@ export default function OrdersTable() {
             order[key] = row[headerIndex] || '';
             
             // Debug específico para el campo estat
-            if (header === 'Estat') {
+            if (header === 'estat' || key === 'estat') {
               console.log(`🔍 DEBUG ESTAT - Row ${index}: Header: ${header}, Value: "${row[headerIndex]}", Key: ${key}, Final order[${key}]: "${order[key]}"`);
             }
           });
@@ -290,6 +290,11 @@ export default function OrdersTable() {
             if (key === 'notesinternes') key = 'notesInternes';
             
             order[key] = row[headerIndex] || '';
+            
+            // Debug específico para el campo estat
+            if (header === 'estat' || key === 'estat') {
+              console.log(`🔍 DEBUG ESTAT FAST - Row ${index}: Header: ${header}, Value: "${row[headerIndex]}", Key: ${key}, Final order[${key}]: "${order[key]}"`);
+            }
           });
           return order;
         });
