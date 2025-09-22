@@ -83,7 +83,7 @@ export default function OrdersTable() {
     {
       field: 'timestamp',
       headerName: 'Data',
-      width: 90,
+      width: 80,
       type: 'dateTime',
       valueFormatter: (params) => {
         if (!params.value) return '';
@@ -94,12 +94,12 @@ export default function OrdersTable() {
     {
       field: 'nomCognoms',
       headerName: 'Monitor',
-      width: 120,
+      width: 130,
     },
     {
       field: 'dataNecessitat',
       headerName: 'Necessari',
-      width: 100,
+      width: 90,
       type: 'date',
       valueFormatter: (params) => {
         if (!params.value) return '';
@@ -113,23 +113,23 @@ export default function OrdersTable() {
     {
       field: 'escola',
       headerName: 'Escola',
-      width: 100,
+      width: 110,
     },
     {
       field: 'activitat',
-      headerName: 'Act.',
-      width: 60,
+      headerName: 'Activitat',
+      width: 70,
     },
     {
       field: 'material',
       headerName: 'Material',
-      width: 160,
+      width: 170,
       valueFormatter: (params) => formatSentenceCase(params.value as string),
     },
     {
       field: 'esMaterialPersonalitzat',
-      headerName: 'Alt.',
-      width: 50,
+      headerName: 'Altres',
+      width: 60,
       renderCell: (params) => (
         params.value === 'TRUE' ? 
           <Chip label="SÍ" size="small" color="warning" sx={{ fontSize: '0.7rem' }} /> : 
@@ -138,14 +138,14 @@ export default function OrdersTable() {
     },
     {
       field: 'unitats',
-      headerName: 'Qty',
-      width: 50,
+      headerName: 'Units',
+      width: 60,
       type: 'number',
     },
     {
       field: 'comentarisGenerals',
       headerName: 'Comentaris',
-      width: 120,
+      width: 130,
       renderCell: (params) => {
         const comentaris = params.value as string;
         if (!comentaris || comentaris.trim() === '') {
@@ -169,15 +169,15 @@ export default function OrdersTable() {
     },
     {
       field: 'entregaManual',
-      headerName: 'Manual',
+      headerName: 'Entrega',
       width: 80,
       renderCell: (params) => (
         params.value === 'TRUE' || params.value === true ? 
           <Chip 
-            label="MAN" 
+            label="MANUAL" 
             size="small" 
             color="warning" 
-            sx={{ fontWeight: 'bold', fontSize: '0.7rem' }}
+            sx={{ fontWeight: 'bold', fontSize: '0.65rem' }}
           /> : 
           null
       ),
@@ -185,7 +185,7 @@ export default function OrdersTable() {
     {
       field: 'estat',
       headerName: 'Estat',
-      width: 110,
+      width: 120,
       renderCell: (params) => {
         const normalized = formatSentenceCase(params.value as string);
         return (
@@ -201,8 +201,8 @@ export default function OrdersTable() {
     },
     {
       field: 'responsablePreparacio',
-      headerName: 'Resp.',
-      width: 90,
+      headerName: 'Responsable',
+      width: 100,
       editable: true,
     },
   ];
@@ -216,6 +216,9 @@ export default function OrdersTable() {
 
       if (response.success && response.data) {
         const { headers, rows, estadisticas } = response.data;
+
+        // Debug headers
+        console.log('🔍 DEBUG HEADERS:', headers);
 
         // Transform raw data to Order objects
         const transformedOrders = rows.map((row, index) => {
@@ -236,6 +239,11 @@ export default function OrdersTable() {
             if (key === 'notesinternes') key = 'notesInternes';
             
             order[key] = row[headerIndex] || '';
+            
+            // Debug específico para el campo estat
+            if (header === 'Estat') {
+              console.log(`🔍 DEBUG ESTAT - Row ${index}: Header: ${header}, Value: "${row[headerIndex]}", Key: ${key}, Final order[${key}]: "${order[key]}"`);
+            }
           });
           return order;
         });
