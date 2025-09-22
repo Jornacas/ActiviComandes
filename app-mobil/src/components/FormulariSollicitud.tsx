@@ -92,17 +92,22 @@ const FormulariSollicitud: React.FC = () => {
     if (field === 'dataNecessitat' && value) {
       console.log('🔄 Validando fecha:', value);
       const fechaNecesidad = new Date(value);
+      console.log('📅 Fecha parseada:', fechaNecesidad);
       const validacion = validarPlazoPedido(fechaNecesidad);
       setValidacionFecha(validacion);
-      
-      console.log('✅ Resultado validación:', validacion);
-      
+
+      console.log('✅ Resultado validación completo:', validacion);
+      console.log('❓ ¿Cumple plazo?:', validacion.cumplePlazo);
+      console.log('💬 Mensaje:', validacion.mensaje);
+
       // Mostrar dialog si no cumple plazo
       if (!validacion.cumplePlazo) {
         console.log('⚠️ MOSTRANDO DIALOG - Plazo vencido');
+        console.log('🔴 FORZANDO setShowPlazoDialog(true)');
         setShowPlazoDialog(true);
       } else {
         console.log('✅ Plazo correcto - No se muestra dialog');
+        setShowPlazoDialog(false);
       }
     }
   };
@@ -344,13 +349,10 @@ const FormulariSollicitud: React.FC = () => {
             submitting={submitting}
           />
 
-          {/* Informació adicional i recordatori de plazo */}
+          {/* Informació adicional */}
           <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-            <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" align="center">
               💡 <strong>Consell:</strong> Pots afegir múltiples materials de diferents escoles i activitats al mateix carret abans d'enviar la sol·licitud
-            </Typography>
-            <Typography variant="body2" color="warning.main" align="center" sx={{ fontWeight: 'bold' }}>
-              ⏰ <strong>Recordatori:</strong> Per necessitat el dimarts, comanda màxim el dimecres anterior
             </Typography>
           </Box>
         </CardContent>
