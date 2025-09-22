@@ -130,7 +130,6 @@ export default function OrdersTable() {
       field: 'esMaterialPersonalitzat',
       headerName: 'Altres',
       width: 60,
-      hide: true,
       renderCell: (params) => (
         params.value === 'TRUE' ?
           <Chip label="SÍ" size="small" color="warning" sx={{ fontSize: '0.7rem' }} /> :
@@ -467,6 +466,9 @@ export default function OrdersTable() {
           disableRowSelectionOnClick
           onRowSelectionModelChange={setSelectedRows}
           rowSelectionModel={selectedRows}
+          columnVisibilityModel={{
+            esMaterialPersonalitzat: false,
+          }}
           slots={{
             toolbar: GridToolbar,
           }}
