@@ -60,18 +60,18 @@ export function validarPlazoPedido(fechaNecesidad: Date): ValidacionFecha {
       month: 'long' 
     });
     
-    mensaje = `⚠️ Plazo de pedido vencido
+    mensaje = `⚠️ Termini de comanda vençut
 
-La solicitud se procesará normalmente, però:
-• La fecha límite era: ${fechaLimiteStr}
-• Eixos Creativa te contactarà per coordinar l'entrega manual
+La sol·licitud es processarà normalment, però:
+• La data límit era: ${fechaLimiteStr}
+• Eixos Creativa et contactarà per coordinar l'entrega manual
 • Recollida abans de la sessió del ${fechaNecesidadNorm.toLocaleDateString('ca-ES', { 
       weekday: 'long', 
       day: 'numeric', 
       month: 'long' 
     })}
 
-✅ El pedido continúa procesándose automáticamente`;
+✅ La comanda continua processant-se automàticament`;
   }
   
   return {

@@ -1458,10 +1458,11 @@ function createMultipleSollicitud(data) {
         isCustomMaterial,             // I: Es_Material_Personalitzat
         item.unitats || 0,            // J: Unitats
         data.altresMaterials || '',   // K: Comentaris_Generals
-        'Pendent',                    // L: Estat
-        timestamp,                    // M: Data_Estat
-        '',                           // N: Responsable_Preparacio
-        ''                            // O: Notes_Internes
+        data.entregaManual ? 'TRUE' : 'FALSE', // L: Entrega_Manual
+        'Pendent',                    // M: Estat
+        timestamp,                    // N: Data_Estat
+        '',                           // O: Responsable_Preparacio
+        ''                            // P: Notes_Internes
       ];
 
       sheet.appendRow(newRow);

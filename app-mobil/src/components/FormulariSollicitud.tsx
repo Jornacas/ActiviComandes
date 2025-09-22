@@ -360,7 +360,7 @@ const FormulariSollicitud: React.FC = () => {
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Warning color="warning" />
-          Plazo de pedido vencido
+          Termini de comanda vençut
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>

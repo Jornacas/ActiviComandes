@@ -42,14 +42,15 @@ const formatSentenceCase = (text: string | null | undefined): string => {
 
 const statusColors = {
   'Pendent': 'default',
-  'En proces': 'warning',
+  'En proces': 'warning', 
   'Preparat': 'info',
-  'Assignat': 'secondary',
   'Entregat': 'success',
+  // Legacy estados (por compatibilidad)
+  'Assignat': 'secondary',
   'Pendiente': 'default',
   'En proceso': 'warning',
   'Preparado': 'info',
-  'Asignado': 'secondary',
+  'Asignado': 'secondary', 
   'Entregado': 'success',
   '': 'default',
 } as const;
@@ -58,8 +59,9 @@ const statusIcons = {
   'Pendent': <Pending />,
   'En proces': <HourglassEmpty />,
   'Preparat': <CheckCircle />,
-  'Assignat': <LocalShipping />,
   'Entregat': <LocalShipping />,
+  // Legacy estados (por compatibilidad)
+  'Assignat': <LocalShipping />,
   'Pendiente': <Pending />,
   'En proceso': <HourglassEmpty />,
   'Preparado': <CheckCircle />,
@@ -80,75 +82,74 @@ export default function OrdersTable() {
   const columns: GridColDef[] = [
     {
       field: 'timestamp',
-      headerName: 'Data Comanda',
-      width: 130,
+      headerName: 'Data',
+      width: 90,
       type: 'dateTime',
       valueFormatter: (params) => {
         if (!params.value) return '';
         const date = new Date(params.value);
-        return date.toLocaleDateString('ca-ES') + ' ' + date.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleDateString('ca-ES', { day: '2-digit', month: '2-digit' });
       },
     },
     {
       field: 'nomCognoms',
-      headerName: 'Sol·licitant',
-      width: 150,
+      headerName: 'Monitor',
+      width: 120,
     },
     {
       field: 'dataNecessitat',
-      headerName: 'Quan ho necessito?',
-      width: 180,
+      headerName: 'Necessari',
+      width: 100,
       type: 'date',
       valueFormatter: (params) => {
         if (!params.value) return '';
         const date = new Date(params.value);
         return date.toLocaleDateString('ca-ES', { 
-          weekday: 'long', 
           day: 'numeric', 
-          month: 'long' 
+          month: 'short' 
         });
       },
     },
     {
       field: 'escola',
       headerName: 'Escola',
-      width: 130,
+      width: 100,
     },
     {
       field: 'activitat',
-      headerName: 'Activitat',
-      width: 100,
+      headerName: 'Act.',
+      width: 60,
     },
     {
       field: 'material',
       headerName: 'Material',
-      width: 200,
+      width: 160,
       valueFormatter: (params) => formatSentenceCase(params.value as string),
     },
     {
       field: 'esMaterialPersonalitzat',
-      headerName: 'Altres materials',
-      width: 120,
+      headerName: 'Alt.',
+      width: 50,
       renderCell: (params) => (
         params.value === 'TRUE' ? 
-          <Chip label="SÍ" size="small" color="warning" /> : 
+          <Chip label="SÍ" size="small" color="warning" sx={{ fontSize: '0.7rem' }} /> : 
           null
       ),
     },
     {
       field: 'unitats',
-      headerName: 'Quantitat',
-      width: 80,
+      headerName: 'Qty',
+      width: 50,
       type: 'number',
     },
     {
       field: 'comentarisGenerals',
       headerName: 'Comentaris',
-      width: 200,
+      width: 120,
       renderCell: (params) => {
         const comentaris = params.value as string;
         if (!comentaris || comentaris.trim() === '') {
-          return <span style={{ color: '#999', fontStyle: 'italic' }}>Sense comentaris</span>;
+          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
         }
         return (
           <div 
@@ -156,7 +157,8 @@ export default function OrdersTable() {
               whiteSpace: 'nowrap', 
               overflow: 'hidden', 
               textOverflow: 'ellipsis',
-              maxWidth: '100%'
+              maxWidth: '100%',
+              fontSize: '0.85rem'
             }}
             title={comentaris}
           >
@@ -167,15 +169,15 @@ export default function OrdersTable() {
     },
     {
       field: 'entregaManual',
-      headerName: 'Entrega Manual',
-      width: 130,
+      headerName: 'Manual',
+      width: 80,
       renderCell: (params) => (
         params.value === 'TRUE' || params.value === true ? 
           <Chip 
-            label="MANUAL" 
+            label="MAN" 
             size="small" 
             color="warning" 
-            sx={{ fontWeight: 'bold' }}
+            sx={{ fontWeight: 'bold', fontSize: '0.7rem' }}
           /> : 
           null
       ),
@@ -183,7 +185,7 @@ export default function OrdersTable() {
     {
       field: 'estat',
       headerName: 'Estat',
-      width: 130,
+      width: 110,
       renderCell: (params) => {
         const normalized = formatSentenceCase(params.value as string);
         return (
@@ -192,14 +194,15 @@ export default function OrdersTable() {
             label={normalized || 'Pendent'}
             color={statusColors[normalized as keyof typeof statusColors] || 'default'}
             size="small"
+            sx={{ fontSize: '0.75rem' }}
           />
         );
       },
     },
     {
       field: 'responsablePreparacio',
-      headerName: 'Responsable',
-      width: 120,
+      headerName: 'Resp.',
+      width: 90,
       editable: true,
     },
   ];
