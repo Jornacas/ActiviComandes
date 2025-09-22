@@ -1,6 +1,7 @@
 /**
  * Validación de fechas para pedidos de materiales
- * Regla: Para necesidad el martes, pedido máximo el miércoles de la semana anterior
+ * Regla: Mínim 6 dies de termini per preparar materials
+ * Exemple: per material el dilluns → demanar abans del dimarts anterior
  */
 
 export interface ValidacionFecha {
@@ -27,25 +28,9 @@ export function validarPlazoPedido(fechaNecesidad: Date): ValidacionFecha {
   console.log('fechaNecesidad toString:', fechaNecesidad.toString());
   console.log('fechaNecesidad ISO:', fechaNecesidad.toISOString());
   
-  // Calcular la fecha límite: miércoles de la semana anterior a la fecha de necesidad
+  // Calcular la fecha límite: 6 dies abans de la data de necessitat
   const fechaLimite = new Date(fechaNecesidadNorm);
-
-  // Retroceder a la semana anterior (7 días)
-  fechaLimite.setDate(fechaLimite.getDate() - 7);
-
-  // Encontrar el miércoles de esa semana
-  const diaSemana = fechaLimite.getDay(); // 0=domingo, 3=miércoles
-  let diasHastaMiercoles;
-
-  if (diaSemana <= 3) {
-    // Si estamos en lunes, martes o miércoles, ir al miércoles de esta semana
-    diasHastaMiercoles = 3 - diaSemana;
-  } else {
-    // Si estamos en jueves, viernes, sábado o domingo, ir al miércoles de la semana siguiente
-    diasHastaMiercoles = 7 - diaSemana + 3;
-  }
-
-  fechaLimite.setDate(fechaLimite.getDate() + diasHastaMiercoles);
+  fechaLimite.setDate(fechaLimite.getDate() - 6);
   
   // CORREGIDO: Cumple plazo si HOY es antes o igual que la fecha límite
   const cumplePlazo = hoy <= fechaLimite;
