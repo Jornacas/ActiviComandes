@@ -367,11 +367,11 @@ class ApiClient {
   }
 
   async getEscoles(): Promise<ApiResponse<string[]>> {
-    return this.request('getEscoles', {}, 'POST');
+    return this.request('getEscoles', {}, 'GET');
   }
 
   async getMaterials(): Promise<ApiResponse<string[]>> {
-    return this.request('getMaterials', {}, 'POST');
+    return this.request('getMaterials', {}, 'GET');
   }
 
   async getActivitats(): Promise<ApiResponse<string[]>> {
