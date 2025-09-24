@@ -1604,8 +1604,10 @@ function loadRespostesData(limit = null) {
         'Responsable_Preparacio': 'responsablePreparacio',
         'Notes_Internes': 'notesInternes',
         'Modalitat_Entrega': 'modalitatEntrega',
+        'Modalitat_Lliurament': 'modalitatEntrega',
         'Monitor_Intermediari': 'monitorIntermediari',
         'Data_Entrega_Prevista': 'dataEntregaPrevista',
+        'Data_Lliurament_Prevista': 'dataEntregaPrevista',
         'Distancia_Academia': 'distanciaAcademia',
         'Notes_Entrega': 'notesEntrega'
       };
@@ -2890,11 +2892,11 @@ function createDelivery(deliveryData) {
     // Obtenir headers existents
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-    // Obtenir índexs de columnes
+    // Obtenir índexs de columnes (buscar tant en català com en espanyol)
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
-    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega" || h === "Modalitat_Lliurament");
     const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
-    const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista");
+    const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista" || h === "Data_Lliurament_Prevista");
     const estatIndex = headers.findIndex(h => h === "Estat");
 
     // Actualitzar files corresponents
