@@ -78,6 +78,25 @@ export default function OrdersTable() {
   const [newStatus, setNewStatus] = useState('');
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [staleOrders, setStaleOrders] = useState<Order[]>([]);
+
+  // Function to detect stale orders (no state change in 5 days)
+  const detectStaleOrders = (ordersList: Order[]) => {
+    const fiveDaysAgo = new Date();
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+    
+    const stale = ordersList.filter(order => {
+      // Check if order has no dataEstat or if dataEstat is older than 5 days
+      if (!order.dataEstat) return true;
+      
+      const lastStateChange = new Date(order.dataEstat);
+      return lastStateChange < fiveDaysAgo && 
+             order.estat !== 'Entregat' && 
+             order.estat !== 'Entregado'; // Include legacy status
+    });
+    
+    setStaleOrders(stale);
+  };
 
   const columns: GridColDef[] = [
     {
@@ -285,6 +304,9 @@ export default function OrdersTable() {
 
         setOrders(transformedOrders);
         setStats(estadisticas);
+        
+        // Detect stale orders
+        detectStaleOrders(transformedOrders);
       } else {
         setError(response.error || 'Error desconocido al cargar datos');
       }
@@ -447,6 +469,23 @@ export default function OrdersTable() {
         </Alert>
       )}
 
+      {staleOrders.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <strong>⚠️ Avisos de Sol·licituds Estancades</strong>
+          <br />
+          Hi ha {staleOrders.length} sol·licitud{staleOrders.length > 1 ? 's' : ''} sense canvi d'estat durant més de 5 dies.
+          {staleOrders.length <= 3 && (
+            <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
+              {staleOrders.map(order => (
+                <div key={order.id}>
+                  • {order.nomCognoms} - {order.escola} - {order.material}
+                </div>
+              ))}
+            </div>
+          )}
+        </Alert>
+      )}
+
       {stats && (
         <Card sx={{ mb: 2 }}>
           <CardContent>
@@ -524,6 +563,11 @@ export default function OrdersTable() {
           rowSelectionModel={selectedRows}
           columnVisibilityModel={{
             esMaterialPersonalitzat: false,
+          }}
+          initialState={{
+            sorting: {
+              sortModel: [{ field: 'timestamp', sort: 'desc' }],
+            },
           }}
           slots={{
             toolbar: GridToolbar,

@@ -44,6 +44,11 @@ import {
   TrendingUp,
   Speed,
   Route,
+  Star,
+  StarHalf,
+  StarOutline,
+  Place,
+  Schedule,
 } from '@mui/icons-material';
 
 // Types
@@ -374,12 +379,43 @@ export default function DeliveryManager() {
                   }
                 };
 
-                const getEfficiencyColor = (eficiencia: string) => {
+                const getEfficiencyDisplay = (eficiencia: string) => {
                   switch (eficiencia) {
-                    case 'Alta': return 'success';
-                    case 'Mitjana-Alta': return 'warning';
-                    case 'Baixa': return 'default';
-                    default: return 'default';
+                    case 'Màxima':
+                      return { 
+                        icon: <Star sx={{ fontSize: 16 }} />, 
+                        color: 'success' as const, 
+                        label: '★★★ Màxima',
+                        stars: '★★★'
+                      };
+                    case 'Alta':
+                      return { 
+                        icon: <Star sx={{ fontSize: 16 }} />, 
+                        color: 'info' as const, 
+                        label: '★★☆ Alta',
+                        stars: '★★☆'
+                      };
+                    case 'Mitjana':
+                      return { 
+                        icon: <StarHalf sx={{ fontSize: 16 }} />, 
+                        color: 'warning' as const, 
+                        label: '★☆☆ Mitjana',
+                        stars: '★☆☆'
+                      };
+                    case 'Baixa':
+                      return { 
+                        icon: <StarOutline sx={{ fontSize: 16 }} />, 
+                        color: 'error' as const, 
+                        label: '☆☆☆ Baixa',
+                        stars: '☆☆☆'
+                      };
+                    default:
+                      return { 
+                        icon: <StarOutline sx={{ fontSize: 16 }} />, 
+                        color: 'default' as const, 
+                        label: '? Desconeguda',
+                        stars: '?'
+                      };
                   }
                 };
 
@@ -407,9 +443,11 @@ export default function DeliveryManager() {
                           )}
                         </Typography>
                         <Chip
-                          label={`Eficiència: ${option.eficiencia}`}
+                          icon={getEfficiencyDisplay(option.eficiencia).icon}
+                          label={getEfficiencyDisplay(option.eficiencia).label}
                           size="small"
-                          color={getEfficiencyColor(option.eficiencia) as any}
+                          color={getEfficiencyDisplay(option.eficiencia).color}
+                          sx={{ fontWeight: 'bold' }}
                         />
                       </Box>
 
@@ -426,20 +464,39 @@ export default function DeliveryManager() {
                         </Typography>
                       )}
 
-                      <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          📍 Escola d'entrega: <strong>{option.escola}</strong>
-                          {option.escolaDestino && (
-                            <span> → Destí final: <strong>{option.escolaDestino}</strong></span>
-                          )}
-                        </Typography>
+                      <Box sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+                        <Stack spacing={1}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Place color="primary" fontSize="small" />
+                            <Typography variant="subtitle2">
+                              <strong>{option.escola}</strong>
+                              {option.escolaDestino && (
+                                <span style={{ color: '#666' }}> → <strong>{option.escolaDestino}</strong></span>
+                              )}
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                            <Chip
+                              icon={<LocalShipping />}
+                              label={`${option.comandes.length} comand${option.comandes.length > 1 ? 'es' : 'a'}`}
+                              size="small"
+                              variant="outlined"
+                            />
+                            
+                            {option.distanciaAcademia && (
+                              <Chip
+                                icon={<Route />}
+                                label={`${option.distanciaAcademia} des d'Eixos`}
+                                size="small"
+                                variant="outlined"
+                                color="info"
+                              />
+                            )}
+                            
 
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          {option.comandes.length} comandes
-                          {option.distanciaAcademia && (
-                            <span> • Distància des d'Eixos: {option.distanciaAcademia}</span>
-                          )}
-                        </Typography>
+                          </Box>
+                        </Stack>
                       </Box>
 
                       <List dense sx={{ mt: 1 }}>
