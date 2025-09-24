@@ -288,48 +288,25 @@ export default function OrdersTable() {
     {
       field: 'distanciaAcademia',
       headerName: 'Distància',
-      width: 80,
+      width: 100,
       renderCell: (params) => {
-        const distance = params.value as string;
-        if (!distance || distance.trim() === '') {
+        const distancia = params.value as string;
+        if (!distancia || distancia.trim() === '') {
           return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
         }
-        return (
-          <Chip
-            label={distance}
-            size="small"
-            color="info"
-            sx={{ fontSize: '0.7rem', minWidth: '60px' }}
-          />
-        );
+        return <span style={{ fontSize: '0.85rem' }}>{distancia}</span>;
       },
     },
     {
-      field: 'actions',
-      headerName: 'Accions',
-      width: 100,
-      sortable: false,
-      filterable: false,
+      field: 'notesEntrega',
+      headerName: 'Notes Lliurament',
+      width: 150,
       renderCell: (params) => {
-        const order = params.row as Order;
-        const hasIntermediary = order.monitorIntermediari && order.monitorIntermediari.trim() !== '';
-        
-        if (!hasIntermediary) {
-          return null;
+        const notes = params.value as string;
+        if (!notes || notes.trim() === '') {
+          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
         }
-
-        return (
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            startIcon={<Clear />}
-            onClick={() => handleRemoveIntermediary([order.idItem || order.id])}
-            sx={{ fontSize: '0.7rem', minWidth: '80px' }}
-          >
-            Eliminar
-          </Button>
-        );
+        return <span style={{ fontSize: '0.85rem' }}>{notes}</span>;
       },
     },
   ];
@@ -623,7 +600,17 @@ export default function OrdersTable() {
               onClick={deleteSelectedOrders}
               disabled={deleting}
             >
-              Eliminar ({selectedRows.length})
+              Eliminar Sol·licitud ({selectedRows.length})
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={<Clear />}
+              onClick={() => handleRemoveIntermediary(selectedRows as string[])}
+              disabled={updating || selectedRows.length === 0}
+            >
+              Eliminar Intermediari ({selectedRows.length})
             </Button>
           </>
         )}
@@ -659,7 +646,7 @@ export default function OrdersTable() {
               backgroundColor: 'rgba(0, 0, 0, 0.04)',
             },
           }}
-        />
+                />
       </Box>
     </Box>
   );
