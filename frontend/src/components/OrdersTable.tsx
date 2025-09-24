@@ -42,10 +42,11 @@ const formatSentenceCase = (text: string | null | undefined): string => {
 
 const statusColors = {
   'Pendent': 'default',
-  'En proces': 'warning', 
+  'En proces': 'warning',
   'Preparat': 'info',
-  'Entregat': 'success',
+  'Lliurat': 'success',
   // Legacy estados (por compatibilidad)
+  'Entregat': 'success',
   'Assignat': 'secondary',
   'Pendiente': 'default',
   'En proceso': 'warning',
@@ -59,8 +60,9 @@ const statusIcons = {
   'Pendent': <Pending />,
   'En proces': <HourglassEmpty />,
   'Preparat': <CheckCircle />,
-  'Entregat': <LocalShipping />,
+  'Lliurat': <LocalShipping />,
   // Legacy estados (por compatibilidad)
+  'Entregat': <LocalShipping />,
   'Assignat': <LocalShipping />,
   'Pendiente': <Pending />,
   'En proceso': <HourglassEmpty />,
@@ -91,6 +93,7 @@ export default function OrdersTable() {
       
       const lastStateChange = new Date(order.dataEstat);
       return lastStateChange < fiveDaysAgo && 
+             order.estat !== 'Lliurat' && 
              order.estat !== 'Entregat' && 
              order.estat !== 'Entregado'; // Include legacy status
     });
@@ -188,7 +191,7 @@ export default function OrdersTable() {
     },
     {
       field: 'modalitatEntrega',
-      headerName: 'Entrega',
+      headerName: 'Lliurament',
       width: 95,
       renderCell: (params) => (
         params.value === 'MANUAL' ?
@@ -226,7 +229,7 @@ export default function OrdersTable() {
     },
     {
       field: 'monitorIntermediari',
-      headerName: 'Monitor Entrega',
+      headerName: 'Monitor Lliurament',
       width: 110,
       renderCell: (params) => {
         const monitor = params.value as string;
@@ -245,7 +248,7 @@ export default function OrdersTable() {
     },
     {
       field: 'dataEntregaPrevista',
-      headerName: 'Data Entrega',
+      headerName: 'Data Lliurament',
       width: 100,
       renderCell: (params) => {
         const date = params.value as string;
@@ -497,7 +500,7 @@ export default function OrdersTable() {
               <Chip label={`Pendents: ${stats.pendientes || stats.pendents || 0}`} color="default" />
               <Chip label={`En Procés: ${stats.enProceso || stats.enProces || 0}`} color="warning" />
               <Chip label={`Preparats: ${stats.preparados || stats.preparats || 0}`} color="info" />
-              <Chip label={`Entregats: ${stats.entregados || stats.entregats || 0}`} color="success" />
+              <Chip label={`Lliurats: ${stats.entregados || stats.entregats || 0}`} color="success" />
             </Stack>
           </CardContent>
         </Card>
@@ -527,7 +530,7 @@ export default function OrdersTable() {
                 <MenuItem value="En proces">En procés</MenuItem>
                 <MenuItem value="Preparat">Preparat</MenuItem>
                 <MenuItem value="Assignat">Assignat</MenuItem>
-                <MenuItem value="Entregat">Entregat</MenuItem>
+                                    <MenuItem value="Lliurat">Lliurat</MenuItem>
               </Select>
             </FormControl>
 

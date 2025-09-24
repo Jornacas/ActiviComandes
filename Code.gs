@@ -3178,7 +3178,7 @@ function findDeliveryOptionsForSchool(targetSchool, schoolData, order) {
     const distanceData = getDistanceForSchool(targetSchool, directSchool.adreça);
     
     options.push({
-      tipus: "Entrega Directa",
+      tipus: "Lliurament Directe",
       escola: targetSchool,
       adreça: directSchool.adreça,
       eficiencia: getEficienciaFromDistance(distanceData),
@@ -3212,7 +3212,7 @@ function findDeliveryOptionsForSchool(targetSchool, schoolData, order) {
             const distanceData = getDistanceForSchool(intermediarySchoolInfo.escola, intermediarySchoolInfo.adreça);
             
             options.push({
-              tipus: "Entrega amb Intermediari",
+              tipus: "Lliurament amb Intermediari",
               escola: intermediarySchoolInfo.escola,
               escolaFinal: targetSchool,
               adreça: intermediarySchoolInfo.adreça,

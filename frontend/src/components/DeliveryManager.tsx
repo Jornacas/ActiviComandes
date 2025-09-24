@@ -177,7 +177,7 @@ export default function DeliveryManager() {
         setDeliveryOptions(result.data || []);
         setDeliveryDialogOpen(true);
       } else {
-        setError(result.error || 'Error obtenint opcions d\'entrega');
+                    setError(result.error || 'Error obtenint opcions de lliurament');
       }
     } catch (err) {
       console.error('Error getting delivery options:', err);
@@ -189,7 +189,7 @@ export default function DeliveryManager() {
 
   const createDelivery = async () => {
     if (!selectedModalitat) {
-      setError('Selecciona la modalitat d\'entrega');
+              setError('Selecciona la modalitat de lliurament');
       return;
     }
 
@@ -218,7 +218,7 @@ export default function DeliveryManager() {
       const result = await response.json();
 
       if (result.success) {
-        setSuccess(result.message || 'Entrega assignada correctament');
+        setSuccess(result.message || 'Lliurament assignat correctament');
         setDeliveryDialogOpen(false);
         setSelectedOrders([]);
         setSelectedModalitat('Directa');
@@ -226,7 +226,7 @@ export default function DeliveryManager() {
         setDataEntrega('');
         fetchPreparatedOrders(); // Refresh the list
       } else {
-        setError(result.error || 'Error creant l\'assignació d\'entrega');
+        setError(result.error || 'Error creant l\'assignació de lliurament');
       }
     } catch (err) {
       console.error('Error creating delivery:', err);
@@ -291,7 +291,7 @@ export default function DeliveryManager() {
 
           {preparatedOrders.length === 0 ? (
             <Typography color="text.secondary">
-              No hi ha comandes preparades per assignar entrega.
+              No hi ha comandes preparades per assignar lliurament.
             </Typography>
           ) : (
             <>
@@ -312,7 +312,7 @@ export default function DeliveryManager() {
                     disabled={selectedOrders.length === 0 || loading}
                     startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <DirectionsCar />}
                   >
-                    Planificar Entrega
+                    Planificar Lliurament
                   </Button>
                 </Stack>
               </Box>
@@ -358,7 +358,7 @@ export default function DeliveryManager() {
         <DialogTitle>
           <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <LocalShipping />
-            Opcions d'Entrega
+            Opcions de Lliurament
           </Typography>
         </DialogTitle>
         <DialogContent>
@@ -372,9 +372,9 @@ export default function DeliveryManager() {
                 // Definir icones per tipus d'opció
                 const getOptionIcon = (tipus: string) => {
                   switch (tipus) {
-                    case 'Entrega Optimitzada': return <TrendingUp color="success" />;
+                    case 'Lliurament Optimitzat': return <TrendingUp color="success" />;
                     case 'Ruta Multicentre': return <Route color="warning" />;
-                    case 'Entrega Directa': return <DirectionsCar color="action" />;
+                    case 'Lliurament Directe': return <DirectionsCar color="action" />;
                     default: return <School />;
                   }
                 };
@@ -537,27 +537,27 @@ export default function DeliveryManager() {
               <Divider sx={{ my: 3 }} />
 
               <Typography variant="h6" gutterBottom>
-                Configuració de l'entrega:
+                Configuració del lliurament:
               </Typography>
 
               <Stack spacing={3}>
                 <FormControl fullWidth>
-                  <InputLabel>Modalitat d'entrega</InputLabel>
+                  <InputLabel>Modalitat de lliurament</InputLabel>
                   <Select
                     value={selectedModalitat}
-                    label="Modalitat d'entrega"
+                    label="Modalitat de lliurament"
                     onChange={(e) => setSelectedModalitat(e.target.value as 'Directa' | 'Intermediari')}
                   >
                     <MenuItem value="Directa">
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <DirectionsCar />
-                        Entrega Directa
+                        Lliurament Directe
                       </Box>
                     </MenuItem>
                     <MenuItem value="Intermediari" disabled={getAvailableMonitors().length === 0}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Person />
-                        Entrega amb Intermediari
+                        Lliurament amb Intermediari
                       </Box>
                     </MenuItem>
                   </Select>
@@ -583,7 +583,7 @@ export default function DeliveryManager() {
                 <TextField
                   fullWidth
                   type="date"
-                  label="Data d'entrega prevista"
+                  label="Data de lliurament prevista"
                   value={dataEntrega}
                   onChange={(e) => setDataEntrega(e.target.value)}
                   InputLabelProps={{
@@ -604,7 +604,7 @@ export default function DeliveryManager() {
             disabled={loading}
             startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
           >
-            Confirmar Entrega
+            Confirmar Lliurament
           </Button>
         </DialogActions>
       </Dialog>

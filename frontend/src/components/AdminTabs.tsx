@@ -152,7 +152,7 @@ export default function AdminTabs() {
             {...a11yProps(0)}
           />
           <Tab
-            label="Entregas"
+                          label="Lliuraments"
             icon={<LocalShipping />}
             iconPosition="start"
             {...a11yProps(1)}
