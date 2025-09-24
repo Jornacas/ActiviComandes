@@ -217,6 +217,10 @@ class ApiClient {
   async calculateDistances(addresses: string[]): Promise<ApiResponse<any[]>> {
     return this.request('calculateDistances', { addresses }, 'POST');
   }
+
+  async removeIntermediaryAssignment(orderIds: string[]): Promise<ApiResponse<{ updatedRows: number; message: string }>> {
+    return this.request('removeIntermediaryAssignment', { orderIds }, 'POST');
+  }
 }
 
 export const apiClient = new ApiClient();

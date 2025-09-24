@@ -29,6 +29,7 @@ import {
   LocalShipping,
   HourglassEmpty,
   Delete,
+  Clear,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
 
@@ -303,7 +304,59 @@ export default function OrdersTable() {
         );
       },
     },
+    {
+      field: 'actions',
+      headerName: 'Accions',
+      width: 100,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        const order = params.row as Order;
+        const hasIntermediary = order.monitorIntermediari && order.monitorIntermediari.trim() !== '';
+        
+        if (!hasIntermediary) {
+          return null;
+        }
+
+        return (
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<Clear />}
+            onClick={() => handleRemoveIntermediary([order.idItem || order.id])}
+            sx={{ fontSize: '0.7rem', minWidth: '80px' }}
+          >
+            Eliminar
+          </Button>
+        );
+      },
+    },
   ];
+
+  const handleRemoveIntermediary = async (orderIds: string[]) => {
+    if (!confirm('Estàs segur que vols eliminar la assignació d\'intermediari? L\'estat tornarà a "Preparat".')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await apiClient.removeIntermediaryAssignment(orderIds);
+      
+      if (result.success) {
+        // Refresh data after successful removal
+        await loadData();
+        // You could also show a success message here
+      } else {
+        setError(result.error || 'Error eliminant assignació d\'intermediari');
+      }
+    } catch (err) {
+      setError('Error de connexió al eliminar intermediari');
+      console.error('Remove intermediary error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -586,6 +639,7 @@ export default function OrdersTable() {
           rowSelectionModel={selectedRows}
           columnVisibilityModel={{
             esMaterialPersonalitzat: false,
+            distanciaAcademia: false,
           }}
           initialState={{
             sorting: {

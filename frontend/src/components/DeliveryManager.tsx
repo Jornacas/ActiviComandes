@@ -202,10 +202,21 @@ export default function DeliveryManager() {
     setError(null);
 
     try {
+      // Buscar la escolaDestino segons la modalitat i monitor seleccionats
+      let escolaDestino = '';
+      if (selectedModalitat === 'Intermediari' && selectedMonitor) {
+        const intermediaryOption = deliveryOptions.find(option => 
+          option.tipus.includes('Intermediari') && 
+          option.monitorsDisponibles.some(monitor => monitor.nom === selectedMonitor)
+        );
+        escolaDestino = intermediaryOption?.escolaDestino || '';
+      }
+
       const deliveryData = {
         orderIds: selectedOrders,
         modalitat: selectedModalitat,
         monitorIntermediaria: selectedModalitat === 'Intermediari' ? selectedMonitor : '',
+        escolaDestino: escolaDestino,
         dataEntrega: dataEntrega
       };
 
