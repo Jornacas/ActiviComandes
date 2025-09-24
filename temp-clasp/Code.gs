@@ -72,6 +72,18 @@ function handleApiRequest(e, method) {
       case 'processFormResponses':
         result = processRespostesData();
         break;
+      case 'debugDadesStructure':
+        result = debugDadesStructure();
+        break;
+      case 'getSchoolAddresses':
+        result = getSchoolAddresses();
+        break;
+      case 'getMonitorSchoolData':
+        result = getMonitorSchoolData();
+        break;
+      case 'testGoogleMaps':
+        result = testGoogleMapsAPI();
+        break;
       case 'updateOrderStatus':
         const uuids = e.parameter.uuids ? e.parameter.uuids.split(',') :
                       (e.postData ? JSON.parse(e.postData.contents).uuids : []);
@@ -190,8 +202,14 @@ function handleApiRequest(e, method) {
         break;
       case 'getDeliveryOptions':
         // Get delivery options for selected orders
+        console.log('📥 getDeliveryOptions called - Raw parameters:', JSON.stringify(e.parameter));
+        console.log('📥 getDeliveryOptions called - Raw postData:', e.postData ? JSON.stringify(e.postData) : 'No postData');
+        
         const selectedOrders = e.parameter.orders ? JSON.parse(e.parameter.orders) :
                              (e.postData ? JSON.parse(e.postData.contents).orders : []);
+        
+        console.log('📥 Parsed selectedOrders:', JSON.stringify(selectedOrders));
+        
         result = getDeliveryOptions(selectedOrders);
         break;
       case 'createDelivery':
@@ -205,6 +223,10 @@ function handleApiRequest(e, method) {
         const addresses = e.parameter.addresses ? JSON.parse(e.parameter.addresses) :
                          (e.postData ? JSON.parse(e.postData.contents).addresses : []);
         result = calculateDistances(addresses);
+        break;
+      case 'getDeliveryOptionsOptimized':
+        // TEST function for debugging delivery options
+        result = testDeliveryOptionsWithDebug();
         break;
       default:
         // If no API action specified, serve the HTML interface (legacy mode)
@@ -988,12 +1010,12 @@ function formatearFecha(fechaString) {
 
 function actualizarCentrosDeEntregaYDia() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetComandes = ss.getSheetByName("Comandes");
+  const sheetComandes = ss.getSheetByName("Respostes");
   // const sheetDades = ss.getSheetByName("dades"); // No longer directly used
   // const sheetOrdreEscoles = ss.getSheetByName("ordre_distancia_escoles"); // No longer directly used
 
   if (!sheetComandes) {
-    return { success: false, error: "Falta la hoja 'Comandes'." };
+    return { success: false, error: "Falta la hoja 'Respostes'." };
   }
 
   // Use cached data for 'dades' and 'ordre_distancia_escoles'
@@ -1455,7 +1477,7 @@ function createMultipleSollicitud(data) {
       const materialName = item.customMaterial || item.material;
       const isCustomMaterial = item.customMaterial ? "TRUE" : "FALSE";
       
-      // Create row for each item with new structure
+      // Create row for each item with CORRECTED structure
       const newRow = [
         timestamp,                    // A: Timestamp
         baseUuid,                     // B: ID_Pedido (common for all items)
@@ -1472,7 +1494,12 @@ function createMultipleSollicitud(data) {
         'Pendent',                    // M: Estat
         timestamp,                    // N: Data_Estat
         '',                           // O: Responsable_Preparacio
-        ''                            // P: Notes_Internes
+        '',                           // P: Notes_Internes
+        data.entregaManual ? 'MANUAL' : 'NORMAL', // Q: Modalitat_Entrega
+        '',                           // R: Monitor_Intermediari
+        '',                           // S: Data_Entrega_Prevista
+        '',                           // T: Distancia_Academia
+        ''                            // U: Notes_Entrega
       ];
 
       sheet.appendRow(newRow);
@@ -1549,16 +1576,16 @@ function loadRespostesData(limit = null) {
       };
     }
     
-    // Remove headers row
-    let rows = values.slice(1);
-    
+    // Derive headers from the sheet's first row and normalize
+    const headersRow = values[0];
+
+    // Remove headers row and ensure strict alignment with headers length
+    let rows = values.slice(1).map(row => row.slice(0, headersRow.length));
+
     // Apply limit if specified (for performance)
     if (limit && limit > 0) {
       rows = rows.slice(0, limit);
     }
-    
-    // Derive headers from the sheet's first row and normalize
-    const headersRow = values[0];
     const headers = headersRow.map(h => {
       const map = {
         'Timestamp': 'timestamp',
@@ -1572,11 +1599,15 @@ function loadRespostesData(limit = null) {
         'Es_Material_Personalitzat': 'esMaterialPersonalitzat',
         'Unitats': 'unitats',
         'Comentaris_Generals': 'comentarisGenerals',
-        'Entrega_Manual': 'entregaManual',
         'Estat': 'estat',
         'Data_Estat': 'dataEstat',
         'Responsable_Preparacio': 'responsablePreparacio',
-        'Notes_Internes': 'notesInternes'
+        'Notes_Internes': 'notesInternes',
+        'Modalitat_Entrega': 'modalitatEntrega',
+        'Monitor_Intermediari': 'monitorIntermediari',
+        'Data_Entrega_Prevista': 'dataEntregaPrevista',
+        'Distancia_Academia': 'distanciaAcademia',
+        'Notes_Entrega': 'notesEntrega'
       };
       return map[h] || String(h).toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
     });
@@ -1584,6 +1615,53 @@ function loadRespostesData(limit = null) {
     // Calculate statistics using dynamic Estat column index
     const allRows = values.slice(1);
     const estatColIndex = headersRow.findIndex(h => h === 'Estat');
+
+    // DEBUG: Log header positions for debugging column alignment issues
+    const responsableColIndex = headersRow.findIndex(h => h === 'Responsable_Preparacio');
+    const dataEstatColIndex = headersRow.findIndex(h => h === 'Data_Estat');
+
+    console.log('DEBUG Headers mapping:', {
+      'Estat': estatColIndex,
+      'Data_Estat': dataEstatColIndex,
+      'Responsable_Preparacio': responsableColIndex,
+      'Total_Headers': headersRow.length
+    });
+
+    // ADDITIONAL DEBUG: Log sample data from first few rows
+    if (allRows.length > 0) {
+      console.log('DEBUG Sample row data:', {
+        'Row_0_Estat': allRows[0][estatColIndex],
+        'Row_0_Data_Estat': allRows[0][dataEstatColIndex],
+        'Row_0_Responsable': allRows[0][responsableColIndex],
+        'Row_Length': allRows[0].length
+      });
+    }
+
+    // FIX: Clean corrupted data - ensure proper data types in columns
+    rows = rows.map(row => {
+      const cleanedRow = [...row]; // Create copy
+
+      // Fix Estat column: should only contain valid states
+      if (estatColIndex >= 0) {
+        const estat = cleanedRow[estatColIndex];
+        if (estat === 'TRUE' || estat === 'FALSE' || estat === true || estat === false) {
+          cleanedRow[estatColIndex] = 'Pendent'; // Default to Pendent if corrupted
+        }
+      }
+
+      // Fix Responsable column: should not contain dates
+      if (responsableColIndex >= 0) {
+        const responsable = cleanedRow[responsableColIndex];
+        // If looks like a date (contains numbers and dashes/slashes), clear it
+        if (responsable && typeof responsable === 'string' &&
+            (responsable.includes('-') || responsable.includes('/')) &&
+            /\d/.test(responsable)) {
+          cleanedRow[responsableColIndex] = ''; // Clear if it's a date
+        }
+      }
+
+      return cleanedRow;
+    });
 
     const stats = {
       total: allRows.length,
@@ -1616,7 +1694,7 @@ function setupRespostesHeaders(sheet) {
   const headers = [
     "Timestamp",
     "ID_Pedido",
-    "ID_Item", 
+    "ID_Item",
     "Nom_Cognoms",
     "Data_Necessitat",
     "Escola",
@@ -1629,7 +1707,12 @@ function setupRespostesHeaders(sheet) {
     "Estat",
     "Data_Estat",
     "Responsable_Preparacio",
-    "Notes_Internes"
+    "Notes_Internes",
+    "Modalitat_Entrega",
+    "Monitor_Intermediari",
+    "Data_Entrega_Prevista",
+    "Distancia_Academia",
+    "Notes_Entrega"
   ];
   
   // Set headers in first row
@@ -1690,6 +1773,194 @@ function createRespostesSheet() {
       headers: 15
     } 
   };
+}
+
+// Función para obtener adreces d'escoles de la hoja "Dades"
+function getSchoolAddresses() {
+  try {
+    const data = getCachedData("Dades", "cache_school_addresses", 3600); // Cache 1 hour
+
+    if (!data || data.length === 0) {
+      return { success: false, error: "Hoja 'Dades' vacía o no encontrada" };
+    }
+
+    // Skip headers (first row)
+    const rows = data.slice(1);
+
+    // Build map of school -> address
+    const schoolAddresses = {};
+    rows.forEach(row => {
+      const escola = row[0] ? row[0].toString().trim() : '';
+      const adreça = row[12] ? row[12].toString().trim() : '';
+
+      if (escola && adreça) {
+        // Use first address found for each school
+        if (!schoolAddresses[escola]) {
+          schoolAddresses[escola] = adreça;
+        }
+      }
+    });
+
+    return {
+      success: true,
+      data: schoolAddresses,
+      count: Object.keys(schoolAddresses).length
+    };
+
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+// Función para obtener datos completos monitor/escola/adreça
+function getMonitorSchoolData() {
+  try {
+    const data = getCachedData("Dades", "cache_monitor_school_data", 3600); // Cache 1 hour
+
+    if (!data || data.length === 0) {
+      return { success: false, error: "Hoja 'Dades' vacía o no encontrada" };
+    }
+
+    // Skip headers (first row)
+    const rows = data.slice(1);
+
+    const monitorData = [];
+    rows.forEach(row => {
+      const escola = row[0] ? row[0].toString().trim() : '';
+      const monitora = row[1] ? row[1].toString().trim() : '';
+      const dia = row[2] ? row[2].toString().trim() : '';
+      const adreça = row[12] ? row[12].toString().trim() : '';
+
+      if (escola && monitora) {
+        monitorData.push({
+          escola: escola,
+          monitora: monitora,
+          dia: dia,
+          adreça: adreça
+        });
+      }
+    });
+
+    return {
+      success: true,
+      data: monitorData,
+      count: monitorData.length
+    };
+
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+// TEST: Función para probar Google Maps Distance Matrix API
+function testGoogleMapsAPI() {
+  try {
+    console.log('🧪 Testing Google Maps Distance Matrix API via UrlFetch...');
+
+    // Test amb dues adreces de Barcelona
+    const origin = "Carrer Ramon Turró 73, 08005 Barcelona"; // Eixos Creativa
+    const destination = "Carrer Mallorca 106, 08029 Barcelona"; // Auro (escola exemple)
+
+    console.log(`Origin: ${origin}`);
+    console.log(`Destination: ${destination}`);
+
+    // Usar UrlFetch en lugar del servicio Maps
+    const apiKey = "AIzaSyDR7fVL6kQvQfn5d_6Znd5ZpHIHOGj9cYc"; // TU API KEY
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destination)}&mode=driving&key=${apiKey}`;
+
+    const response = UrlFetchApp.fetch(url);
+    const data = JSON.parse(response.getContentText());
+
+    console.log('📥 API Response:', JSON.stringify(data, null, 2));
+
+    if (data.status === "OK" && data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0]) {
+      const element = data.rows[0].elements[0];
+
+      if (element.status === "OK") {
+        return {
+          success: true,
+          data: {
+            origin: origin,
+            destination: destination,
+            distance: element.distance.text,
+            distanceValue: element.distance.value, // metres
+            duration: element.duration.text,
+            durationValue: element.duration.value, // segons
+            status: "API funciona correctament via UrlFetch! ✅"
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: `API resposta amb status: ${element.status}`,
+          details: element
+        };
+      }
+    } else {
+      return {
+        success: false,
+        error: "API resposta invàlida",
+        response: data
+      };
+    }
+
+  } catch (error) {
+    console.error('❌ Error testing Google Maps API via UrlFetch:', error);
+    return {
+      success: false,
+      error: "Error: " + error.toString(),
+      details: {
+        message: "Possible causes:",
+        causes: [
+          "Distance Matrix API not enabled",
+          "Invalid API key",
+          "No billing account configured",
+          "API quota exceeded",
+          "Network connectivity issues"
+        ]
+      }
+    };
+  }
+}
+
+// DEBUG: Función para analizar estructura hoja "Dades"
+function debugDadesStructure() {
+  try {
+    const data = getCachedData("Dades", "debug_dades_structure", 60); // Cache 1 min
+
+    if (!data || data.length === 0) {
+      return { success: false, error: "Hoja 'Dades' vacía o no encontrada" };
+    }
+
+    // Get headers (first row)
+    const headers = data[0];
+
+    // Get sample data (first 5 rows of data)
+    const sampleData = data.slice(1, 6);
+
+    // Find address-related columns
+    const addressColumns = [];
+    headers.forEach((header, index) => {
+      if (header && header.toString().toLowerCase().includes('adre')) {
+        addressColumns.push({ index, name: header });
+      }
+    });
+
+    return {
+      success: true,
+      data: {
+        headers: headers,
+        totalRows: data.length - 1, // exclude headers
+        totalCols: headers.length,
+        sampleData: sampleData,
+        addressColumns: addressColumns,
+        estructura: headers.map((h, i) => `${i}: ${h}`).join(' | ')
+      }
+    };
+
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
 }
 
 // Función para normalizar nombres (como en Python)
@@ -2495,263 +2766,51 @@ function getPreparatedOrders() {
  * Motor d'opcions d'entrega simplificat - NOMÉS amb dades reals
  * Genera opcions basades únicament en la hoja "Dades" existent
  */
+// FUNCIÓN GETDELIVERYOPTIONS COMPLETAMENTE REESCRITA - VERSION 2.0
 function getDeliveryOptions(selectedOrders) {
   try {
+    console.log('🚀 getDeliveryOptions v2.0 - selectedOrders received:', JSON.stringify(selectedOrders));
+    
     if (!selectedOrders || selectedOrders.length === 0) {
+      console.log('❌ ERROR: No selectedOrders provided');
       return {
         success: false,
         error: "No s'han proporcionat comandes seleccionades"
       };
     }
 
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const dadesSheet = ss.getSheetByName("Dades");
-
-    if (!dadesSheet) {
-      return { success: false, error: "La hoja 'Dades' no existe." };
+    // 🎯 PASO 1: Obtener datos de escuelas y monitores desde "Dades"
+    const schoolData = getSchoolMonitorData();
+    if (!schoolData.success) {
+      return schoolData;
     }
 
-    // Carregar NOMÉS dades dels monitors i escoles que tenim realment
-    const dadesValues = dadesSheet.getDataRange().getValues();
-    const dadesHeaders = dadesValues[0];
-    const escolaIdx = dadesHeaders.findIndex(h => h === "ESCOLA");
-    const monitoraIdx = dadesHeaders.findIndex(h => h === "MONITORA");
-    const diaIdx = dadesHeaders.findIndex(h => h === "DIA");
-    const adreçaIdx = dadesHeaders.findIndex(h => h === "ADREÇA");
+    console.log('📚 School data loaded:', schoolData.data.schools.length, 'schools');
 
-    if (escolaIdx === -1 || monitoraIdx === -1) {
-      return {
-        success: false,
-        error: "No s'han trobat les columnes necessàries a la hoja 'Dades'"
-      };
-    }
-
-    // Crear mapa de tots els monitors i les seves rutes REALS
-    const allMonitors = new Map();
-    for (let i = 1; i < dadesValues.length; i++) {
-      const row = dadesValues[i];
-      const escola = row[escolaIdx];
-      const monitora = row[monitoraIdx];
-      const dia = row[diaIdx] || '';
-      const adreça = row[adreçaIdx] || '';
-
-      if (monitora && escola) {
-        if (!allMonitors.has(monitora)) {
-          allMonitors.set(monitora, {
-            nom: monitora,
-            escoles: new Map(),
-            adreça: adreça
-          });
-        }
-
-        const monitor = allMonitors.get(monitora);
-        if (!monitor.escoles.has(escola)) {
-          monitor.escoles.set(escola, {
-            escola: escola,
-            dies: [],
-            adreça: adreça
-          });
-        }
-
-        const escolaData = monitor.escoles.get(escola);
-        if (dia && !escolaData.dies.includes(dia)) {
-          escolaData.dies.push(dia);
-        }
-      }
-    }
-
-    // Calcular distàncies reals des d'Eixos Creativa per totes les escoles
-    const allSchools = Array.from(new Set([
-      ...selectedOrders.map(order => order.escola),
-      ...Array.from(allMonitors.values()).flatMap(monitor => Array.from(monitor.escoles.keys()))
-    ]));
-
-    let schoolDistances = new Map();
-    try {
-      const distanceResponse = calculateDistances(allSchools);
-      if (distanceResponse.success && distanceResponse.data) {
-        distanceResponse.data.forEach(result => {
-          if (!result.error && result.distanceValue) {
-            schoolDistances.set(result.address, {
-              distance: result.distance,
-              distanceValue: result.distanceValue, // metres
-              duration: result.duration,
-              durationValue: result.durationValue // segons
-            });
-          }
-        });
-      }
-    } catch (error) {
-      console.error("Error calculant distàncies:", error);
-      // Continuar sense distàncies si falla l'API
-    }
-
-    // Agrupar comandes per escola
-    const ordersBySchool = {};
-    selectedOrders.forEach(order => {
-      if (!ordersBySchool[order.escola]) {
-        ordersBySchool[order.escola] = [];
-      }
-      ordersBySchool[order.escola].push(order);
-    });
-
+    // 🎯 PASO 2: Crear opciones de entrega para cada comanda
     const deliveryOptions = [];
-
-    Object.keys(ordersBySchool).forEach(targetSchool => {
-      const schoolOrders = ordersBySchool[targetSchool];
-
-      // OPCIÓ 1: Entrega directa a l'escola solicitant
-      const directMonitors = [];
-      allMonitors.forEach(monitor => {
-        if (monitor.escoles.has(targetSchool)) {
-          const escolaInfo = monitor.escoles.get(targetSchool);
-          directMonitors.push({
-            nom: monitor.nom,
-            escola: targetSchool,
-            dies: escolaInfo.dies,
-            adreça: escolaInfo.adreça,
-            tipus: "directa"
-          });
-        }
-      });
-
-      if (directMonitors.length > 0) {
+    
+    for (const order of selectedOrders) {
+      console.log('🎯 Processing order for school:', order.escola);
+      
+      // Buscar opciones para esta escuela
+      const schoolOptions = findDeliveryOptionsForSchool(order.escola, schoolData.data, order);
+      
+      schoolOptions.forEach(option => {
         deliveryOptions.push({
-          tipus: "Entrega Directa",
-          prioritat: 2,
-          escola: targetSchool,
-          comandes: schoolOrders,
-          monitorsDisponibles: directMonitors,
-          descripció: `Entrega directa a ${targetSchool}`,
-          eficiencia: "Standard",
-          notes: "Entrega directa a l'escola solicitant"
-        });
-      }
-
-      // OPCIÓ 2: Entrega optimitzada per proximitat (escoles més properes a Eixos)
-      const nearbySchoolOptions = [];
-
-      // Trobar escoles alternatives més properes que l'escola destí
-      const targetDistance = schoolDistances.get(targetSchool);
-
-      allMonitors.forEach(monitor => {
-        if (monitor.escoles.size > 1 && monitor.escoles.has(targetSchool)) {
-          const escolesList = Array.from(monitor.escoles.keys());
-
-          escolesList.forEach(altSchool => {
-            if (altSchool !== targetSchool) {
-              const altDistance = schoolDistances.get(altSchool);
-              const altEscolaInfo = monitor.escoles.get(altSchool);
-              const targetEscolaInfo = monitor.escoles.get(targetSchool);
-
-              // Si tenim distàncies i l'escola alternativa està més propera
-              const isCloser = altDistance && targetDistance ?
-                altDistance.distanceValue < targetDistance.distanceValue : false;
-
-              nearbySchoolOptions.push({
-                nom: monitor.nom,
-                escola: altSchool,
-                dies: altEscolaInfo.dies,
-                adreça: altEscolaInfo.adreça,
-                tipus: "optimitzada",
-                destinoFinal: {
-                  escola: targetSchool,
-                  dies: targetEscolaInfo.dies
-                },
-                distanceInfo: altDistance,
-                isCloserToEixos: isCloser,
-                estalviDistancia: isCloser && targetDistance ?
-                  targetDistance.distanceValue - altDistance.distanceValue : 0
-              });
-            }
-          });
-        }
-      });
-
-      // Ordenar per proximitat a Eixos (més proper primer)
-      nearbySchoolOptions.sort((a, b) => {
-        const aDistance = a.distanceInfo ? a.distanceInfo.distanceValue : 999999;
-        const bDistance = b.distanceInfo ? b.distanceInfo.distanceValue : 999999;
-        return aDistance - bDistance;
-      });
-
-      // Agrupar per escola i crear opcions
-      const groupedNearby = {};
-      nearbySchoolOptions.forEach(option => {
-        if (!groupedNearby[option.escola]) {
-          groupedNearby[option.escola] = [];
-        }
-        groupedNearby[option.escola].push(option);
-      });
-
-      // Crear opcions d'entrega optimitzades
-      Object.keys(groupedNearby).slice(0, 3).forEach(intermediateSchool => { // Top 3 escoles
-        const monitors = groupedNearby[intermediateSchool];
-        const firstMonitor = monitors[0];
-        const distanceInfo = firstMonitor.distanceInfo;
-
-        const eficiencia = firstMonitor.isCloserToEixos ? "Alta" : "Mitjana";
-        const prioritat = firstMonitor.isCloserToEixos ? 1 : 2;
-
-        let notes = "Monitor multicentre";
-        if (firstMonitor.isCloserToEixos && firstMonitor.estalviDistancia > 0) {
-          const estalviKm = (firstMonitor.estalviDistancia / 1000).toFixed(1);
-          notes = `Estalvia ${estalviKm}km respecte entrega directa`;
-        }
-
-        deliveryOptions.push({
-          tipus: firstMonitor.isCloserToEixos ? "Entrega Optimitzada" : "Entrega amb Intermediari",
-          prioritat: prioritat,
-          escola: intermediateSchool,
-          escolaDestino: targetSchool,
-          comandes: schoolOrders,
-          monitorsDisponibles: monitors,
-          descripció: `Entrega a ${intermediateSchool}${distanceInfo ? ` (${distanceInfo.distance})` : ''} → Monitor transporta a ${targetSchool}`,
-          eficiencia: eficiencia,
-          distanciaAcademia: distanceInfo ? distanceInfo.distance : 'N/A',
-          tempsAcademia: distanceInfo ? distanceInfo.duration : 'N/A',
-          notes: notes
-        });
-      });
-
-      // Si no hi ha opcions optimitzades, crear una opció genèrica amb tots els monitors
-      if (Object.keys(groupedNearby).length === 0 && directMonitors.length === 0) {
-        // Buscar QUALSEVOL monitor que pugui fer la entrega
-        const anyMonitors = [];
-        allMonitors.forEach(monitor => {
-          const monitorSchools = Array.from(monitor.escoles.keys());
-          if (monitorSchools.length > 0) {
-            const firstSchool = monitorSchools[0];
-            const schoolInfo = monitor.escoles.get(firstSchool);
-
-            anyMonitors.push({
-              nom: monitor.nom,
-              escola: firstSchool,
-              dies: schoolInfo.dies,
-              adreça: schoolInfo.adreça,
-              tipus: "flexible"
-            });
+          ...option,
+          comandes: [order],
+          orderDetails: {
+            idItem: order.idItem,
+            solicitant: order.solicitant,
+            material: order.material,
+            quantitat: order.quantitat
           }
         });
+      });
+    }
 
-        if (anyMonitors.length > 0) {
-          deliveryOptions.push({
-            tipus: "Entrega Flexible",
-            prioritat: 3,
-            escola: "Diversos centres",
-            escolaDestino: targetSchool,
-            comandes: schoolOrders,
-            monitorsDisponibles: anyMonitors.slice(0, 10), // Limitar a 10
-            descripció: `Entrega flexible - coordinar amb monitor disponible`,
-            eficiencia: "Variable",
-            notes: "Qualsevol monitor pot coordinar la entrega"
-          });
-        }
-      }
-    });
-
-    // Ordenar per prioritat
-    deliveryOptions.sort((a, b) => a.prioritat - b.prioritat);
+    console.log('✅ Total delivery options generated:', deliveryOptions.length);
 
     return {
       success: true,
@@ -2759,12 +2818,51 @@ function getDeliveryOptions(selectedOrders) {
     };
 
   } catch (error) {
-    console.error("Error en getDeliveryOptions:", error);
+    console.error('❌ Error in getDeliveryOptions v2.0:', error);
     return {
       success: false,
       error: "Error generant opcions d'entrega: " + error.toString()
     };
   }
+}
+
+    // La nueva lógica ya está implementada arriba
+    console.log('✅ getDeliveryOptions v2.0 completed');
+
+// Función auxiliar para convertir día de la semana a fecha
+function getDiaAsDate(dia, referenceDate) {
+  const dies = {
+    'Dilluns': 1, 'Dimarts': 2, 'Dimecres': 3, 'Dijous': 4,
+    'Divendres': 5, 'Dissabte': 6, 'Diumenge': 0
+  };
+
+  const targetDay = dies[dia];
+  if (targetDay === undefined) return new Date(9999, 0, 1); // Fecha muy lejana si no coincide
+
+  const date = new Date(referenceDate);
+  const currentDay = date.getDay();
+  const daysDifference = targetDay - currentDay;
+
+  // Si es el mismo día o en el futuro de esta semana
+  if (daysDifference >= 0) {
+    date.setDate(date.getDate() + daysDifference);
+  } else {
+    // Es la próxima semana
+    date.setDate(date.getDate() + daysDifference + 7);
+  }
+
+  return date;
+}
+
+// Función auxiliar para determinar eficiencia
+function getEficiencia(distanceInfo) {
+  if (!distanceInfo) return "Baixa";
+
+  const km = distanceInfo.distanceValue / 1000;
+  if (km < 2) return "Màxima";
+  if (km < 4) return "Alta";
+  if (km < 6) return "Mitjana";
+  return "Baixa";
 }
 
 /**
@@ -2861,57 +2959,398 @@ function createDelivery(deliveryData) {
  */
 function calculateDistances(addresses) {
   try {
+    console.log('🗺️ calculateDistances - Input addresses:', JSON.stringify(addresses));
+    
     if (!addresses || addresses.length === 0) {
+      console.log('❌ No addresses provided');
       return {
         success: false,
         error: "No s'han proporcionat adreces"
       };
     }
 
-    const origin = "Eixos Creativa";
+    const origin = "Carrer Ramon Turró 73, 08005 Barcelona"; // Eixos Creativa
     const results = [];
+    
+    console.log('🗺️ Origin set to:', origin);
 
-    addresses.forEach(address => {
-      try {
-        const response = Maps.newDistanceMatrixService()
-          .getDistanceMatrix(origin, address, Maps.Mode.DRIVING);
+    addresses.forEach((address, index) => {
+      console.log(`🗺️ Processing address ${index + 1}/${addresses.length}: ${address}`);
+              try {
+          const apiKey = "AIzaSyDR7fVL6kQvQfn5d_6Znd5ZpHIHOGj9cYc";
+          const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(address)}&mode=driving&key=${apiKey}`;
+          
+          console.log(`🗺️ API URL for ${address}:`, url);
+          
+          const response = UrlFetchApp.fetch(url);
+          const data = JSON.parse(response.getContentText());
+          
+          console.log(`🗺️ API Response for ${address}:`, JSON.stringify(data));
 
-        if (response.rows && response.rows[0] && response.rows[0].elements && response.rows[0].elements[0]) {
-          const element = response.rows[0].elements[0];
-          if (element.status === "OK") {
-            results.push({
-              address: address,
-              distance: element.distance.text,
-              distanceValue: element.distance.value, // metres
-              duration: element.duration.text,
-              durationValue: element.duration.value // segons
-            });
+          if (data.status === "OK" && data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0]) {
+            const element = data.rows[0].elements[0];
+            console.log(`🗺️ Element status for ${address}:`, element.status);
+            
+            if (element.status === "OK") {
+              const result = {
+                address: address,
+                distance: element.distance.text,
+                distanceValue: element.distance.value, // metres
+                duration: element.duration.text,
+                durationValue: element.duration.value // segons
+              };
+              console.log(`✅ Success for ${address}:`, JSON.stringify(result));
+              results.push(result);
+            } else {
+              const errorResult = {
+                address: address,
+                error: `Element status: ${element.status}`
+              };
+              console.log(`❌ Element error for ${address}:`, errorResult);
+              results.push(errorResult);
+            }
           } else {
-            results.push({
+            const errorResult = {
               address: address,
-              error: "No s'ha pogut calcular la distància"
-            });
+              error: `API status: ${data.status}`
+            };
+            console.log(`❌ API error for ${address}:`, errorResult);
+            results.push(errorResult);
           }
+        } catch (addressError) {
+          console.error("Error calculant distància per " + address + ":", addressError);
+          const errorResult = {
+            address: address,
+            error: "Error en el càlcul: " + addressError.toString()
+          };
+          console.log(`❌ Exception for ${address}:`, errorResult);
+          results.push(errorResult);
         }
-      } catch (addressError) {
-        console.error("Error calculant distància per " + address + ":", addressError);
-        results.push({
-          address: address,
-          error: "Error en el càlcul: " + addressError.toString()
-        });
-      }
     });
 
+    console.log('🗺️ Final results:', JSON.stringify(results));
+    
     return {
       success: true,
       data: results
     };
 
   } catch (error) {
-    console.error("Error en calculateDistances:", error);
+    console.error("❌ Error en calculateDistances:", error);
     return {
       success: false,
       error: "Error calculant distàncies: " + error.toString()
+    };
+  }
+}
+
+/**
+ * FUNCIÓN AUXILIAR: Obtiene datos estructurados de escuelas y monitores
+ */
+function getSchoolMonitorData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const dadesSheet = ss.getSheetByName("Dades");
+
+    if (!dadesSheet) {
+      return { success: false, error: "La hoja 'Dades' no existe." };
+    }
+
+    const values = dadesSheet.getDataRange().getValues();
+    const headers = values[0];
+    
+    // Encontrar índices de columnas
+    const escolaIdx = headers.findIndex(h => h === "ESCOLA");
+    const monitoraIdx = headers.findIndex(h => h === "MONITORA");
+    const diaIdx = headers.findIndex(h => h === "DIA");
+    const adreçaIdx = headers.findIndex(h => h === "ADREÇA");
+
+    if (escolaIdx === -1 || monitoraIdx === -1) {
+      return {
+        success: false,
+        error: "No s'han trobat les columnes necessàries (ESCOLA, MONITORA)"
+      };
+    }
+
+    console.log(`📋 Found columns - ESCOLA: ${escolaIdx}, MONITORA: ${monitoraIdx}, DIA: ${diaIdx}, ADREÇA: ${adreçaIdx}`);
+
+    // Procesar datos
+    const schools = new Map();
+    const monitors = new Map();
+    
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const escola = row[escolaIdx]?.toString().trim();
+      const monitora = row[monitoraIdx]?.toString().trim();
+      const dia = row[diaIdx]?.toString().trim() || '';
+      const adreça = row[adreçaIdx]?.toString().trim() || '';
+
+      if (!escola || !monitora) continue;
+
+      // Datos de la escuela
+      if (!schools.has(escola)) {
+        schools.set(escola, {
+          nom: escola,
+          adreça: adreça,
+          monitors: [],
+          dies: []
+        });
+      }
+      
+      const schoolData = schools.get(escola);
+      if (!schoolData.monitors.includes(monitora)) {
+        schoolData.monitors.push(monitora);
+      }
+      if (dia && !schoolData.dies.includes(dia)) {
+        schoolData.dies.push(dia);
+      }
+
+      // Datos del monitor
+      if (!monitors.has(monitora)) {
+        monitors.set(monitora, {
+          nom: monitora,
+          escoles: []
+        });
+      }
+
+      const monitorData = monitors.get(monitora);
+      const existingSchool = monitorData.escoles.find(s => s.escola === escola);
+      
+      if (!existingSchool) {
+        monitorData.escoles.push({
+          escola: escola,
+          adreça: adreça,
+          dies: dia ? [dia] : []
+        });
+      } else if (dia && !existingSchool.dies.includes(dia)) {
+        existingSchool.dies.push(dia);
+      }
+    }
+
+    console.log(`✅ Processed ${schools.size} schools and ${monitors.size} monitors`);
+
+    return {
+      success: true,
+      data: {
+        schools: Array.from(schools.values()),
+        monitors: Array.from(monitors.values()),
+        schoolsMap: schools,
+        monitorsMap: monitors
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error in getSchoolMonitorData:', error);
+    return {
+      success: false,
+      error: "Error carregant dades d'escoles i monitors: " + error.toString()
+    };
+  }
+}
+
+/**
+ * FUNCIÓN AUXILIAR: Encuentra opciones de entrega para una escuela específica
+ */
+function findDeliveryOptionsForSchool(targetSchool, schoolData, order) {
+  console.log(`🎯 Finding options for school: ${targetSchool}`);
+  
+  const options = [];
+  const { schools, monitors, schoolsMap, monitorsMap } = schoolData;
+
+  // 🎯 OPCIÓN 1: ENTREGA DIRECTA
+  const directSchool = schoolsMap.get(targetSchool);
+  if (directSchool) {
+    console.log(`📍 Direct delivery option found for ${targetSchool}`);
+    
+    // Calcular distancia para entrega directa
+    const distanceData = getDistanceForSchool(targetSchool, directSchool.adreça);
+    
+    options.push({
+      tipus: "Entrega Directa",
+      escola: targetSchool,
+      adreça: directSchool.adreça,
+      eficiencia: getEficienciaFromDistance(distanceData),
+      prioritat: distanceData ? distanceData.distanceValue : 99999,
+      distanceInfo: distanceData,
+      monitorsDisponibles: directSchool.monitors.map(monitor => ({
+        nom: monitor,
+        dies: directSchool.dies,
+        tipus: "directa"
+      })),
+      descripció: `Entrega directa a ${targetSchool}`,
+      distanciaAcademia: distanceData ? distanceData.distance : "N/A",
+      tempsAcademia: distanceData ? distanceData.duration : "N/A"
+    });
+  }
+
+  // 🎯 OPCIÓN 2: ENTREGA CON INTERMEDIARIO
+  // Buscar monitores que vayan a múltiples escuelas
+  monitors.forEach(monitor => {
+    if (monitor.escoles.length > 1) {
+      // ¿Este monitor va a la escuela destino?
+      const targetSchoolInfo = monitor.escoles.find(s => s.escola === targetSchool);
+      
+      if (targetSchoolInfo) {
+        // Buscar otras escuelas donde va este monitor (posibles intermediarios)
+        monitor.escoles.forEach(intermediarySchoolInfo => {
+          if (intermediarySchoolInfo.escola !== targetSchool) {
+            console.log(`🔄 Intermediate option: ${intermediarySchoolInfo.escola} → ${targetSchool} via ${monitor.nom}`);
+            
+            // Calcular distancia a la escuela intermediaria
+            const distanceData = getDistanceForSchool(intermediarySchoolInfo.escola, intermediarySchoolInfo.adreça);
+            
+            options.push({
+              tipus: "Entrega amb Intermediari",
+              escola: intermediarySchoolInfo.escola,
+              escolaFinal: targetSchool,
+              adreça: intermediarySchoolInfo.adreça,
+              eficiencia: getEficienciaFromDistance(distanceData),
+              prioritat: distanceData ? distanceData.distanceValue : 99999,
+              distanceInfo: distanceData,
+              monitorsDisponibles: [{
+                nom: monitor.nom,
+                dies: intermediarySchoolInfo.dies,
+                tipus: "intermediari"
+              }],
+              descripció: `Entrega a ${intermediarySchoolInfo.escola} → Monitor transporta a ${targetSchool}`,
+              distanciaAcademia: distanceData ? distanceData.distance : "N/A",
+              tempsAcademia: distanceData ? distanceData.duration : "N/A",
+              notes: "Monitor multicentre"
+            });
+          }
+        });
+      }
+    }
+  });
+
+  // Ordenar por distancia (más cercana primero)
+  options.sort((a, b) => a.prioritat - b.prioritat);
+
+  console.log(`✅ Found ${options.length} delivery options for ${targetSchool}`);
+  return options;
+}
+
+/**
+ * FUNCIÓN AUXILIAR: Calcula distancia para una escuela usando cache y Google Maps
+ */
+function getDistanceForSchool(schoolName, address) {
+  // Cache simple en memoria
+  if (!getDistanceForSchool._cache) {
+    getDistanceForSchool._cache = new Map();
+  }
+
+  const cacheKey = `${schoolName}_${address}`;
+  if (getDistanceForSchool._cache.has(cacheKey)) {
+    console.log(`📦 Using cached distance for ${schoolName}`);
+    return getDistanceForSchool._cache.get(cacheKey);
+  }
+
+  if (!address) {
+    console.log(`❌ No address available for ${schoolName}`);
+    return null;
+  }
+
+  try {
+    console.log(`🗺️ Calculating distance for ${schoolName}: ${address}`);
+    
+    const origin = "Carrer Ramon Turró 73, 08005 Barcelona"; // Eixos Creativa
+    const apiKey = "AIzaSyDR7fVL6kQvQfn5d_6Znd5ZpHIHOGj9cYc";
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(address)}&mode=driving&key=${apiKey}`;
+    
+    const response = UrlFetchApp.fetch(url);
+    const data = JSON.parse(response.getContentText());
+
+    if (data.status === "OK" && data.rows?.[0]?.elements?.[0]?.status === "OK") {
+      const element = data.rows[0].elements[0];
+      const result = {
+        distance: element.distance.text,
+        distanceValue: element.distance.value,
+        duration: element.duration.text,
+        durationValue: element.duration.value
+      };
+      
+      console.log(`✅ Distance calculated for ${schoolName}: ${result.distance}`);
+      
+      // Guardar en cache
+      getDistanceForSchool._cache.set(cacheKey, result);
+      return result;
+    } else {
+      console.log(`❌ Google Maps error for ${schoolName}: ${data.status}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ Error calculating distance for ${schoolName}:`, error);
+    return null;
+  }
+}
+
+/**
+ * FUNCIÓN AUXILIAR: Calcula eficiencia basada en distancia
+ */
+function getEficienciaFromDistance(distanceData) {
+  if (!distanceData) return "Baixa";
+  
+  const km = distanceData.distanceValue / 1000;
+  if (km < 2) return "Màxima";
+  if (km < 4) return "Alta";
+  if (km < 6) return "Mitjana";
+  return "Baixa";
+}
+
+/**
+ * TEST FUNCTION: Debug delivery options step by step
+ */
+function testDeliveryOptionsWithDebug() {
+  try {
+    console.log('🧪 TEST v2.0: Starting delivery options debug');
+    
+    // Create test order with realistic school name
+    const testOrder = {
+      idItem: 'TEST_001',
+      solicitant: 'Test User',
+      escola: 'Lestonnac',
+      dataNecessitat: '2024-10-01',
+      material: 'Test Material',
+      quantitat: 1
+    };
+    
+    console.log('🧪 TEST: Created test order:', JSON.stringify(testOrder));
+    
+    // Test school data loading first
+    console.log('🧪 TEST: Loading school data...');
+    const schoolData = getSchoolMonitorData();
+    console.log('🧪 TEST: School data result:', schoolData.success ? 'SUCCESS' : 'FAILED');
+    
+    if (schoolData.success) {
+      console.log('🧪 TEST: Schools found:', schoolData.data.schools.length);
+      console.log('🧪 TEST: Monitors found:', schoolData.data.monitors.length);
+      
+      // Look for Lestonnac specifically
+      const lestonnac = schoolData.data.schools.find(s => s.nom === 'Lestonnac');
+      console.log('🧪 TEST: Lestonnac data:', lestonnac ? JSON.stringify(lestonnac) : 'NOT FOUND');
+    }
+    
+    // Call the actual function
+    console.log('🧪 TEST: Calling getDeliveryOptions...');
+    const result = getDeliveryOptions([testOrder]);
+    
+    console.log('🧪 TEST: getDeliveryOptions result:', JSON.stringify(result, null, 2));
+    
+    return {
+      success: true,
+      data: {
+        testOrder: testOrder,
+        schoolDataResult: schoolData,
+        deliveryOptionsResult: result,
+        message: "Test v2.0 completat. Revisa els logs per veure els detalls."
+      }
+    };
+    
+  } catch (error) {
+    console.error('🧪 TEST ERROR v2.0:', error);
+    return {
+      success: false,
+      error: "Test error v2.0: " + error.toString()
     };
   }
 }
