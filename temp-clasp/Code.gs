@@ -218,6 +218,12 @@ function handleApiRequest(e, method) {
                            (e.postData ? JSON.parse(e.postData.contents).deliveryData : {});
         result = createDelivery(deliveryData);
         break;
+      case 'removeIntermediaryAssignment':
+        // Remove intermediary assignment and return to "Preparat" status
+        const removeOrderIds = e.parameter.orderIds ? JSON.parse(e.parameter.orderIds) :
+                              (e.postData ? JSON.parse(e.postData.contents).orderIds : []);
+        result = removeIntermediaryAssignment(removeOrderIds);
+        break;
       case 'calculateDistances':
         // Calculate distances from Eixos Creativa
         const addresses = e.parameter.addresses ? JSON.parse(e.parameter.addresses) :
@@ -1606,6 +1612,7 @@ function loadRespostesData(limit = null) {
         'Modalitat_Entrega': 'modalitatEntrega',
         'Modalitat_Lliurament': 'modalitatEntrega',
         'Monitor_Intermediari': 'monitorIntermediari',
+        'Escola_Destino_Intermediari': 'escolaDestinoIntermediari',
         'Data_Entrega_Prevista': 'dataEntregaPrevista',
         'Data_Lliurament_Prevista': 'dataEntregaPrevista',
         'Distancia_Academia': 'distanciaAcademia',
@@ -1712,6 +1719,7 @@ function setupRespostesHeaders(sheet) {
     "Notes_Internes",
     "Modalitat_Entrega",
     "Monitor_Intermediari",
+    "Escola_Destino_Intermediari",
     "Data_Entrega_Prevista",
     "Distancia_Academia",
     "Notes_Entrega"
@@ -2896,6 +2904,7 @@ function createDelivery(deliveryData) {
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
     const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega" || h === "Modalitat_Lliurament");
     const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
+    const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
     const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista" || h === "Data_Lliurament_Prevista");
     const estatIndex = headers.findIndex(h => h === "Estat");
 
@@ -2912,8 +2921,23 @@ function createDelivery(deliveryData) {
         // Actualitzar dades d'entrega
         row[modalittatIndex] = deliveryData.modalitat;
         row[monitorIndex] = deliveryData.monitorIntermediaria || '';
+        if (escolaDestinoIndex !== -1) {
+          row[escolaDestinoIndex] = deliveryData.escolaDestino || '';
+        }
         row[dataEntregaIndex] = deliveryData.dataEntrega || '';
         row[estatIndex] = "Assignat"; // Nou estat
+        
+        // També actualitzar distància i notes si estan disponibles
+        const distanciaIndex = headers.findIndex(h => h === "Distancia_Academia");
+        const notesIndex = headers.findIndex(h => h === "Notes_Entrega");
+        
+        if (distanciaIndex !== -1 && deliveryData.distanciaAcademia) {
+          row[distanciaIndex] = deliveryData.distanciaAcademia;
+        }
+        if (notesIndex !== -1 && deliveryData.notes) {
+          row[notesIndex] = deliveryData.notes;
+        }
+        
         updatedRows++;
       }
     }
@@ -2933,6 +2957,92 @@ function createDelivery(deliveryData) {
     return {
       success: false,
       error: "Error creant assignació d'entrega: " + error.toString()
+    };
+  }
+}
+
+/**
+ * Eliminar o resetear assignació d'intermediari
+ */
+function removeIntermediaryAssignment(orderIds) {
+  try {
+    if (!orderIds || orderIds.length === 0) {
+      return {
+        success: false,
+        error: "No s'han proporcionat IDs de comandes"
+      };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Respostes");
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: "La hoja 'Respostes' no existe."
+      };
+    }
+
+    // Obtenir headers existents
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    // Obtenir índexs de columnes
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega" || h === "Modalitat_Lliurament");
+    const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
+    const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
+    const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista" || h === "Data_Lliurament_Prevista");
+    const estatIndex = headers.findIndex(h => h === "Estat");
+
+    // Actualitzar files corresponents
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    let updatedRows = 0;
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const idItem = row[idItemIndex];
+
+      if (orderIds.includes(idItem)) {
+        // Resetear dades d'intermediari
+        row[modalittatIndex] = '';
+        row[monitorIndex] = '';
+        if (escolaDestinoIndex !== -1) {
+          row[escolaDestinoIndex] = '';
+        }
+        row[dataEntregaIndex] = '';
+        row[estatIndex] = "Preparat"; // Tornar a estat preparat
+        
+        // També netejar distància i notes
+        const distanciaIndex = headers.findIndex(h => h === "Distancia_Academia");
+        const notesIndex = headers.findIndex(h => h === "Notes_Entrega");
+        
+        if (distanciaIndex !== -1) {
+          row[distanciaIndex] = '';
+        }
+        if (notesIndex !== -1) {
+          row[notesIndex] = '';
+        }
+        
+        updatedRows++;
+      }
+    }
+
+    if (updatedRows > 0) {
+      sheet.getDataRange().setValues(values);
+    }
+
+    return {
+      success: true,
+      updatedRows: updatedRows,
+      message: `S'han eliminat ${updatedRows} assignacions d'intermediari. Estat tornat a "Preparat"`
+    };
+
+  } catch (error) {
+    console.error("Error en removeIntermediaryAssignment:", error);
+    return {
+      success: false,
+      error: "Error eliminant assignació d'intermediari: " + error.toString()
     };
   }
 }

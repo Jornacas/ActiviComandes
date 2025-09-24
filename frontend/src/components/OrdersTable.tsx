@@ -247,6 +247,26 @@ export default function OrdersTable() {
       },
     },
     {
+      field: 'escolaDestinoIntermediari',
+      headerName: 'Escola Destí',
+      width: 120,
+      renderCell: (params) => {
+        const escola = params.value as string;
+        if (!escola || escola.trim() === '') {
+          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
+        }
+        return (
+          <Chip
+            label={escola}
+            size="small"
+            color="info"
+            variant="outlined"
+            sx={{ fontSize: '0.7rem', maxWidth: '110px' }}
+          />
+        );
+      },
+    },
+    {
       field: 'dataEntregaPrevista',
       headerName: 'Data Lliurament',
       width: 100,

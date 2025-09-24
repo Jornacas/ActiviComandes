@@ -30,6 +30,7 @@ export interface Order {
   // Delivery assignment fields
   modalitatEntrega?: string;
   monitorIntermediari?: string;
+  escolaDestinoIntermediari?: string;
   dataEntregaPrevista?: string;
   distanciaAcademia?: string;
   notesEntrega?: string;
