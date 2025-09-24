@@ -268,7 +268,7 @@ export default function OrdersTable() {
       },
     },
     {
-      field: 'dataEntregaPrevista',
+      field: 'Data_Lliurament_Prevista',
       headerName: 'Data Lliurament',
       width: 100,
       renderCell: (params) => {
