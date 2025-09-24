@@ -2887,27 +2887,8 @@ function createDelivery(deliveryData) {
       };
     }
 
-    // Ampliar headers si no existeixen les noves columnes
+    // Obtenir headers existents
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const newColumns = [
-      "Modalitat_Entrega",
-      "Monitor_Intermediari",
-      "Data_Entrega_Prevista",
-      "Distancia_Academia",
-      "Notes_Entrega"
-    ];
-
-    let headersUpdated = false;
-    newColumns.forEach(col => {
-      if (!headers.includes(col)) {
-        headers.push(col);
-        headersUpdated = true;
-      }
-    });
-
-    if (headersUpdated) {
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    }
 
     // Obtenir índexs de columnes
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
