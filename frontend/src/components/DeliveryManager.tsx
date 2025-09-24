@@ -220,11 +220,17 @@ export default function DeliveryManager() {
         dataEntrega: dataEntrega
       };
 
+      console.log('🚀 Frontend sending deliveryData:', JSON.stringify(deliveryData, null, 2));
+      console.log('📅 dataEntrega value:', dataEntrega);
+      console.log('🏫 escolaDestino value:', escolaDestino);
+
       const url = new URL(API_BASE_URL);
       url.searchParams.append('action', 'createDelivery');
       url.searchParams.append('token', API_TOKEN);
       url.searchParams.append('deliveryData', JSON.stringify(deliveryData));
 
+      console.log('🌐 Full URL being sent:', url.toString());
+      
       const response = await fetch(url.toString());
       const result = await response.json();
 
