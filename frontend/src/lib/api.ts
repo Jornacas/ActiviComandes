@@ -75,7 +75,10 @@ class ApiClient {
 
       if (data) {
         Object.keys(data).forEach(key => {
-          url.searchParams.append(key, data[key]);
+          const value = data[key];
+          // Serializar objetos complejos como JSON para evitar [object Object]
+          const serializedValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+          url.searchParams.append(key, serializedValue);
         });
       }
     }
