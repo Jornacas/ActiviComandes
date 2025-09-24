@@ -14,7 +14,16 @@
 const AUTH_TOKEN = "comanda_materials_2024"; // Token para la app móvil
 
 function doGet(e) {
-  return handleApiRequest(e, 'GET');
+  console.log('🚨 doGet called! e.parameter keys:', Object.keys(e.parameter || {}));
+  console.log('🚨 doGet action:', e.parameter ? e.parameter.action : 'NO ACTION');
+  try {
+    return handleApiRequest(e, 'GET');
+  } catch (error) {
+    console.log('💥 doGet ERROR:', error.toString());
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: false, error: 'doGet error: ' + error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function doPost(e) {
@@ -47,15 +56,23 @@ function doOptions(e) {
 }
 
 function handleApiRequest(e, method) {
+  console.log('🔥 handleApiRequest called with method:', method);
+  console.log('🔥 e.parameter:', JSON.stringify(e.parameter));
+  console.log('🔥 e.postData:', e.postData ? JSON.stringify(e.postData) : 'No postData');
+  
   // Security check
   const token = e.parameter.token || (e.postData && JSON.parse(e.postData.contents || '{}').token);
+  console.log('🔑 Token check:', token === AUTH_TOKEN ? 'VALID' : 'INVALID');
+  
   if (!token || token !== AUTH_TOKEN) {
+    console.log('❌ UNAUTHORIZED ACCESS');
     return ContentService
       .createTextOutput(JSON.stringify({ success: false, error: 'Unauthorized access' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
   const action = e.parameter.action || (e.postData && JSON.parse(e.postData.contents || '{}').action);
+  console.log('🎯 Action detected:', action);
   const callback = e.parameter.callback; // For JSONP support
 
   try {
@@ -214,9 +231,17 @@ function handleApiRequest(e, method) {
         break;
       case 'createDelivery':
         // Create delivery assignment
-        const deliveryData = e.parameter.deliveryData ? JSON.parse(e.parameter.deliveryData) :
-                           (e.postData ? JSON.parse(e.postData.contents).deliveryData : {});
-        result = createDelivery(deliveryData);
+        console.log('🎯 createDelivery case reached');
+        console.log('🎯 e.parameter.deliveryData:', e.parameter.deliveryData);
+        try {
+          const deliveryData = e.parameter.deliveryData ? JSON.parse(e.parameter.deliveryData) :
+                             (e.postData ? JSON.parse(e.postData.contents).deliveryData : {});
+          console.log('🎯 Parsed deliveryData:', JSON.stringify(deliveryData));
+          result = createDelivery(deliveryData);
+        } catch (parseError) {
+          console.log('❌ JSON Parse Error:', parseError);
+          result = { success: false, error: 'Error parsing deliveryData: ' + parseError.toString() };
+        }
         break;
       case 'removeIntermediaryAssignment':
         // Remove intermediary assignment and return to "Preparat" status
@@ -1501,11 +1526,12 @@ function createMultipleSollicitud(data) {
         timestamp,                    // N: Data_Estat
         '',                           // O: Responsable_Preparacio
         '',                           // P: Notes_Internes
-        data.entregaManual ? 'MANUAL' : 'NORMAL', // Q: Modalitat_Entrega
+        data.entregaManual ? 'MANUAL' : 'NORMAL', // Q: Modalitat_Lliurament
         '',                           // R: Monitor_Intermediari
-        '',                           // S: Data_Entrega_Prevista
-        '',                           // T: Distancia_Academia
-        ''                            // U: Notes_Entrega
+        '',                           // S: Escola_Destino_Intermediari
+        '',                           // T: Data_Entrega_Prevista
+        '',                           // U: Distancia_Academia
+        ''                            // V: Notes_Entrega
       ];
 
       sheet.appendRow(newRow);
@@ -1605,6 +1631,7 @@ function loadRespostesData(limit = null) {
         'Es_Material_Personalitzat': 'esMaterialPersonalitzat',
         'Unitats': 'unitats',
         'Comentaris_Generals': 'comentarisGenerals',
+        'Entrega_Manual': 'entregaManual',
         'Estat': 'estat',
         'Data_Estat': 'dataEstat',
         'Responsable_Preparacio': 'responsablePreparacio',
@@ -1633,7 +1660,11 @@ function loadRespostesData(limit = null) {
       'Estat': estatColIndex,
       'Data_Estat': dataEstatColIndex,
       'Responsable_Preparacio': responsableColIndex,
-      'Total_Headers': headersRow.length
+      'Total_Headers': headersRow.length,
+      'Monitor_Intermediari': headersRow.findIndex(h => h === 'Monitor_Intermediari'),
+      'Escola_Destino_Intermediari': headersRow.findIndex(h => h === 'Escola_Destino_Intermediari'),
+      'Data_Lliurament_Prevista': headersRow.findIndex(h => h === 'Data_Lliurament_Prevista'),
+      'All_Headers': headersRow
     });
 
     // ADDITIONAL DEBUG: Log sample data from first few rows
@@ -1717,10 +1748,10 @@ function setupRespostesHeaders(sheet) {
     "Data_Estat",
     "Responsable_Preparacio",
     "Notes_Internes",
-    "Modalitat_Entrega",
+    "Modalitat_Lliurament",
     "Monitor_Intermediari",
     "Escola_Destino_Intermediari",
-    "Data_Entrega_Prevista",
+    "Data_Lliurament_Prevista",
     "Distancia_Academia",
     "Notes_Entrega"
   ];
@@ -1752,6 +1783,12 @@ function setupRespostesHeaders(sheet) {
   sheet.setColumnWidth(14, 150); // Data_Estat
   sheet.setColumnWidth(15, 150); // Responsable_Preparacio
   sheet.setColumnWidth(16, 200); // Notes_Internes
+  sheet.setColumnWidth(17, 120); // Modalitat_Lliurament
+  sheet.setColumnWidth(18, 150); // Monitor_Intermediari
+  sheet.setColumnWidth(19, 150); // Escola_Destino_Intermediari
+  sheet.setColumnWidth(20, 120); // Data_Lliurament_Prevista
+  sheet.setColumnWidth(21, 100); // Distancia_Academia
+  sheet.setColumnWidth(22, 200); // Notes_Entrega
   
   // Freeze header row
   sheet.setFrozenRows(1);
@@ -2880,7 +2917,10 @@ function getEficiencia(distanceInfo) {
  */
 function createDelivery(deliveryData) {
   try {
+    console.log('🚀 createDelivery called with:', JSON.stringify(deliveryData, null, 2));
+    
     if (!deliveryData || !deliveryData.orderIds || !deliveryData.modalitat) {
+      console.log('❌ createDelivery ERROR: Dades incompletes');
       return {
         success: false,
         error: "Dades d'entrega incompletes"
@@ -2899,14 +2939,32 @@ function createDelivery(deliveryData) {
 
     // Obtenir headers existents
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    console.log('📋 Headers found:', headers);
+    console.log('📋 Headers count:', headers.length);
+
+    // Log específico para encontrar las columnas de entrega
+    headers.forEach((header, index) => {
+      if (header && (header.includes('Monitor') || header.includes('Modalitat') || header.includes('Escola') || header.includes('Data'))) {
+        console.log(`📋 Column ${index}: "${header}"`);
+      }
+    });
 
     // Obtenir índexs de columnes (buscar tant en català com en espanyol)
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
-    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega" || h === "Modalitat_Lliurament");
+    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Lliurament" || h === "Modalitat_Entrega");
     const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
-    const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista" || h === "Data_Lliurament_Prevista");
+    const dataEntregaIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista" || h === "Data_Entrega_Prevista");
     const estatIndex = headers.findIndex(h => h === "Estat");
+    
+    console.log('📍 Column indices:', {
+      idItemIndex,
+      modalittatIndex,
+      monitorIndex,
+      escolaDestinoIndex,
+      dataEntregaIndex,
+      estatIndex
+    });
 
     // Actualitzar files corresponents
     const dataRange = sheet.getDataRange();
@@ -2918,14 +2976,58 @@ function createDelivery(deliveryData) {
       const idItem = row[idItemIndex];
 
       if (deliveryData.orderIds.includes(idItem)) {
+        console.log('✅ Found matching order:', idItem);
+        console.log('📝 Before update, row values:', {
+          modalitat: row[modalittatIndex],
+          monitor: row[monitorIndex],
+          escolaDestino: row[escolaDestinoIndex],
+          dataEntrega: row[dataEntregaIndex],
+          estat: row[estatIndex]
+        });
+        
         // Actualitzar dades d'entrega
-        row[modalittatIndex] = deliveryData.modalitat;
-        row[monitorIndex] = deliveryData.monitorIntermediaria || '';
+        if (modalittatIndex !== -1) {
+          row[modalittatIndex] = deliveryData.modalitat;
+          console.log('✅ Updated modalitat:', deliveryData.modalitat);
+        } else {
+          console.log('❌ modalittatIndex not found!');
+        }
+
+        if (monitorIndex !== -1) {
+          row[monitorIndex] = deliveryData.monitorIntermediaria || '';
+          console.log('✅ Updated monitor:', deliveryData.monitorIntermediaria);
+        } else {
+          console.log('❌ monitorIndex not found!');
+        }
+
         if (escolaDestinoIndex !== -1) {
           row[escolaDestinoIndex] = deliveryData.escolaDestino || '';
+          console.log('✅ Updated escolaDestino:', deliveryData.escolaDestino);
+        } else {
+          console.log('❌ escolaDestinoIndex not found!');
         }
-        row[dataEntregaIndex] = deliveryData.dataEntrega || '';
-        row[estatIndex] = "Assignat"; // Nou estat
+
+        if (dataEntregaIndex !== -1) {
+          row[dataEntregaIndex] = deliveryData.dataEntrega || '';
+          console.log('✅ Updated dataEntrega:', deliveryData.dataEntrega);
+        } else {
+          console.log('❌ dataEntregaIndex not found!');
+        }
+
+        if (estatIndex !== -1) {
+          row[estatIndex] = "Assignat"; // Nou estat
+          console.log('✅ Updated estat to: Assignat');
+        } else {
+          console.log('❌ estatIndex not found!');
+        }
+        
+        console.log('📝 After update, row values:', {
+          modalitat: row[modalittatIndex],
+          monitor: row[monitorIndex],
+          escolaDestino: row[escolaDestinoIndex],
+          dataEntrega: row[dataEntregaIndex],
+          estat: row[estatIndex]
+        });
         
         // També actualitzar distància i notes si estan disponibles
         const distanciaIndex = headers.findIndex(h => h === "Distancia_Academia");
@@ -2943,7 +3045,11 @@ function createDelivery(deliveryData) {
     }
 
     if (updatedRows > 0) {
+      console.log('💾 Saving changes to sheet...');
       sheet.getDataRange().setValues(values);
+      console.log('✅ Changes saved successfully');
+    } else {
+      console.log('⚠️ No rows were updated');
     }
 
     return {
@@ -2988,10 +3094,10 @@ function removeIntermediaryAssignment(orderIds) {
 
     // Obtenir índexs de columnes
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
-    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega" || h === "Modalitat_Lliurament");
+    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Lliurament" || h === "Modalitat_Entrega");
     const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
-    const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista" || h === "Data_Lliurament_Prevista");
+    const dataEntregaIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista" || h === "Data_Entrega_Prevista");
     const estatIndex = headers.findIndex(h => h === "Estat");
 
     // Actualitzar files corresponents
