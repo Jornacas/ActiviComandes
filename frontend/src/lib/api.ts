@@ -27,6 +27,12 @@ export interface Order {
   dataEstat?: string;
   responsablePreparacio?: string;
   notesInternes?: string;
+  // Delivery assignment fields
+  modalitatEntrega?: string;
+  monitorIntermediari?: string;
+  dataEntregaPrevista?: string;
+  distanciaAcademia?: string;
+  notesEntrega?: string;
   // Legacy fields for backward compatibility
   nombre?: string;
   fecha?: string;

@@ -2911,7 +2911,7 @@ function createDelivery(deliveryData) {
 
     // Obtenir índexs de columnes
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
-    const modalitатIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega");
     const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista");
     const estatIndex = headers.findIndex(h => h === "Estat");
@@ -2931,6 +2931,18 @@ function createDelivery(deliveryData) {
         row[monitorIndex] = deliveryData.monitorIntermediaria || '';
         row[dataEntregaIndex] = deliveryData.dataEntrega || '';
         row[estatIndex] = "Assignat"; // Nou estat
+        
+        // També actualitzar distància i notes si estan disponibles
+        const distanciaIndex = headers.findIndex(h => h === "Distancia_Academia");
+        const notesIndex = headers.findIndex(h => h === "Notes_Entrega");
+        
+        if (distanciaIndex !== -1 && deliveryData.distanciaAcademia) {
+          row[distanciaIndex] = deliveryData.distanciaAcademia;
+        }
+        if (notesIndex !== -1 && deliveryData.notes) {
+          row[notesIndex] = deliveryData.notes;
+        }
+        
         updatedRows++;
       }
     }

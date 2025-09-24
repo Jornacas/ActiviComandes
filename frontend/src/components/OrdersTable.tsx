@@ -123,7 +123,7 @@ export default function OrdersTable() {
     {
       field: 'material',
       headerName: 'Material',
-      width: 170,
+      width: 150,
       valueFormatter: (params) => formatSentenceCase(params.value as string),
     },
     {
@@ -145,7 +145,7 @@ export default function OrdersTable() {
     {
       field: 'comentarisGenerals',
       headerName: 'Comentaris',
-      width: 130,
+      width: 120,
       renderCell: (params) => {
         const comentaris = params.value as string;
         if (!comentaris || comentaris.trim() === '') {
@@ -204,6 +204,62 @@ export default function OrdersTable() {
       headerName: 'Responsable',
       width: 100,
       editable: true,
+    },
+    {
+      field: 'monitorIntermediari',
+      headerName: 'Monitor Entrega',
+      width: 110,
+      renderCell: (params) => {
+        const monitor = params.value as string;
+        if (!monitor || monitor.trim() === '') {
+          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
+        }
+        return (
+          <Chip
+            label={monitor}
+            size="small"
+            color="primary"
+            sx={{ fontSize: '0.7rem', maxWidth: '115px' }}
+          />
+        );
+      },
+    },
+    {
+      field: 'dataEntregaPrevista',
+      headerName: 'Data Entrega',
+      width: 100,
+      renderCell: (params) => {
+        const date = params.value as string;
+        if (!date || date.trim() === '') {
+          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
+        }
+        // Format date if it's a full date string
+        try {
+          const formattedDate = new Date(date).toLocaleDateString('ca-ES');
+          return <span style={{ fontSize: '0.85rem' }}>{formattedDate}</span>;
+        } catch {
+          return <span style={{ fontSize: '0.85rem' }}>{date}</span>;
+        }
+      },
+    },
+    {
+      field: 'distanciaAcademia',
+      headerName: 'Distància',
+      width: 80,
+      renderCell: (params) => {
+        const distance = params.value as string;
+        if (!distance || distance.trim() === '') {
+          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
+        }
+        return (
+          <Chip
+            label={distance}
+            size="small"
+            color="info"
+            sx={{ fontSize: '0.7rem', minWidth: '60px' }}
+          />
+        );
+      },
     },
   ];
 

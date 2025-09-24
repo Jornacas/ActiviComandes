@@ -2911,7 +2911,7 @@ function createDelivery(deliveryData) {
 
     // Obtenir índexs de columnes
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
-    const modalitатIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega");
     const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const dataEntregaIndex = headers.findIndex(h => h === "Data_Entrega_Prevista");
     const estatIndex = headers.findIndex(h => h === "Estat");
