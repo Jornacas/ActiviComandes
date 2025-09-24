@@ -347,11 +347,13 @@ export default function OrdersTable() {
 
         // Transform raw data to Order objects
         const transformedOrders = rows.map((row, index) => {
-          const order: any = { id: index };
+          const order: any = {};
           headers.forEach((header, headerIndex) => {
             // Use headers as they come from backend (already normalized)
             order[header] = row[headerIndex] || '';
           });
+          // Use idItem as the primary ID, fallback to index if not available
+          order.id = order.idItem || order.idPedido || `row-${index}`;
           return order;
         });
 
