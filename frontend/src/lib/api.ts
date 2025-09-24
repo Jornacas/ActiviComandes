@@ -219,7 +219,7 @@ class ApiClient {
   }
 
   async removeIntermediaryAssignment(orderIds: string[]): Promise<ApiResponse<{ updatedRows: number; message: string }>> {
-    return this.request('removeIntermediaryAssignment', { orderIds }, 'POST');
+    return this.request('removeIntermediaryAssignment', { orderIds: JSON.stringify(orderIds) }, 'GET');
   }
 }
 
