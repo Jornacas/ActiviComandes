@@ -20,7 +20,7 @@ export const sendNotificationToIntermediary = async (data: NotificationData): Pr
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Intermediari: ${data.monitorIntermediario}
 
-📥 RECEBIRÀS MATERIAL:
+📥 REBRÀS MATERIAL:
 🏫 Escola: ${data.escolaDestinoIntermediario}
 📅 Data: ${data.dataEntrega}
 📦 Material: ${data.material}
