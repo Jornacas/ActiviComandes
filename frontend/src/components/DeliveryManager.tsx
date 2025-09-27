@@ -110,20 +110,58 @@ export default function DeliveryManager() {
   const [selectedMonitor, setSelectedMonitor] = useState('');
   const [dataEntrega, setDataEntrega] = useState('');
   const [dateError, setDateError] = useState('');
+  const [dateWarning, setDateWarning] = useState('');
 
-  // Función para validar que no sea domingo
+  // Función para validar que no sea domingo y que esté dentro del plazo de necesidad
   const validateDate = (dateString: string) => {
     if (!dateString) {
       setDateError('');
+      setDateWarning('');
       return true;
     }
 
     const date = new Date(dateString);
     const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Lunes, etc.
 
+    // Validar que no sea domingo
     if (dayOfWeek === 0) {
       setDateError('No es poden programar lliuraments els diumenges (no hi ha activitats)');
+      setDateWarning('');
       return false;
+    }
+
+    // Validar que esté dentro del plazo de necesidad
+    const selectedOrdersData = preparatedOrders.filter(order =>
+      selectedOrders.includes(order.idItem)
+    );
+
+    let warningMessages: string[] = [];
+    let hasOutOfRange = false;
+
+    selectedOrdersData.forEach(order => {
+      if (order.dataNecessitat) {
+        const needDate = new Date(order.dataNecessitat);
+        
+        // Comparar fechas (solo día, sin hora)
+        const deliveryDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const needDateOnly = new Date(needDate.getFullYear(), needDate.getMonth(), needDate.getDate());
+        
+        if (deliveryDate > needDateOnly) {
+          hasOutOfRange = true;
+          const formatDate = (d: Date) => d.toLocaleDateString('ca-ES', { 
+            weekday: 'long', 
+            day: 'numeric', 
+            month: 'long' 
+          });
+          warningMessages.push(`${order.material} (necessari: ${formatDate(needDate)})`);
+        }
+      }
+    });
+
+    if (hasOutOfRange) {
+      setDateWarning(`⚠️ Aviso: La data de lliurament és posterior a la data de necessitat per algunes comandes: ${warningMessages.join(', ')}`);
+    } else {
+      setDateWarning('');
     }
 
     setDateError('');
@@ -222,7 +260,7 @@ export default function DeliveryManager() {
       return;
     }
 
-    // Validar que no sea domingo
+    // Validar que no sea domingo (los avisos no bloquean el proceso)
     if (dataEntrega && !validateDate(dataEntrega)) {
       setError('No es poden programar lliuraments els diumenges');
       return;
@@ -288,6 +326,8 @@ export default function DeliveryManager() {
         setSelectedModalitat('Directa');
         setSelectedMonitor('');
         setDataEntrega('');
+        setDateError('');
+        setDateWarning('');
         fetchPreparatedOrders(); // Refresh the list
       } else {
         setError(result.error || 'Error creant l\'assignació de lliurament');
@@ -702,6 +742,12 @@ export default function DeliveryManager() {
                     shrink: true,
                   }}
                 />
+
+                {dateWarning && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    {dateWarning}
+                  </Alert>
+                )}
               </Stack>
             </Box>
           )}
@@ -716,7 +762,7 @@ export default function DeliveryManager() {
             disabled={loading || !!dateError}
             startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
           >
-            Confirmar Lliurament
+            {dateWarning ? 'Confirmar Lliurament (amb avís)' : 'Confirmar Lliurament'}
           </Button>
         </DialogActions>
       </Dialog>
