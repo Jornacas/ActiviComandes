@@ -725,6 +725,12 @@ export default function DeliveryManager() {
                   </FormControl>
                 )}
 
+                {dateWarning && (
+                  <Alert severity="warning" sx={{ mb: 1 }}>
+                    {dateWarning}
+                  </Alert>
+                )}
+
                 <TextField
                   fullWidth
                   type="date"
@@ -742,12 +748,6 @@ export default function DeliveryManager() {
                     shrink: true,
                   }}
                 />
-
-                {dateWarning && (
-                  <Alert severity="warning" sx={{ mt: 1 }}>
-                    {dateWarning}
-                  </Alert>
-                )}
               </Stack>
             </Box>
           )}
