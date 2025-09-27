@@ -123,6 +123,7 @@ export default function OrdersTable() {
 🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
 📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
 📦 Material: ${order.material || 'N/A'}
+📍 Ubicació: Consergeria o caixa de material
 
 📤 LLIURARÀS MATERIAL:
 🏫 Escola: ${order.escola || 'N/A'}
@@ -143,7 +144,7 @@ ${order.material || 'N/A'}
 👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
 🏫 Escola: ${order.escola || 'N/A'}
 📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
-⏰ Hora: Durant l'activitat
+⏰ Hora: Abans de l'activitat
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [✅ Confirmar recepció] [❌ Hi ha un problema]`;
