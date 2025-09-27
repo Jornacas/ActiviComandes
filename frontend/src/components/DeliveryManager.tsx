@@ -327,7 +327,7 @@ export default function DeliveryManager() {
         setSuccess(result.message || 'Lliurament assignat correctament');
         
         // Enviar notificaciones automáticas si las notificaciones están activadas
-        if (isFeatureEnabled('NOTIFICACIONES_AUTOMATICAS') && selectedModalitat === 'Intermediari') {
+        if (selectedModalitat === 'Intermediari') {
           try {
             console.log('🚀 Enviando notificaciones automáticas...');
             
