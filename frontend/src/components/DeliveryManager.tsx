@@ -60,6 +60,7 @@ interface PreparatedOrder {
   dataNecessitat: string;
   material: string;
   quantitat: number;
+  dataLliurament: string;
   rowIndex: number;
 }
 
@@ -108,6 +109,26 @@ export default function DeliveryManager() {
   const [selectedModalitat, setSelectedModalitat] = useState<'Directa' | 'Intermediari'>('Directa');
   const [selectedMonitor, setSelectedMonitor] = useState('');
   const [dataEntrega, setDataEntrega] = useState('');
+  const [dateError, setDateError] = useState('');
+
+  // Función para validar que no sea domingo
+  const validateDate = (dateString: string) => {
+    if (!dateString) {
+      setDateError('');
+      return true;
+    }
+
+    const date = new Date(dateString);
+    const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+
+    if (dayOfWeek === 0) {
+      setDateError('No es poden programar lliuraments els diumenges (no hi ha activitats)');
+      return false;
+    }
+
+    setDateError('');
+    return true;
+  };
 
   // Fetch preparated orders on component mount
   useEffect(() => {
@@ -123,6 +144,7 @@ export default function DeliveryManager() {
       const result = await response.json();
 
       if (result.success) {
+        console.log('📋 DEBUG - Preparated orders from backend:', result.data);
         setPreparatedOrders(result.data || []);
       } else {
         setError(result.error || 'Error carregant comandes preparades');
@@ -198,6 +220,12 @@ export default function DeliveryManager() {
       return;
     }
 
+    // Validar que no sea domingo
+    if (dataEntrega && !validateDate(dataEntrega)) {
+      setError('No es poden programar lliuraments els diumenges');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -205,11 +233,17 @@ export default function DeliveryManager() {
       // Buscar la escolaDestino segons la modalitat i monitor seleccionats
       let escolaDestino = '';
       if (selectedModalitat === 'Intermediari' && selectedMonitor) {
-        const intermediaryOption = deliveryOptions.find(option => 
-          option.tipus.includes('Intermediari') && 
+        console.log('🔍 DEBUG - deliveryOptions:', deliveryOptions);
+        console.log('🔍 DEBUG - selectedMonitor:', selectedMonitor);
+
+        const intermediaryOption = deliveryOptions.find(option =>
+          option.tipus.includes('Intermediari') &&
           option.monitorsDisponibles.some(monitor => monitor.nom === selectedMonitor)
         );
-        escolaDestino = intermediaryOption?.escolaDestino || '';
+
+        console.log('🔍 DEBUG - intermediaryOption found:', intermediaryOption);
+        escolaDestino = intermediaryOption?.escola || '';
+        console.log('🔍 DEBUG - escolaDestino calculated:', escolaDestino);
       }
 
       const deliveryData = {
@@ -220,14 +254,30 @@ export default function DeliveryManager() {
         dataEntrega: dataEntrega
       };
 
+      // DEBUG: Log datos que se van a enviar
+      console.log('📅 DEBUG - Estado dataEntrega antes de enviar:', dataEntrega);
+      console.log('📦 DEBUG - deliveryData object:', deliveryData);
+      console.log('🚀 FRONTEND DEBUG - Datos a enviar:', {
+        deliveryData,
+        selectedModalitat,
+        selectedMonitor,
+        dataEntrega,
+        escolaDestino,
+        deliveryOptions: deliveryOptions.length
+      });
+
       // Back to GET method like before, but with shorter URL
       const url = new URL(API_BASE_URL);
       url.searchParams.append('action', 'createDelivery');
       url.searchParams.append('token', API_TOKEN);
       url.searchParams.append('deliveryData', JSON.stringify(deliveryData));
 
+      console.log('🌐 DEBUG - URL enviada:', url.toString());
       const response = await fetch(url.toString());
+      console.log('📡 DEBUG - Response status:', response.status);
       const result = await response.json();
+      console.log('📥 DEBUG - Backend response:', result);
+      console.log('📥 DEBUG - processedData:', result.processedData);
 
       if (result.success) {
         setSuccess(result.message || 'Lliurament assignat correctament');
@@ -339,6 +389,7 @@ export default function DeliveryManager() {
                       <TableCell>Material</TableCell>
                       <TableCell>Quantitat</TableCell>
                       <TableCell>Data Necessitat</TableCell>
+                      <TableCell>Data Lliurament</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -355,6 +406,18 @@ export default function DeliveryManager() {
                         <TableCell>{order.material}</TableCell>
                         <TableCell>{order.quantitat}</TableCell>
                         <TableCell>{formatDate(order.dataNecessitat)}</TableCell>
+                        <TableCell>
+                          {order.dataLliurament ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Schedule fontSize="small" color="primary" />
+                              {formatDate(order.dataLliurament)}
+                            </Box>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              No assignada
+                            </Typography>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -597,7 +660,14 @@ export default function DeliveryManager() {
                   type="date"
                   label="Data de lliurament prevista"
                   value={dataEntrega}
-                  onChange={(e) => setDataEntrega(e.target.value)}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    console.log('📅 DEBUG - Nueva fecha seleccionada:', newDate);
+                    setDataEntrega(newDate);
+                    validateDate(newDate);
+                  }}
+                  error={!!dateError}
+                  helperText={dateError}
                   InputLabelProps={{
                     shrink: true,
                   }}
@@ -613,7 +683,7 @@ export default function DeliveryManager() {
           <Button
             onClick={createDelivery}
             variant="contained"
-            disabled={loading}
+            disabled={loading || !!dateError}
             startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
           >
             Confirmar Lliurament
