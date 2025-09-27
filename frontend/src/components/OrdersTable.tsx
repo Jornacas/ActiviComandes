@@ -114,10 +114,13 @@ export default function OrdersTable() {
 
   // Función para generar el mensaje de notificación
   const generateNotificationMessage = (order: any, type: 'intermediario' | 'destinatario'): string => {
+    // Debug: ver qué campos tiene la orden
+    console.log('🔍 Order data for notification:', order);
+    
     if (type === 'intermediario') {
       return `🔔 NOVA ASSIGNACIÓ DE MATERIAL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
+👤 Intermediari: ${order.monitorIntermediaria || order.monitorIntermediari || 'N/A'}
 
 📥 REBRÀS MATERIAL:
 🏫 Escola: ${order.escolaDestino || 'N/A'}
@@ -140,7 +143,7 @@ export default function OrdersTable() {
 ${order.material || 'N/A'}
 
 🚚 LLIURAMENT:
-👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
+👤 Intermediari: ${order.monitorIntermediaria || order.monitorIntermediari || 'N/A'}
 🏫 Escola: ${order.escolaDestino || 'N/A'}
 📅 Data: ${order.dataLliurament || 'N/A'}
 ⏰ Hora: Durant l'activitat
@@ -1020,7 +1023,7 @@ ${order.material || 'N/A'}
             <Typography variant="subtitle2" gutterBottom>
               <strong>Destinatario:</strong> {
                 notificationType === 'intermediario' 
-                  ? selectedOrderForNotification?.monitorIntermediari 
+                  ? selectedOrderForNotification?.monitorIntermediaria || selectedOrderForNotification?.monitorIntermediari
                   : selectedOrderForNotification?.solicitant
               }
             </Typography>
