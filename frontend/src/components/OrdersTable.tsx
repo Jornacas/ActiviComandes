@@ -83,7 +83,21 @@ export default function OrdersTable() {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [staleOrders, setStaleOrders] = useState<Order[]>([]);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    // Cargar el estado desde localStorage si existe
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('notificationsEnabled');
+      return saved === 'true';
+    }
+    return false;
+  });
+
+  // Guardar el estado en localStorage cuando cambie
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('notificationsEnabled', notificationsEnabled.toString());
+    }
+  }, [notificationsEnabled]);
 
   // Function to detect stale orders (no state change in 5 days)
   const detectStaleOrders = (ordersList: Order[]) => {
