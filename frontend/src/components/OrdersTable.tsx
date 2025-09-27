@@ -396,7 +396,7 @@ export default function OrdersTable() {
         field: 'notifIntermediario',
         headerName: 'Notif. Intermediari',
         width: 120,
-        renderCell: (params) => {
+        renderCell: (params: any) => {
           const order = params.row;
           const estado = order.estat;
           
@@ -457,7 +457,7 @@ export default function OrdersTable() {
         field: 'notifDestinatario',
         headerName: 'Notif. Destinatari',
         width: 120,
-        renderCell: (params) => {
+        renderCell: (params: any) => {
           const order = params.row;
           const estado = order.estat;
           
