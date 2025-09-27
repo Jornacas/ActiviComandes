@@ -32,6 +32,7 @@ import {
   Clear,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
+import { isFeatureEnabled } from '../lib/featureFlags';
 
 const formatSentenceCase = (text: string | null | undefined): string => {
   if (!text) return '';
@@ -82,6 +83,7 @@ export default function OrdersTable() {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [staleOrders, setStaleOrders] = useState<Order[]>([]);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   // Function to detect stale orders (no state change in 5 days)
   const detectStaleOrders = (ordersList: Order[]) => {
@@ -609,6 +611,12 @@ export default function OrdersTable() {
         </Alert>
       )}
 
+      {isFeatureEnabled('NOTIFICACIONES_AUTOMATICAS') && notificationsEnabled && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          🔔 <strong>Notificacions automàtiques activades</strong> - Les assignacions d'intermediaris enviaran notificacions automàtiques
+        </Alert>
+      )}
+
       {staleOrders.length > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           <strong>⚠️ Avisos de Sol·licituds Estancades</strong>
@@ -652,6 +660,17 @@ export default function OrdersTable() {
         >
           Sincronitzar Respostes
         </Button>
+
+        {isFeatureEnabled('NOTIFICACIONES_AUTOMATICAS') && (
+          <Button
+            variant={notificationsEnabled ? "contained" : "outlined"}
+            color={notificationsEnabled ? "success" : "primary"}
+            onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+            startIcon={notificationsEnabled ? <CheckCircle /> : <Pending />}
+          >
+            {notificationsEnabled ? 'Notificacions Actives' : 'Activar Notificacions'}
+          </Button>
+        )}
 
 
         {selectedRows.length > 0 && (
