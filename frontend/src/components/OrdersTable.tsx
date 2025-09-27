@@ -739,7 +739,7 @@ export default function OrdersTable() {
         </Alert>
       )}
 
-      {isFeatureEnabled('NOTIFICACIONES_AUTOMATICAS') && notificationsEnabled && (
+      {notificationsEnabled && (
         <Alert severity="info" sx={{ mb: 2 }}>
           🔔 <strong>Notificacions automàtiques activades</strong> - Les assignacions d'intermediaris enviaran notificacions automàtiques
         </Alert>
@@ -789,16 +789,14 @@ export default function OrdersTable() {
           Sincronitzar Respostes
         </Button>
 
-        {isFeatureEnabled('NOTIFICACIONES_AUTOMATICAS') && (
-          <Button
-            variant={notificationsEnabled ? "contained" : "outlined"}
-            color={notificationsEnabled ? "success" : "primary"}
-            onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-            startIcon={notificationsEnabled ? <CheckCircle /> : <Pending />}
-          >
-            {notificationsEnabled ? 'Notificacions Actives' : 'Activar Notificacions'}
-          </Button>
-        )}
+        <Button
+          variant={notificationsEnabled ? "contained" : "outlined"}
+          color={notificationsEnabled ? "success" : "primary"}
+          onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+          startIcon={notificationsEnabled ? <CheckCircle /> : <Pending />}
+        >
+          {notificationsEnabled ? 'Notificacions Actives' : 'Activar Notificacions'}
+        </Button>
 
 
         {selectedRows.length > 0 && (
