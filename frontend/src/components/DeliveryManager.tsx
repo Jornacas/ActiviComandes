@@ -51,6 +51,9 @@ import {
   Schedule,
 } from '@mui/icons-material';
 
+// Importar sistema de notificaciones
+import { sendAllNotifications, type NotificationData } from '../lib/notifications';
+
 // Types
 interface PreparatedOrder {
   idPedido: string;
@@ -321,6 +324,39 @@ export default function DeliveryManager() {
 
       if (result.success) {
         setSuccess(result.message || 'Lliurament assignat correctament');
+        
+        // Enviar notificaciones automáticas si las notificaciones están activadas
+        if (isFeatureEnabled('NOTIFICACIONES_AUTOMATICAS') && selectedModalitat === 'Intermediari') {
+          try {
+            console.log('🚀 Enviando notificaciones automáticas...');
+            
+            // Obtener datos de las órdenes seleccionadas para las notificaciones
+            const selectedOrdersData = preparatedOrders.filter(order =>
+              selectedOrders.includes(order.idItem)
+            );
+            
+            // Enviar notificación por cada orden
+            for (const order of selectedOrdersData) {
+              const notificationData: NotificationData = {
+                orderId: order.idItem,
+                monitorIntermediario: selectedMonitor,
+                escolaDestino: escolaDestino,
+                dataEntrega: dataEntrega,
+                material: order.material,
+                solicitante: order.solicitant,
+                escolaDestinoIntermediario: escolaDestino // Por ahora usamos la misma escuela
+              };
+              
+              await sendAllNotifications(notificationData);
+            }
+            
+            console.log('✅ Notificaciones enviadas correctamente');
+          } catch (notificationError) {
+            console.error('⚠️ Error enviando notificaciones:', notificationError);
+            // No fallar la creación si las notificaciones fallan
+          }
+        }
+        
         setDeliveryDialogOpen(false);
         setSelectedOrders([]);
         setSelectedModalitat('Directa');
