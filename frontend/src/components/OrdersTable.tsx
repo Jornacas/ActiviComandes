@@ -106,7 +106,7 @@ export default function OrdersTable() {
     {
       field: 'timestamp',
       headerName: 'Data',
-      width: 80,
+      width: 70,
       type: 'dateTime',
       valueFormatter: (params) => {
         if (!params.value) return '';
@@ -117,12 +117,14 @@ export default function OrdersTable() {
     {
       field: 'nomCognoms',
       headerName: 'Monitor',
-      width: 130,
+      width: 100,
+      flex: 0.8,
     },
     {
       field: 'dataNecessitat',
       headerName: 'Necessari',
-      width: 140,
+      width: 120,
+      flex: 0.9,
       renderCell: (params) => {
         const date = params.value as string;
         if (!date || date.trim() === '') {
@@ -168,17 +170,19 @@ export default function OrdersTable() {
     {
       field: 'escola',
       headerName: 'Escola',
-      width: 130,
+      width: 100,
+      flex: 0.8,
     },
     {
       field: 'activitat',
       headerName: 'Activitat',
-      width: 70,
+      width: 60,
     },
     {
       field: 'material',
       headerName: 'Material',
-      width: 250,
+      width: 200,
+      flex: 1.5,
       valueFormatter: (params) => formatSentenceCase(params.value as string),
     },
     {
@@ -194,13 +198,14 @@ export default function OrdersTable() {
     {
       field: 'unitats',
       headerName: 'Units',
-      width: 60,
+      width: 50,
       type: 'number',
     },
     {
       field: 'comentarisGenerals',
       headerName: 'Comentaris',
-      width: 120,
+      width: 100,
+      flex: 0.7,
       renderCell: (params) => {
         const comentaris = params.value as string;
         if (!comentaris || comentaris.trim() === '') {
@@ -263,7 +268,8 @@ export default function OrdersTable() {
     {
       field: 'monitorIntermediari',
       headerName: 'Monitor Lliurament',
-      width: 140,
+      width: 120,
+      flex: 0.8,
       renderCell: (params) => {
         const monitor = params.value as string;
         if (!monitor || monitor.trim() === '') {
@@ -283,7 +289,8 @@ export default function OrdersTable() {
     {
       field: 'escolaDestinoIntermediari',
       headerName: 'Escola Destí',
-      width: 140,
+      width: 120,
+      flex: 0.8,
       renderCell: (params) => {
         const escola = params.value as string;
         if (!escola || escola.trim() === '') {
@@ -303,7 +310,8 @@ export default function OrdersTable() {
     {
       field: 'Data_Lliurament_Prevista',
       headerName: 'Data Lliurament',
-      width: 140,
+      width: 120,
+      flex: 0.9,
       renderCell: (params) => {
         const date = params.value as string;
         if (!date || date.trim() === '') {
@@ -587,7 +595,13 @@ export default function OrdersTable() {
   }
 
   return (
-    <Box>
+    <Box sx={{ 
+      width: '100%', 
+      overflow: 'hidden',
+      '& .MuiDataGrid-root': {
+        border: 'none',
+      }
+    }}>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -714,12 +728,27 @@ export default function OrdersTable() {
               showQuickFilter: true,
             },
           }}
+          autoHeight={false}
+          disableColumnMenu={false}
+          disableColumnFilter={false}
+          disableColumnSelector={false}
+          disableDensitySelector={false}
           sx={{
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'rgba(0, 0, 0, 0.04)',
             },
+            '& .MuiDataGrid-cell': {
+              fontSize: '0.8rem',
+            },
+            '& .MuiDataGrid-columnHeader': {
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+            },
+            '& .MuiDataGrid-main': {
+              overflowX: 'auto',
+            },
           }}
-                />
+        />
       </Box>
     </Box>
   );
