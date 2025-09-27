@@ -155,6 +155,14 @@ ${order.material || 'N/A'}
 
   // Función para abrir el modal de notificación
   const openNotificationModal = (order: any, type: 'intermediario' | 'destinatario') => {
+    // Debug completo de la orden
+    console.log('🔍 DEBUG COMPLETO - Order:', order);
+    console.log('🔍 DEBUG COMPLETO - Order keys:', Object.keys(order));
+    console.log('🔍 DEBUG COMPLETO - EscolaDestino:', order.escolaDestino);
+    console.log('🔍 DEBUG COMPLETO - DataLliurament:', order.dataLliurament);
+    console.log('🔍 DEBUG COMPLETO - MonitorIntermediaria:', order.monitorIntermediaria);
+    console.log('🔍 DEBUG COMPLETO - MonitorIntermediari:', order.monitorIntermediari);
+    
     setSelectedOrderForNotification(order);
     setNotificationType(type);
     setCustomMessage(generateNotificationMessage(order, type));
