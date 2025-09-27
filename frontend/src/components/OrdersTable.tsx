@@ -21,6 +21,12 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Tooltip,
 } from '@mui/material';
 import {
   Sync,
@@ -92,12 +98,95 @@ export default function OrdersTable() {
     return false;
   });
 
+  // Estados para el modal de notificaciones
+  const [notificationModalOpen, setNotificationModalOpen] = useState(false);
+  const [selectedOrderForNotification, setSelectedOrderForNotification] = useState<any>(null);
+  const [notificationType, setNotificationType] = useState<'intermediario' | 'destinatario'>('intermediario');
+  const [customMessage, setCustomMessage] = useState('');
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
+
   // Guardar el estado en localStorage cuando cambie
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('notificationsEnabled', notificationsEnabled.toString());
     }
   }, [notificationsEnabled]);
+
+  // Función para generar el mensaje de notificación
+  const generateNotificationMessage = (order: any, type: 'intermediario' | 'destinatario'): string => {
+    if (type === 'intermediario') {
+      return `🔔 NOVA ASSIGNACIÓ DE MATERIAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
+
+📥 REBRÀS MATERIAL:
+🏫 Escola: ${order.escolaDestino || 'N/A'}
+📅 Data: ${order.dataLliurament || 'N/A'}
+📦 Material: ${order.material || 'N/A'}
+
+📤 LLIURARÀS MATERIAL:
+🏫 Escola: ${order.escolaDestino || 'N/A'}
+📅 Data: ${order.dataLliurament || 'N/A'}
+👤 Per: ${order.solicitant || 'N/A'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[✅ Confirmar recepció] [❌ Hi ha un problema]`;
+    } else {
+      return `📦 MATERIAL ASSIGNAT PER LLIURAMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Sol·licitant: ${order.solicitant || 'N/A'}
+
+📦 MATERIAL:
+${order.material || 'N/A'}
+
+🚚 LLIURAMENT:
+👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
+🏫 Escola: ${order.escolaDestino || 'N/A'}
+📅 Data: ${order.dataLliurament || 'N/A'}
+⏰ Hora: Durant l'activitat
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[✅ Confirmar recepció] [❌ Hi ha un problema]`;
+    }
+  };
+
+  // Función para abrir el modal de notificación
+  const openNotificationModal = (order: any, type: 'intermediario' | 'destinatario') => {
+    setSelectedOrderForNotification(order);
+    setNotificationType(type);
+    setCustomMessage(generateNotificationMessage(order, type));
+    setNotificationModalOpen(true);
+  };
+
+  // Función para enviar la notificación
+  const sendNotification = async () => {
+    if (!selectedOrderForNotification) return;
+
+    setIsSendingNotification(true);
+    try {
+      // Simular envío de notificación
+      console.log(`📱 Enviando notificación ${notificationType}:`, {
+        destinatario: notificationType === 'intermediario' 
+          ? selectedOrderForNotification.monitorIntermediari 
+          : selectedOrderForNotification.solicitant,
+        mensaje: customMessage
+      });
+
+      // Aquí iría la lógica real de envío
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular delay
+
+      console.log(`✅ Notificación ${notificationType} enviada correctamente`);
+      
+      // Cerrar modal
+      setNotificationModalOpen(false);
+      setSelectedOrderForNotification(null);
+      setCustomMessage('');
+    } catch (error) {
+      console.error(`⚠️ Error enviando notificación ${notificationType}:`, error);
+    } finally {
+      setIsSendingNotification(false);
+    }
+  };
 
   // Function to detect stale orders (no state change in 5 days)
   const detectStaleOrders = (ordersList: Order[]) => {
@@ -421,15 +510,25 @@ export default function OrdersTable() {
           
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
+            const message = generateNotificationMessage(order, 'intermediario');
             return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Chip
-                  label="📤 Enviada"
+              <Tooltip title={message} placement="top" arrow>
+                <Button
                   size="small"
-                  color="info"
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              </Box>
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<span>📤</span>}
+                  onClick={() => openNotificationModal(order, 'intermediario')}
+                  sx={{ 
+                    fontSize: '0.7rem',
+                    minWidth: 'auto',
+                    px: 1,
+                    py: 0.5
+                  }}
+                >
+                  Enviar
+                </Button>
+              </Tooltip>
             );
           } else if (estado === 'Entregant') {
             return (
@@ -482,15 +581,25 @@ export default function OrdersTable() {
           
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
+            const message = generateNotificationMessage(order, 'destinatario');
             return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Chip
-                  label="📤 Enviada"
+              <Tooltip title={message} placement="top" arrow>
+                <Button
                   size="small"
-                  color="info"
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              </Box>
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<span>📤</span>}
+                  onClick={() => openNotificationModal(order, 'destinatario')}
+                  sx={{ 
+                    fontSize: '0.7rem',
+                    minWidth: 'auto',
+                    px: 1,
+                    py: 0.5
+                  }}
+                >
+                  Enviar
+                </Button>
+              </Tooltip>
             );
           } else if (estado === 'Lliurat') {
             return (
@@ -895,6 +1004,65 @@ export default function OrdersTable() {
           }}
         />
       </Box>
+
+      {/* Modal de notificaciones */}
+      <Dialog
+        open={notificationModalOpen}
+        onClose={() => setNotificationModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          📤 Enviar Notificación {notificationType === 'intermediario' ? 'al Intermediario' : 'al Destinatario'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              <strong>Destinatario:</strong> {
+                notificationType === 'intermediario' 
+                  ? selectedOrderForNotification?.monitorIntermediari 
+                  : selectedOrderForNotification?.solicitant
+              }
+            </Typography>
+            
+            <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+              <strong>Material:</strong> {selectedOrderForNotification?.material}
+            </Typography>
+            
+            <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+              <strong>Mensaje a enviar:</strong>
+            </Typography>
+            
+            <TextField
+              fullWidth
+              multiline
+              rows={8}
+              value={customMessage}
+              onChange={(e) => setCustomMessage(e.target.value)}
+              variant="outlined"
+              sx={{ mt: 1 }}
+              placeholder="Edita el mensaje aquí..."
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setNotificationModalOpen(false)}
+            disabled={isSendingNotification}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={sendNotification}
+            variant="contained"
+            color="primary"
+            disabled={isSendingNotification}
+            startIcon={isSendingNotification ? <CircularProgress size={20} /> : <span>📤</span>}
+          >
+            {isSendingNotification ? 'Enviant...' : 'Enviar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
