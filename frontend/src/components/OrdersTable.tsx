@@ -122,21 +122,53 @@ export default function OrdersTable() {
     {
       field: 'dataNecessitat',
       headerName: 'Necessari',
-      width: 90,
-      type: 'date',
-      valueFormatter: (params) => {
-        if (!params.value) return '';
-        const date = new Date(params.value);
-        return date.toLocaleDateString('ca-ES', { 
-          day: 'numeric', 
-          month: 'short' 
-        });
+      width: 140,
+      renderCell: (params) => {
+        const date = params.value as string;
+        if (!date || date.trim() === '') {
+          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
+        }
+        
+        // Función para formatear la fecha en formato "martes 03 noviembre"
+        const formatDataNecessitat = (dateString: string) => {
+          if (!dateString) return '';
+          
+          // Si es una fecha ISO con Z (UTC), extraer solo la parte de fecha
+          if (dateString.includes('T') && dateString.includes('Z')) {
+            const dateOnly = dateString.split('T')[0]; // "2025-10-01"
+            const [year, month, day] = dateOnly.split('-');
+            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            
+            const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+            const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+
+            return `${days[date.getDay()]} ${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]}`;
+          }
+          
+          // Para fechas normales
+          const dateObj = new Date(dateString);
+          const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+          const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+
+          return `${days[dateObj.getDay()]} ${String(dateObj.getDate()).padStart(2, '0')} ${months[dateObj.getMonth()]}`;
+        };
+        
+        try {
+          const formattedDate = formatDataNecessitat(date);
+          return (
+            <span style={{ fontSize: '0.85rem' }}>
+              {formattedDate}
+            </span>
+          );
+        } catch {
+          return <span style={{ fontSize: '0.85rem' }}>{date}</span>;
+        }
       },
     },
     {
       field: 'escola',
       headerName: 'Escola',
-      width: 110,
+      width: 130,
     },
     {
       field: 'activitat',
@@ -146,7 +178,7 @@ export default function OrdersTable() {
     {
       field: 'material',
       headerName: 'Material',
-      width: 150,
+      width: 250,
       valueFormatter: (params) => formatSentenceCase(params.value as string),
     },
     {
@@ -231,57 +263,96 @@ export default function OrdersTable() {
     {
       field: 'monitorIntermediari',
       headerName: 'Monitor Lliurament',
-      width: 110,
+      width: 140,
       renderCell: (params) => {
         const monitor = params.value as string;
         if (!monitor || monitor.trim() === '') {
           return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
         }
         return (
-          <Chip
-            label={monitor}
-            size="small"
-            color="primary"
-            sx={{ fontSize: '0.7rem', maxWidth: '115px' }}
-          />
+          <span style={{ 
+            color: '#1976d2', 
+            fontSize: '0.85rem', 
+            fontWeight: '500' 
+          }}>
+            {monitor}
+          </span>
         );
       },
     },
     {
       field: 'escolaDestinoIntermediari',
       headerName: 'Escola Destí',
-      width: 120,
+      width: 140,
       renderCell: (params) => {
         const escola = params.value as string;
         if (!escola || escola.trim() === '') {
           return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
         }
         return (
-          <Chip
-            label={escola}
-            size="small"
-            color="info"
-            variant="outlined"
-            sx={{ fontSize: '0.7rem', maxWidth: '110px' }}
-          />
+          <span style={{ 
+            color: '#1976d2', 
+            fontSize: '0.85rem', 
+            fontWeight: '500' 
+          }}>
+            {escola}
+          </span>
         );
       },
     },
     {
       field: 'Data_Lliurament_Prevista',
       headerName: 'Data Lliurament',
-      width: 100,
+      width: 140,
       renderCell: (params) => {
         const date = params.value as string;
         if (!date || date.trim() === '') {
           return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
         }
-        // Format date if it's a full date string
+        
+        // Usar la misma función formatDate que funciona en DeliveryManager
+        const formatDate = (dateString: string) => {
+          if (!dateString) return '';
+          
+          // Si es una fecha ISO con Z (UTC), extraer solo la parte de fecha
+          if (dateString.includes('T') && dateString.includes('Z')) {
+            const dateOnly = dateString.split('T')[0]; // "2025-10-01"
+            const [year, month, day] = dateOnly.split('-');
+            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            
+            const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+            const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+
+            return `${days[date.getDay()]} ${date.getDate()} de ${months[date.getMonth()]}`;
+          }
+          
+          // Para fechas normales
+          const dateObj = new Date(dateString);
+          const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+          const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+
+          return `${days[dateObj.getDay()]} ${dateObj.getDate()} de ${months[dateObj.getMonth()]}`;
+        };
+        
         try {
-          const formattedDate = new Date(date).toLocaleDateString('ca-ES');
-          return <span style={{ fontSize: '0.85rem' }}>{formattedDate}</span>;
+          const formattedDate = formatDate(date);
+          return (
+            <span style={{ 
+              fontSize: '0.85rem', 
+              color: '#1976d2', 
+              fontWeight: '500' 
+            }}>
+              {formattedDate}
+            </span>
+          );
         } catch {
-          return <span style={{ fontSize: '0.85rem' }}>{date}</span>;
+          return <span style={{ 
+            fontSize: '0.85rem', 
+            color: '#1976d2', 
+            fontWeight: '500' 
+          }}>
+            {date}
+          </span>;
         }
       },
     },

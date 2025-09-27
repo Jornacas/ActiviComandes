@@ -145,6 +145,8 @@ export default function DeliveryManager() {
 
       if (result.success) {
         console.log('📋 DEBUG - Preparated orders from backend:', result.data);
+        
+        
         setPreparatedOrders(result.data || []);
       } else {
         setError(result.error || 'Error carregant comandes preparades');
@@ -300,6 +302,20 @@ export default function DeliveryManager() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
+    
+    // Si es una fecha ISO con Z (UTC), extraer solo la parte de fecha
+    if (dateString.includes('T') && dateString.includes('Z')) {
+      const dateOnly = dateString.split('T')[0]; // "2025-10-01"
+      const [year, month, day] = dateOnly.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      
+      const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+      const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+
+      return `${days[date.getDay()]} ${date.getDate()} de ${months[date.getMonth()]}`;
+    }
+    
+    // Para fechas normales
     const date = new Date(dateString);
     const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
     const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
@@ -407,16 +423,30 @@ export default function DeliveryManager() {
                         <TableCell>{order.quantitat}</TableCell>
                         <TableCell>{formatDate(order.dataNecessitat)}</TableCell>
                         <TableCell>
-                          {order.dataLliurament ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Schedule fontSize="small" color="primary" />
-                              {formatDate(order.dataLliurament)}
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              No assignada
-                            </Typography>
-                          )}
+                          {(() => {
+                            console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: dataLliurament = "${order.dataLliurament}"`);
+                            console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: typeof dataLliurament = "${typeof order.dataLliurament}"`);
+                            console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: dataLliurament length = ${order.dataLliurament?.length}`);
+                            console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: dataLliurament truthy = ${!!order.dataLliurament}`);
+                            
+                            if (order.dataLliurament && order.dataLliurament.trim() !== '') {
+                              const formattedDate = formatDate(order.dataLliurament);
+                              console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: Showing date with icon: "${formattedDate}"`);
+                              return (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Schedule fontSize="small" color="primary" />
+                                  {formattedDate}
+                                </Box>
+                              );
+                            } else {
+                              console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: Showing "No assignada"`);
+                              return (
+                                <Typography variant="body2" color="text.secondary">
+                                  No assignada
+                                </Typography>
+                              );
+                            }
+                          })()}
                         </TableCell>
                       </TableRow>
                     ))}

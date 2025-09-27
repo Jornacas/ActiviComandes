@@ -695,7 +695,6 @@ function loadRespostesData(limit = null) {
         'Monitor_Intermediari': 'monitorIntermediari',
         'Escola_Destino_Intermediari': 'escolaDestinoIntermediari',
         'Data_Entrega_Prevista': 'dataEntregaPrevista',
-        'Data_Lliurament_Prevista': 'Data_Lliurament_Prevista',
         'Distancia_Academia': 'distanciaAcademia',
         'Notes_Entrega': 'notesEntrega'
       };
@@ -704,39 +703,6 @@ function loadRespostesData(limit = null) {
 
     const allRows = values.slice(1);
     const estatColIndex = headersRow.findIndex(h => h === 'Estat');
-    const dataLliuramentColIndex = headersRow.findIndex(h => h === 'Data_Lliurament_Prevista');
-    const dataNecessitatColIndex = headersRow.findIndex(h => h === 'Data_Necessitat');
-
-    // Procesar fechas en las filas para evitar problemas de UTC
-    const processedRows = rows.map(row => {
-      const processedRow = [...row];
-      
-      // Procesar Data_Necessitat
-      if (dataNecessitatColIndex !== -1 && processedRow[dataNecessitatColIndex]) {
-        const rawDate = processedRow[dataNecessitatColIndex];
-        if (rawDate instanceof Date) {
-          // Convertir Date a string en formato YYYY-MM-DD
-          const year = rawDate.getFullYear();
-          const month = String(rawDate.getMonth() + 1).padStart(2, '0');
-          const day = String(rawDate.getDate()).padStart(2, '0');
-          processedRow[dataNecessitatColIndex] = `${year}-${month}-${day}`;
-        }
-      }
-      
-      // Procesar Data_Lliurament_Prevista
-      if (dataLliuramentColIndex !== -1 && processedRow[dataLliuramentColIndex]) {
-        const rawDate = processedRow[dataLliuramentColIndex];
-        if (rawDate instanceof Date) {
-          // Convertir Date a string en formato YYYY-MM-DD
-          const year = rawDate.getFullYear();
-          const month = String(rawDate.getMonth() + 1).padStart(2, '0');
-          const day = String(rawDate.getDate()).padStart(2, '0');
-          processedRow[dataLliuramentColIndex] = `${year}-${month}-${day}`;
-        }
-      }
-      
-      return processedRow;
-    });
 
     const stats = {
       total: allRows.length,
@@ -750,7 +716,7 @@ function loadRespostesData(limit = null) {
       success: true,
       data: {
         headers: headers,
-        rows: processedRows,
+        rows: rows,
         estadisticas: stats
       }
     };
@@ -1164,10 +1130,6 @@ function getPreparatedOrders() {
     const quantitatIndex = headers.findIndex(h => h === "Unitats");
     const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
-    const dataLliuramentIndex = headers.findIndex(h => h.trim() === "Data_Lliurament_Prevista" || h.trim().toLowerCase() === "datalliuramentprevista");
-
-    console.log('📋 DEBUG getPreparatedOrders - Headers:', headers);
-    console.log('📋 DEBUG getPreparatedOrders - dataLliuramentIndex:', dataLliuramentIndex);
 
     const preparatedOrders = [];
 
@@ -1175,71 +1137,20 @@ function getPreparatedOrders() {
       const row = values[i];
       const estat = row[estatIndex];
 
-      if (estat === "Preparat" || estat === "Assignat") {
-        // Procesar la fecha de necesidad para evitar problemas de UTC
-        let dataNecessitatValue = '';
-        if (dataNecessitatIndex !== -1 && row[dataNecessitatIndex]) {
-          const rawDate = row[dataNecessitatIndex];
-          console.log(`📅 DEBUG - Raw dataNecessitat from sheet: "${rawDate}" (type: ${typeof rawDate})`);
-          
-          if (rawDate instanceof Date) {
-            // Si es un objeto Date, convertir a string en formato YYYY-MM-DD
-            const year = rawDate.getFullYear();
-            const month = String(rawDate.getMonth() + 1).padStart(2, '0');
-            const day = String(rawDate.getDate()).padStart(2, '0');
-            dataNecessitatValue = `${year}-${month}-${day}`;
-            console.log(`📅 DEBUG - Converted dataNecessitat Date to string: "${dataNecessitatValue}"`);
-          } else if (typeof rawDate === 'string') {
-            // Si ya es string, usar tal como está
-            dataNecessitatValue = rawDate;
-            console.log(`📅 DEBUG - Using dataNecessitat string as is: "${dataNecessitatValue}"`);
-          }
-        }
-
-        // Procesar la fecha de entrega para evitar problemas de UTC
-        let dataLliuramentValue = '';
-        if (dataLliuramentIndex !== -1 && row[dataLliuramentIndex]) {
-          const rawDate = row[dataLliuramentIndex];
-          console.log(`📅 DEBUG - Raw dataLliurament from sheet: "${rawDate}" (type: ${typeof rawDate})`);
-          
-          if (rawDate instanceof Date) {
-            // Si es un objeto Date, convertir a string en formato YYYY-MM-DD
-            const year = rawDate.getFullYear();
-            const month = String(rawDate.getMonth() + 1).padStart(2, '0');
-            const day = String(rawDate.getDate()).padStart(2, '0');
-            dataLliuramentValue = `${year}-${month}-${day}`;
-            console.log(`📅 DEBUG - Converted dataLliurament Date to string: "${dataLliuramentValue}"`);
-          } else if (typeof rawDate === 'string') {
-            // Si ya es string, usar tal como está
-            dataLliuramentValue = rawDate;
-            console.log(`📅 DEBUG - Using dataLliurament string as is: "${dataLliuramentValue}"`);
-          }
-        }
-
-        const orderData = {
+      if (estat === "Preparat") {
+        preparatedOrders.push({
           idPedido: row[idPedidoIndex],
           idItem: row[idItemIndex],
           solicitant: row[solicitantIndex],
           escola: row[escolaIndex],
-          dataNecessitat: dataNecessitatValue,
+          dataNecessitat: row[dataNecessitatIndex],
           material: row[materialIndex],
           quantitat: row[quantitatIndex],
-          dataLliurament: dataLliuramentValue,
           rowIndex: i + 1
-        };
-        
-        // DEBUG: Log each order's dataLliurament
-        if (orderData.dataLliurament) {
-          console.log(`📅 DEBUG - Order ${orderData.idItem} has dataLliurament: "${orderData.dataLliurament}"`);
-        }
-        
-        preparatedOrders.push(orderData);
+        });
       }
     }
 
-    // DEBUG: Log final result
-    console.log('📋 DEBUG getPreparatedOrders - Final result:', JSON.stringify(preparatedOrders, null, 2));
-    
     return { success: true, data: preparatedOrders };
 
   } catch (error) {
@@ -1262,27 +1173,11 @@ function getDeliveryOptions(selectedOrders) {
     const deliveryOptions = [];
     
     for (const order of selectedOrders) {
-      console.log('🎯 Processing order for school:', order.escola);
-
-      // Crear opciones básicas para esta escuela
-      const directSchool = schoolData.data.schoolsMap?.get(order.escola);
-
-      if (directSchool) {
-        // OPCIÓN 1: Entrega directa
-        const directOption = {
-          tipus: "Lliurament Directe",
-          escola: order.escola,
-          adreça: directSchool.adreça,
-          eficiencia: "Calculant...",
-          prioritat: 99999,
-          monitorsDisponibles: directSchool.monitors?.map(monitor => ({
-            nom: monitor,
-            dies: directSchool.dies,
-            tipus: "directa"
-          })) || [],
-          descripció: `Entrega directa a ${order.escola}`,
-          distanciaAcademia: "Calculant...",
-          tempsAcademia: "Calculant...",
+      const schoolOptions = findDeliveryOptionsForSchool(order.escola, schoolData.data, order);
+      
+      schoolOptions.forEach(option => {
+        deliveryOptions.push({
+          ...option,
           comandes: [order],
           orderDetails: {
             idItem: order.idItem,
@@ -1290,87 +1185,8 @@ function getDeliveryOptions(selectedOrders) {
             material: order.material,
             quantitat: order.quantitat
           }
-        };
-
-        deliveryOptions.push(directOption);
-
-        // OPCIÓN 2: Entrega con intermediario (buscar monitores multicentre)
-        if (schoolData.data.monitors) {
-          schoolData.data.monitors.forEach(monitor => {
-            if (monitor.escoles?.length > 1) {
-              const targetSchoolInfo = monitor.escoles.find(s => s.escola === order.escola);
-
-              if (targetSchoolInfo) {
-                monitor.escoles.forEach(intermediarySchoolInfo => {
-                  if (intermediarySchoolInfo.escola !== order.escola) {
-                    const intermediaryOption = {
-                      tipus: "Lliurament amb Intermediari",
-                      escola: intermediarySchoolInfo.escola,
-                      escolaFinal: order.escola,
-                      adreça: intermediarySchoolInfo.adreça,
-                      eficiencia: "Calculant...",
-                      prioritat: 99999,
-                      monitorsDisponibles: [{
-                        nom: monitor.nom,
-                        dies: intermediarySchoolInfo.dies,
-                        tipus: "intermediari"
-                      }],
-                      descripció: `Entrega a ${intermediarySchoolInfo.escola} → Monitor transporta a ${order.escola}`,
-                      distanciaAcademia: "Calculant...",
-                      tempsAcademia: "Calculant...",
-                      notes: "Monitor multicentre",
-                      comandes: [order],
-                      orderDetails: {
-                        idItem: order.idItem,
-                        solicitant: order.solicitant,
-                        material: order.material,
-                        quantitat: order.quantitat
-                      }
-                    };
-
-                    deliveryOptions.push(intermediaryOption);
-                  }
-                });
-              }
-            }
-          });
-        }
-      }
-    }
-
-    // Calcular distancias reales para todas las opciones
-    const addressesMap = new Map();
-    deliveryOptions.forEach(option => {
-      if (option.adreça) {
-        addressesMap.set(option.adreça, option.escola);
-      }
-    });
-
-    const addresses = Array.from(addressesMap.keys());
-    console.log('🗺️ Calculating distances for addresses:', addresses);
-
-    const distanceResults = calculateDistances(addresses);
-
-    if (distanceResults.success) {
-      // Aplicar distancias calculadas a las opciones
-      deliveryOptions.forEach(option => {
-        const distanceData = distanceResults.data.find(d => d.address === option.adreça);
-        if (distanceData) {
-          option.distanciaAcademia = distanceData.distance;
-          option.tempsAcademia = distanceData.duration;
-          option.prioritat = distanceData.distanceValue;
-
-          // Calcular eficiencia basada en distancia
-          const km = distanceData.distanceValue / 1000;
-          if (km < 2) option.eficiencia = "Màxima";
-          else if (km < 4) option.eficiencia = "Alta";
-          else if (km < 6) option.eficiencia = "Mitjana";
-          else option.eficiencia = "Baixa";
-        }
+        });
       });
-
-      // Ordenar por distancia (más cercana primero)
-      deliveryOptions.sort((a, b) => a.prioritat - b.prioritat);
     }
 
     return { success: true, data: deliveryOptions };
@@ -1541,7 +1357,7 @@ function createDelivery(deliveryData) {
       modalitat: headers.findIndex(h => h === "Modalitat_Lliurament" || h === "modalitatlliurament"),
       monitor: headers.findIndex(h => h === "Monitor_Intermediari" || h === "monitorIntermediari"),
       escolaDestino: headers.findIndex(h => h === "Escola_Destino_Intermediari" || h === "escolaDestinoIntermediari"),
-      dataEntrega: headers.findIndex(h => h.trim() === "Data_Lliurament_Prevista" || h.trim().toLowerCase() === "datalliuramentprevista"),
+      dataEntrega: headers.findIndex(h => h === "Data_Lliurament_Prevista" || h === "datalliuramentprevista"),
       estat: headers.findIndex(h => h === "Estat" || h === "estat")
     };
 
@@ -1625,11 +1441,6 @@ function createDelivery(deliveryData) {
           const dataValue = deliveryData.dataEntrega || '';
           row[columnIndices.dataEntrega] = dataValue;
           console.log(`  ✅ DataEntrega: ${dataValue}`);
-          console.log(`  📅 DEBUG - Column index for dataEntrega: ${columnIndices.dataEntrega}`);
-          console.log(`  📅 DEBUG - Input deliveryData.dataEntrega: "${deliveryData.dataEntrega}"`);
-        } else {
-          console.log(`  ❌ ERROR - Column 'Data_Lliurament_Prevista' not found!`);
-          console.log(`  📋 Available headers:`, headers);
         }
 
         if (columnIndices.estat !== -1) {
@@ -1694,18 +1505,7 @@ function removeIntermediaryAssignment(orderIds) {
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
     const modalittatIndex = headers.findIndex(h => h === "Modalitat_Entrega");
     const monitorIndex = headers.findIndex(h => h === "Monitor_Intermediari");
-    const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
-    const dataEntregaIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
     const estatIndex = headers.findIndex(h => h === "Estat");
-
-    console.log('🧹 DEBUG removeIntermediaryAssignment - Column indices:', {
-      idItem: idItemIndex,
-      modalitat: modalittatIndex,
-      monitor: monitorIndex,
-      escolaDestino: escolaDestinoIndex,
-      dataEntrega: dataEntregaIndex,
-      estat: estatIndex
-    });
 
     const dataRange = sheet.getDataRange();
     const values = dataRange.getValues();
@@ -1716,34 +1516,9 @@ function removeIntermediaryAssignment(orderIds) {
       const idItem = row[idItemIndex];
 
       if (orderIds.includes(idItem)) {
-        console.log(`🧹 DEBUG - Cleaning intermediary data for order: ${idItem}`);
-        
-        // Limpiar todos los campos relacionados con el intermediario
-        if (modalittatIndex !== -1) {
-          row[modalittatIndex] = '';
-          console.log(`  ✅ Modalitat cleared`);
-        }
-        
-        if (monitorIndex !== -1) {
-          row[monitorIndex] = '';
-          console.log(`  ✅ Monitor cleared`);
-        }
-        
-        if (escolaDestinoIndex !== -1) {
-          row[escolaDestinoIndex] = '';
-          console.log(`  ✅ Escola Destino cleared`);
-        }
-        
-        if (dataEntregaIndex !== -1) {
-          row[dataEntregaIndex] = '';
-          console.log(`  ✅ Data Entrega cleared`);
-        }
-        
-        if (estatIndex !== -1) {
-          row[estatIndex] = "Preparat";
-          console.log(`  ✅ Estat set to "Preparat"`);
-        }
-        
+        row[modalittatIndex] = '';
+        row[monitorIndex] = '';
+        row[estatIndex] = "Preparat";
         updatedRows++;
       }
     }
@@ -1766,73 +1541,23 @@ function removeIntermediaryAssignment(orderIds) {
 
 function calculateDistances(addresses) {
   try {
-    console.log('🗺️ calculateDistances - Input addresses:', JSON.stringify(addresses));
-
     if (!addresses || addresses.length === 0) {
-      console.log('❌ No addresses provided');
-      return {
-        success: false,
-        error: "No s'han proporcionat adreces"
-      };
+      return { success: false, error: "No s'han proporcionat adreces" };
     }
 
-    const origin = "Carrer Ramon Turró 73, 08005 Barcelona"; // Eixos Creativa
-    const results = [];
+    const results = addresses.map(address => ({
+      address: address,
+      distance: "N/A (simplificat)",
+      duration: "N/A (simplificat)",
+      distanceValue: 5000,
+      durationValue: 600
+    }));
 
-    for (const address of addresses) {
-      try {
-        console.log(`🗺️ Calculating distance to: ${address}`);
-
-        const directions = Maps.newDirectionFinder()
-          .setOrigin(origin)
-          .setDestination(address)
-          .setMode(Maps.DirectionFinder.Mode.DRIVING)
-          .getDirections();
-
-        if (directions.routes && directions.routes.length > 0) {
-          const route = directions.routes[0];
-          const leg = route.legs[0];
-
-          results.push({
-            address: address,
-            distance: leg.distance.text,
-            duration: leg.duration.text,
-            distanceValue: leg.distance.value,  // meters
-            durationValue: leg.duration.value   // seconds
-          });
-
-          console.log(`✅ Distance calculated: ${leg.distance.text} (${leg.duration.text})`);
-        } else {
-          console.log(`❌ No route found for ${address}`);
-          results.push({
-            address: address,
-            distance: "N/A",
-            duration: "N/A",
-            distanceValue: 99999,
-            durationValue: 99999
-          });
-        }
-      } catch (addressError) {
-        console.error(`❌ Error for address ${address}:`, addressError);
-        results.push({
-          address: address,
-          distance: "Error",
-          duration: "Error",
-          distanceValue: 99999,
-          durationValue: 99999
-        });
-      }
-    }
-
-    console.log(`✅ calculateDistances completed. ${results.length} results.`);
     return { success: true, data: results };
 
   } catch (error) {
-    console.error("❌ Error en calculateDistances:", error);
-    return {
-      success: false,
-      error: "Error calculant distàncies: " + error.toString()
-    };
+    console.error("Error en calculateDistances:", error);
+    return { success: false, error: "Error calculant distàncies: " + error.toString() };
   }
 }
 
