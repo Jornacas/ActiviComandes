@@ -390,6 +390,120 @@ export default function OrdersTable() {
         return <span style={{ fontSize: '0.85rem' }}>{notes}</span>;
       },
     },
+    // Columnas de notificación (solo visibles cuando las notificaciones están activadas)
+    ...(notificationsEnabled ? [
+      {
+        field: 'notifIntermediario',
+        headerName: 'Notif. Intermediari',
+        width: 120,
+        renderCell: (params) => {
+          const order = params.row;
+          const estado = order.estat;
+          
+          // Si no tiene intermediario asignado, no mostrar nada
+          if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
+            return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
+          }
+          
+          // Lógica de estados de notificación
+          if (estado === 'Assignat') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="📤 Enviada"
+                  size="small"
+                  color="info"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          } else if (estado === 'Entregant') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="✅ Confirmat"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          } else if (estado === 'Lliurat') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="✅ Confirmat"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          } else {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="⏳ Pendent"
+                  size="small"
+                  color="warning"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          }
+        },
+      },
+      {
+        field: 'notifDestinatario',
+        headerName: 'Notif. Destinatari',
+        width: 120,
+        renderCell: (params) => {
+          const order = params.row;
+          const estado = order.estat;
+          
+          // Si no tiene intermediario asignado, no mostrar nada
+          if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
+            return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
+          }
+          
+          // Lógica de estados de notificación
+          if (estado === 'Assignat') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="📤 Enviada"
+                  size="small"
+                  color="info"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          } else if (estado === 'Lliurat') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="✅ Confirmat"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          } else {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="⏳ Pendent"
+                  size="small"
+                  color="warning"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          }
+        },
+      },
+    ] : []),
   ];
 
   const handleRemoveIntermediary = async (orderIds: string[]) => {

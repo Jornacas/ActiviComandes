@@ -1,6 +1,18 @@
 {
-  "buildCommand": "cd app-mobil && npm run build",
-  "devCommand": "cd app-mobil && npm run dev",
-  "installCommand": "cd app-mobil && npm install",
-  "outputDirectory": "app-mobil/.next"
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/next",
+      "config": {
+        "distDir": "frontend/.next"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "frontend/$1"
+    }
+  ]
 }
