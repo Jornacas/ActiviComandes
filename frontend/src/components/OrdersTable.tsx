@@ -114,38 +114,35 @@ export default function OrdersTable() {
 
   // Función para generar el mensaje de notificación
   const generateNotificationMessage = (order: any, type: 'intermediario' | 'destinatario'): string => {
-    // Debug: ver qué campos tiene la orden
-    console.log('🔍 Order data for notification:', order);
-    
     if (type === 'intermediario') {
       return `🔔 NOVA ASSIGNACIÓ DE MATERIAL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 Intermediari: ${order.monitorIntermediaria || order.monitorIntermediari || 'N/A'}
+👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
 
 📥 REBRÀS MATERIAL:
-🏫 Escola: ${order.escolaDestino || 'N/A'}
-📅 Data: ${order.dataLliurament || 'N/A'}
+🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
+📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
 📦 Material: ${order.material || 'N/A'}
 
 📤 LLIURARÀS MATERIAL:
-🏫 Escola: ${order.escolaDestino || 'N/A'}
-📅 Data: ${order.dataLliurament || 'N/A'}
-👤 Per: ${order.solicitant || 'N/A'}
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
+👤 Per: ${order.nomCognoms || 'N/A'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [✅ Confirmar recepció] [❌ Hi ha un problema]`;
     } else {
       return `📦 MATERIAL ASSIGNAT PER LLIURAMENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 Sol·licitant: ${order.solicitant || 'N/A'}
+👤 Sol·licitant: ${order.nomCognoms || 'N/A'}
 
 📦 MATERIAL:
 ${order.material || 'N/A'}
 
 🚚 LLIURAMENT:
-👤 Intermediari: ${order.monitorIntermediaria || order.monitorIntermediari || 'N/A'}
-🏫 Escola: ${order.escolaDestino || 'N/A'}
-📅 Data: ${order.dataLliurament || 'N/A'}
+👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
 ⏰ Hora: Durant l'activitat
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -155,14 +152,6 @@ ${order.material || 'N/A'}
 
   // Función para abrir el modal de notificación
   const openNotificationModal = (order: any, type: 'intermediario' | 'destinatario') => {
-    // Debug completo de la orden
-    console.log('🔍 DEBUG COMPLETO - Order:', order);
-    console.log('🔍 DEBUG COMPLETO - Order keys:', Object.keys(order));
-    console.log('🔍 DEBUG COMPLETO - EscolaDestino:', order.escolaDestino);
-    console.log('🔍 DEBUG COMPLETO - DataLliurament:', order.dataLliurament);
-    console.log('🔍 DEBUG COMPLETO - MonitorIntermediaria:', order.monitorIntermediaria);
-    console.log('🔍 DEBUG COMPLETO - MonitorIntermediari:', order.monitorIntermediari);
-    
     setSelectedOrderForNotification(order);
     setNotificationType(type);
     setCustomMessage(generateNotificationMessage(order, type));
@@ -1031,8 +1020,8 @@ ${order.material || 'N/A'}
             <Typography variant="subtitle2" gutterBottom>
               <strong>Destinatario:</strong> {
                 notificationType === 'intermediario' 
-                  ? selectedOrderForNotification?.monitorIntermediaria || selectedOrderForNotification?.monitorIntermediari
-                  : selectedOrderForNotification?.solicitant
+                  ? selectedOrderForNotification?.monitorIntermediari
+                  : selectedOrderForNotification?.nomCognoms
               }
             </Typography>
             
