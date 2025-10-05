@@ -18,7 +18,7 @@ import gspread
 
 # IMPORTANTE: Configurar estas variables con tus valores
 CLIENT_ID = '31975727778-hhij06u9u8enu2b8etnttjjgair0lrpq.apps.googleusercontent.com'
-CLIENT_SECRET = 'GOCSPX-VhnkE8tNaGpMX6APDK XuyS2IksjH'  # Cambiar por tu client secret real
+CLIENT_SECRET = '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'  # Del script anterior - verificar que sea correcto
 SPREADSHEET_ID = '1ZbhYEXJ4jnRjGhV__KgpLSreGIbbGKaWKNQ6hkHCEFw'  # ID de tu spreadsheet de ActiviComandes
 
 # OAuth 2.0 endpoints
@@ -111,13 +111,13 @@ def callback():
         user_info = service.userinfo().get().execute()
         session['email'] = user_info.get('email')
         
-        print(f"\n✅ Usuario autenticado: {session['email']}\n")
+        print(f"\nOK - Usuario autenticado: {session['email']}\n")
         
         # Redirigir a la página de exportación
         return redirect('/export')
         
     except Exception as e:
-        print(f"❌ Error en callback: {e}")
+        print(f"ERROR en callback: {e}")
         return f'<h1>Error en autenticación</h1><p>{str(e)}</p><a href="/">Volver</a>'
 
 @app.route('/export')
@@ -127,11 +127,11 @@ def export_spaces():
     
     try:
         print("\n" + "="*60)
-        print("🚀 INICIANDO EXPORTACIÓN DE ESPACIOS")
+        print("INICIANDO EXPORTACION DE ESPACIOS")
         print("="*60 + "\n")
         
         # 1. Obtener espacios de Google Chat
-        print("📡 Obteniendo espacios de Google Chat...")
+        print("Obteniendo espacios de Google Chat...")
         creds = Credentials(
             token=session['credentials']['access_token'],
             refresh_token=session['credentials'].get('refresh_token'),
@@ -158,14 +158,14 @@ def export_spaces():
             if not page_token:
                 break
         
-        print(f"✅ Encontrados {len(all_spaces)} espacios totales")
+        print(f"OK - Encontrados {len(all_spaces)} espacios totales")
         
         # Filtrar solo espacios ROOM (no DMs)
         room_spaces = [s for s in all_spaces if s.get('type') == 'ROOM' and s.get('displayName')]
-        print(f"✅ Filtrados {len(room_spaces)} espacios tipo ROOM\n")
+        print(f"OK - Filtrados {len(room_spaces)} espacios tipo ROOM\n")
         
         # 2. Preparar datos para Google Sheets
-        print("📊 Preparando datos para Google Sheets...")
+        print("Preparando datos para Google Sheets...")
         spaces_data = []
         for space in room_spaces:
             spaces_data.append([
@@ -180,15 +180,15 @@ def export_spaces():
         spaces_data.sort(key=lambda x: x[0])
         
         # 3. Conectar a Google Sheets
-        print("📝 Conectando a Google Sheets...")
+        print("Conectando a Google Sheets...")
         gc = gspread.authorize(creds)
         spreadsheet = gc.open_by_key(SPREADSHEET_ID)
         
         try:
             sheet = spreadsheet.worksheet('ChatWebhooks')
-            print("✅ Hoja 'ChatWebhooks' encontrada")
+            print("OK - Hoja 'ChatWebhooks' encontrada")
         except gspread.exceptions.WorksheetNotFound:
-            print("⚠️  Hoja 'ChatWebhooks' no existe. Creándola...")
+            print("AVISO - Hoja 'ChatWebhooks' no existe. Creandola...")
             sheet = spreadsheet.add_worksheet(title='ChatWebhooks', rows=1000, cols=5)
             # Agregar headers
             sheet.update('A1:E1', [[
@@ -198,31 +198,31 @@ def export_spaces():
                 'Miembros',
                 'Última Actualización'
             ]])
-            print("✅ Hoja 'ChatWebhooks' creada")
+            print("OK - Hoja 'ChatWebhooks' creada")
         
         # 4. Escribir datos
-        print(f"💾 Escribiendo {len(spaces_data)} espacios en Google Sheets...")
+        print(f"Escribiendo {len(spaces_data)} espacios en Google Sheets...")
         if spaces_data:
             end_row = len(spaces_data) + 1
             sheet.update(f'A2:E{end_row}', spaces_data)
-            print(f"✅ {len(spaces_data)} espacios exportados correctamente\n")
+            print(f"OK - {len(spaces_data)} espacios exportados correctamente\n")
         else:
-            print("⚠️  No se encontraron espacios para exportar\n")
+            print("AVISO - No se encontraron espacios para exportar\n")
         
         # 5. Mostrar resumen
         print("="*60)
-        print("📋 RESUMEN DE ESPACIOS EXPORTADOS")
+        print("RESUMEN DE ESPACIOS EXPORTADOS")
         print("="*60)
         print(f"\nTotal espacios exportados: {len(spaces_data)}\n")
         print("Primeros 10 espacios:")
         for i, space in enumerate(spaces_data[:10], 1):
-            print(f"  {i:2d}. {space[0]:<30} → {space[1]}")
+            print(f"  {i:2d}. {space[0]:<30} -> {space[1]}")
         
         if len(spaces_data) > 10:
-            print(f"\n  ... y {len(spaces_data) - 10} espacios más")
+            print(f"\n  ... y {len(spaces_data) - 10} espacios mas")
         
         print("\n" + "="*60)
-        print("✅ EXPORTACIÓN COMPLETADA")
+        print("EXPORTACION COMPLETADA")
         print("="*60 + "\n")
         
         # Generar HTML de resultado
@@ -279,7 +279,7 @@ def export_spaces():
         '''
         
     except Exception as e:
-        print(f"\n❌ ERROR durante la exportación: {e}\n")
+        print(f"\nERROR durante la exportacion: {e}\n")
         import traceback
         traceback.print_exc()
         return f'''
@@ -295,14 +295,20 @@ def export_spaces():
         '''
 
 if __name__ == '__main__':
+    # Configurar encoding para Windows
+    import sys
+    import io
+    if sys.platform == 'win32':
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    
     print("\n" + "="*60)
-    print("🚀 EXPORTADOR DE ESPACIOS GOOGLE CHAT")
+    print("EXPORTADOR DE ESPACIOS GOOGLE CHAT")
     print("="*60)
-    print(f"\n📋 Configuración:")
+    print(f"\nConfiguracion:")
     print(f"  - Spreadsheet ID: {SPREADSHEET_ID}")
     print(f"  - Client ID: {CLIENT_ID[:30]}...")
-    print(f"\n🌐 Abriendo servidor en: http://localhost:5000")
-    print("   👆 Abre esta URL en tu navegador\n")
+    print(f"\nAbriendo servidor en: http://localhost:5000")
+    print("   Abre esta URL en tu navegador\n")
     print("="*60 + "\n")
     
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, use_reloader=False)

@@ -1664,6 +1664,93 @@ function createDelivery(deliveryData) {
       }
     };
 
+    // 📢 ENVIAR NOTIFICACIONES AUTOMÁTICAS A GOOGLE CHAT
+    if (updatedRows > 0) {
+      try {
+        console.log('📢 Intentando enviar notificaciones automáticas...');
+        
+        // Obtener información de las órdenes procesadas para construir la notificación
+        const escolaIndex = headers.findIndex(h => h === 'Escola' || h === 'escola');
+        const activitatIndex = headers.findIndex(h => h === 'Activitat' || h === 'activitat');
+        const materialIndex = headers.findIndex(h => h === 'Material' || h === 'material');
+        
+        // Recopilar información de las órdenes actualizadas
+        const processedOrders = [];
+        for (let i = 1; i < values.length; i++) {
+          const row = values[i];
+          const idItem = row[columnIndices.idItem];
+          
+          if (deliveryData.orderIds.includes(idItem)) {
+            processedOrders.push({
+              escola: escolaIndex !== -1 ? row[escolaIndex] : '',
+              activitat: activitatIndex !== -1 ? row[activitatIndex] : '',
+              material: materialIndex !== -1 ? row[materialIndex] : ''
+            });
+          }
+        }
+        
+        // Obtener escola y activitat de la primera orden (asumiendo que todas son de la misma)
+        if (processedOrders.length > 0) {
+          const firstOrder = processedOrders[0];
+          const escola = firstOrder.escola;
+          const activitat = firstOrder.activitat;
+          
+          // Construir nombre del espacio: /EscolaActividad
+          // Ejemplo: "Lestonnac" + "DX1" = "/LestonnacDX1"
+          const spaceName = `/${escola}${activitat}`;
+          
+          console.log(`📍 Espacio calculado: ${spaceName}`);
+          
+          // Construir mensaje de notificación
+          let mensaje = `🚀 **Nova entrega assignada**\n\n`;
+          mensaje += `📦 **Modalitat:** ${deliveryData.modalitat}\n`;
+          mensaje += `🏫 **Escola:** ${escola}\n`;
+          mensaje += `📚 **Activitat:** ${activitat}\n`;
+          mensaje += `📊 **Comandes:** ${updatedRows}\n`;
+          
+          if (deliveryData.modalitat === 'Intermediari') {
+            mensaje += `👤 **Monitor:** ${deliveryData.monitorIntermediaria || 'No especificat'}\n`;
+            mensaje += `🎯 **Escola destí:** ${calculatedEscolaDestino}\n`;
+          }
+          
+          mensaje += `📅 **Data entrega:** ${deliveryData.dataEntrega || 'No especificada'}\n\n`;
+          
+          // Listar materiales
+          const materials = processedOrders.map(o => o.material).filter(Boolean);
+          if (materials.length > 0) {
+            mensaje += `📋 **Materials:**\n`;
+            // Agrupar materiales únicos
+            const uniqueMaterials = [...new Set(materials)];
+            uniqueMaterials.forEach(mat => {
+              const count = materials.filter(m => m === mat).length;
+              mensaje += `  • ${mat} (${count})\n`;
+            });
+          }
+          
+          // Enviar notificación
+          const notificationResult = sendChatNotification(spaceName, mensaje);
+          
+          if (notificationResult.success) {
+            console.log('✅ Notificación enviada correctamente');
+            result.notificationSent = true;
+            result.notificationSpace = spaceName;
+          } else {
+            console.warn('⚠️ No se pudo enviar la notificación:', notificationResult.error);
+            result.notificationSent = false;
+            result.notificationError = notificationResult.error;
+          }
+        } else {
+          console.log('ℹ️ No se pudieron obtener datos de las órdenes para la notificación');
+        }
+        
+      } catch (notifError) {
+        console.error('❌ Error enviando notificación automática:', notifError);
+        // No fallar la operación principal si falla la notificación
+        result.notificationSent = false;
+        result.notificationError = notifError.toString();
+      }
+    }
+
     console.log('🎉 CREATEDELIVERY SUCCESS:', JSON.stringify(result, null, 2));
     return result;
 
@@ -2004,6 +2091,7 @@ function setupChatWebhooksSheet() {
       // Configurar headers
       const headers = [
         'Nombre Espacio',
+        'Webhook URL',
         'Space ID',
         'Fecha Creación',
         'Miembros',
@@ -2018,10 +2106,11 @@ function setupChatWebhooksSheet() {
       
       // Ajustar anchos de columna
       sheet.setColumnWidth(1, 200); // Nombre Espacio
-      sheet.setColumnWidth(2, 250); // Space ID
-      sheet.setColumnWidth(3, 180); // Fecha Creación
-      sheet.setColumnWidth(4, 100); // Miembros
-      sheet.setColumnWidth(5, 180); // Última Actualización
+      sheet.setColumnWidth(2, 400); // Webhook URL
+      sheet.setColumnWidth(3, 250); // Space ID
+      sheet.setColumnWidth(4, 180); // Fecha Creación
+      sheet.setColumnWidth(5, 100); // Miembros
+      sheet.setColumnWidth(6, 180); // Última Actualización
       
       // Proteger la hoja para evitar ediciones accidentales
       const protection = sheet.protect();
@@ -2040,10 +2129,117 @@ function setupChatWebhooksSheet() {
 }
 
 /**
+ * Migra la hoja ChatWebhooks de la estructura antigua a la nueva
+ * Añade la columna "Webhook URL" entre "Nombre Espacio" y "Space ID"
+ */
+function migrateChatWebhooksSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('ChatWebhooks');
+    
+    if (!sheet) {
+      console.error('❌ Hoja ChatWebhooks no existe');
+      return { success: false, error: 'Hoja ChatWebhooks no existe' };
+    }
+    
+    console.log('🔄 Iniciando migración de la hoja ChatWebhooks...');
+    
+    // Verificar estructura actual leyendo los headers
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    console.log('📋 Headers actuales:', currentHeaders);
+    
+    // Verificar si ya tiene la columna "Webhook URL"
+    if (currentHeaders[1] === 'Webhook URL') {
+      console.log('✅ La hoja ya tiene la estructura correcta');
+      return { success: true, message: 'La hoja ya está migrada' };
+    }
+    
+    // Estructura antigua esperada: Nombre Espacio, Space ID, Fecha Creación, Miembros, Última Actualización
+    if (currentHeaders[1] !== 'Space ID') {
+      console.error('❌ Estructura inesperada. Se esperaba "Space ID" en columna B');
+      return { success: false, error: 'Estructura de hoja no reconocida' };
+    }
+    
+    // Insertar nueva columna B para "Webhook URL"
+    console.log('➕ Insertando columna "Webhook URL" en posición B...');
+    sheet.insertColumnBefore(2); // Insertar antes de la columna 2 (actual Space ID)
+    
+    // Actualizar header de la nueva columna B
+    sheet.getRange(1, 2).setValue('Webhook URL');
+    
+    // Aplicar formato al header
+    const headerRange = sheet.getRange(1, 1, 1, 6);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#4285F4');
+    headerRange.setFontColor('#FFFFFF');
+    
+    // Ajustar anchos de columna
+    sheet.setColumnWidth(2, 400); // Webhook URL
+    sheet.setColumnWidth(3, 250); // Space ID
+    
+    console.log('✅ Migración completada correctamente');
+    console.log('📊 Nueva estructura:');
+    console.log('   A: Nombre Espacio');
+    console.log('   B: Webhook URL (NUEVA - vacía por ahora)');
+    console.log('   C: Space ID');
+    console.log('   D: Fecha Creación');
+    console.log('   E: Miembros');
+    console.log('   F: Última Actualización');
+    
+    return { 
+      success: true, 
+      message: 'Hoja migrada correctamente. Añade las Webhook URLs en la columna B.',
+      rowsAffected: sheet.getLastRow() - 1 // -1 para excluir header
+    };
+    
+  } catch (error) {
+    console.error('❌ Error durante la migración:', error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
  * Busca el Space ID de un espacio por su nombre
  * @param {string} spaceName - Nombre del espacio (ej: "/LestonnacDX1")
  * @return {string|null} - Space ID o null si no se encuentra
  */
+/**
+ * Obtiene la Webhook URL de un espacio por su nombre
+ */
+function getWebhookUrlByName(spaceName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('ChatWebhooks');
+    
+    if (!sheet) {
+      console.error('❌ Hoja ChatWebhooks no existe. Ejecuta setupChatWebhooksSheet() primero.');
+      return null;
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    
+    // Buscar en la columna A (Nombre Espacio)
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === spaceName) {
+        const webhookUrl = data[i][1]; // Columna B = Webhook URL
+        if (webhookUrl && webhookUrl.toString().trim() !== '') {
+          console.log(`✅ Webhook URL encontrada para ${spaceName}`);
+          return webhookUrl;
+        } else {
+          console.warn(`⚠️ Webhook URL vacía para: ${spaceName}`);
+          return null;
+        }
+      }
+    }
+    
+    console.warn(`⚠️ No se encontró espacio con nombre: ${spaceName}`);
+    return null;
+  } catch (error) {
+    console.error('❌ Error buscando Webhook URL:', error);
+    return null;
+  }
+}
+
 function getSpaceIdByName(spaceName) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2059,7 +2255,7 @@ function getSpaceIdByName(spaceName) {
     // Buscar en la columna A (Nombre Espacio)
     for (let i = 1; i < data.length; i++) {
       if (data[i][0] === spaceName) {
-        const spaceId = data[i][1]; // Columna B = Space ID
+        const spaceId = data[i][2]; // Columna C = Space ID (ahora es la tercera columna)
         console.log(`✅ Space ID encontrado para ${spaceName}: ${spaceId}`);
         return spaceId;
       }
@@ -2083,11 +2279,11 @@ function sendChatNotification(spaceName, message) {
   try {
     console.log(`📤 Intentando enviar notificación a: ${spaceName}`);
     
-    // Buscar Space ID
-    const spaceId = getSpaceIdByName(spaceName);
+    // Buscar Webhook URL
+    const webhookUrl = getWebhookUrlByName(spaceName);
     
-    if (!spaceId) {
-      const errorMsg = `Espacio no encontrado en ChatWebhooks: ${spaceName}`;
+    if (!webhookUrl) {
+      const errorMsg = `No se encontró Webhook URL para: ${spaceName}. Verifica la hoja ChatWebhooks.`;
       console.error(`❌ ${errorMsg}`);
       return { 
         success: false, 
@@ -2097,28 +2293,45 @@ function sendChatNotification(spaceName, message) {
     }
     
     // Construir mensaje para Google Chat
-    const chatMessage = {
+    const payload = {
       text: message
     };
     
-    // Enviar mensaje usando Google Chat API Advanced Service
+    // Configurar la petición HTTP
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    // Enviar mensaje usando Webhook
     try {
-      Chat.Spaces.Messages.create(chatMessage, spaceId);
-      console.log(`✅ Mensaje enviado correctamente a ${spaceName}`);
+      const response = UrlFetchApp.fetch(webhookUrl, options);
+      const responseCode = response.getResponseCode();
       
-      return { 
-        success: true, 
-        spaceName: spaceName,
-        spaceId: spaceId,
-        message: 'Notificación enviada correctamente'
-      };
-    } catch (chatError) {
-      console.error(`❌ Error de Google Chat API:`, chatError);
+      if (responseCode === 200) {
+        console.log(`✅ Mensaje enviado correctamente a ${spaceName}`);
+        return { 
+          success: true, 
+          spaceName: spaceName,
+          message: 'Notificación enviada correctamente'
+        };
+      } else {
+        const errorMsg = `Error HTTP ${responseCode}: ${response.getContentText()}`;
+        console.error(`❌ ${errorMsg}`);
+        return { 
+          success: false, 
+          error: errorMsg,
+          spaceName: spaceName
+        };
+      }
+    } catch (fetchError) {
+      console.error(`❌ Error enviando webhook:`, fetchError);
       return { 
         success: false, 
-        error: `Error de Google Chat API: ${chatError.toString()}`,
-        spaceName: spaceName,
-        spaceId: spaceId
+        error: `Error enviando webhook: ${fetchError.toString()}`,
+        spaceName: spaceName
       };
     }
   } catch (error) {
