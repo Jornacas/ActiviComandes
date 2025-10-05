@@ -1,0 +1,41 @@
+# Excluir carpetas temporales
+temp-clasp/**
+temp-deploy-fix/**
+temp-deploy-minimal/**
+
+# Excluir archivos de backup
+*_backup*.gs
+Code_backup_*.gs
+createDelivery_*.gs
+getDeliveryOptions_*.js
+
+# Excluir carpetas de Node.js
+node_modules/**
+**/node_modules/**
+
+# Excluir archivos de frontend
+frontend/**
+app-mobil/**
+
+# Excluir archivos markdown y documentación
+*.md
+README.md
+**/*.md
+
+# Excluir archivos Python
+*.py
+**/*.py
+
+# Excluir archivos de configuración
+.git/**
+.github/**
+.gitignore
+package.json
+package-lock.json
+tsconfig.json
+next.config.js
+vercel.json
+
+# Excluir archivos HTML
+*.html
+**/*.html
