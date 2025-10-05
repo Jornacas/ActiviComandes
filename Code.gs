@@ -1983,3 +1983,177 @@ function findAnySchoolForMonitor(monitorName) {
     return null;
   }
 }
+
+// ======================================================
+// GOOGLE CHAT NOTIFICATIONS SYSTEM
+// ======================================================
+
+/**
+ * Configura la hoja ChatWebhooks si no existe
+ * Esta hoja almacenará los Space IDs de cada espacio de Google Chat
+ */
+function setupChatWebhooksSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('ChatWebhooks');
+    
+    if (!sheet) {
+      console.log('Creando hoja ChatWebhooks...');
+      sheet = ss.insertSheet('ChatWebhooks');
+      
+      // Configurar headers
+      const headers = [
+        'Nombre Espacio',
+        'Space ID',
+        'Fecha Creación',
+        'Miembros',
+        'Última Actualización'
+      ];
+      
+      const headerRange = sheet.getRange(1, 1, 1, headers.length);
+      headerRange.setValues([headers]);
+      headerRange.setFontWeight('bold');
+      headerRange.setBackground('#4285F4');
+      headerRange.setFontColor('#FFFFFF');
+      
+      // Ajustar anchos de columna
+      sheet.setColumnWidth(1, 200); // Nombre Espacio
+      sheet.setColumnWidth(2, 250); // Space ID
+      sheet.setColumnWidth(3, 180); // Fecha Creación
+      sheet.setColumnWidth(4, 100); // Miembros
+      sheet.setColumnWidth(5, 180); // Última Actualización
+      
+      // Proteger la hoja para evitar ediciones accidentales
+      const protection = sheet.protect();
+      protection.setDescription('Hoja protegida - datos de Google Chat API');
+      
+      console.log('✅ Hoja ChatWebhooks creada correctamente');
+      return { success: true, message: 'Hoja ChatWebhooks creada' };
+    } else {
+      console.log('ℹ️ La hoja ChatWebhooks ya existe');
+      return { success: true, message: 'La hoja ChatWebhooks ya existe' };
+    }
+  } catch (error) {
+    console.error('❌ Error creando hoja ChatWebhooks:', error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * Busca el Space ID de un espacio por su nombre
+ * @param {string} spaceName - Nombre del espacio (ej: "/LestonnacDX1")
+ * @return {string|null} - Space ID o null si no se encuentra
+ */
+function getSpaceIdByName(spaceName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('ChatWebhooks');
+    
+    if (!sheet) {
+      console.error('❌ Hoja ChatWebhooks no existe. Ejecuta setupChatWebhooksSheet() primero.');
+      return null;
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    
+    // Buscar en la columna A (Nombre Espacio)
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === spaceName) {
+        const spaceId = data[i][1]; // Columna B = Space ID
+        console.log(`✅ Space ID encontrado para ${spaceName}: ${spaceId}`);
+        return spaceId;
+      }
+    }
+    
+    console.warn(`⚠️ No se encontró Space ID para: ${spaceName}`);
+    return null;
+  } catch (error) {
+    console.error('❌ Error buscando Space ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Envía una notificación a un espacio de Google Chat
+ * @param {string} spaceName - Nombre del espacio (ej: "/LestonnacDX1")
+ * @param {string} message - Mensaje a enviar
+ * @return {Object} - Resultado del envío
+ */
+function sendChatNotification(spaceName, message) {
+  try {
+    console.log(`📤 Intentando enviar notificación a: ${spaceName}`);
+    
+    // Buscar Space ID
+    const spaceId = getSpaceIdByName(spaceName);
+    
+    if (!spaceId) {
+      const errorMsg = `Espacio no encontrado en ChatWebhooks: ${spaceName}`;
+      console.error(`❌ ${errorMsg}`);
+      return { 
+        success: false, 
+        error: errorMsg,
+        spaceName: spaceName 
+      };
+    }
+    
+    // Construir mensaje para Google Chat
+    const chatMessage = {
+      text: message
+    };
+    
+    // Enviar mensaje usando Google Chat API Advanced Service
+    try {
+      Chat.Spaces.Messages.create(chatMessage, spaceId);
+      console.log(`✅ Mensaje enviado correctamente a ${spaceName}`);
+      
+      return { 
+        success: true, 
+        spaceName: spaceName,
+        spaceId: spaceId,
+        message: 'Notificación enviada correctamente'
+      };
+    } catch (chatError) {
+      console.error(`❌ Error de Google Chat API:`, chatError);
+      return { 
+        success: false, 
+        error: `Error de Google Chat API: ${chatError.toString()}`,
+        spaceName: spaceName,
+        spaceId: spaceId
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error general en sendChatNotification:', error);
+    return { 
+      success: false, 
+      error: error.toString(),
+      spaceName: spaceName
+    };
+  }
+}
+
+/**
+ * Función de prueba para verificar que todo funciona
+ */
+function testChatNotification() {
+  // Primero configurar la hoja
+  const setupResult = setupChatWebhooksSheet();
+  console.log('Setup result:', setupResult);
+  
+  // Mensaje de prueba
+  const testMessage = `🔔 TEST DE NOTIFICACIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Aquest és un missatge de prova del sistema de notificacions.
+Si reps això, el sistema funciona correctament! ✅
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+  
+  // IMPORTANTE: Cambiar esto por un espacio real que tengas
+  const testSpaceName = '/LestonnacDX1'; // Cambiar por un espacio real
+  
+  console.log(`\n🧪 Enviando mensaje de prueba a: ${testSpaceName}`);
+  const result = sendChatNotification(testSpaceName, testMessage);
+  
+  console.log('\n📊 Resultado del test:');
+  console.log(JSON.stringify(result, null, 2));
+  
+  return result;
+}
