@@ -2320,27 +2320,51 @@ function sendChatNotification(spaceName, message) {
       };
     }
     
-    // Enviar mensaje usando Chat API (Advanced Service)
+    // Enviar mensaje usando Chat API REST (sin necesidad de configurar Chat app)
     try {
-      const chatMessage = {
+      const url = `https://chat.googleapis.com/v1/${spaceId}/messages`;
+      const payload = JSON.stringify({
         text: message
+      });
+
+      const options = {
+        method: 'post',
+        contentType: 'application/json',
+        headers: {
+          'Authorization': 'Bearer ' + ScriptApp.getOAuthToken()
+        },
+        payload: payload,
+        muteHttpExceptions: true
       };
-      
-      const response = Chat.Spaces.Messages.create(chatMessage, spaceId);
-      
-      console.log(`✅ Mensaje enviado correctamente a ${spaceName} (${spaceId})`);
-      return { 
-        success: true, 
-        spaceName: spaceName,
-        spaceId: spaceId,
-        message: 'Notificación enviada correctamente',
-        messageId: response.name
-      };
-      
+
+      const response = UrlFetchApp.fetch(url, options);
+      const responseCode = response.getResponseCode();
+
+      if (responseCode === 200) {
+        const result = JSON.parse(response.getContentText());
+        console.log(`✅ Mensaje enviado correctamente a ${spaceName} (${spaceId})`);
+        return {
+          success: true,
+          spaceName: spaceName,
+          spaceId: spaceId,
+          message: 'Notificación enviada correctamente',
+          messageId: result.name
+        };
+      } else {
+        const errorText = response.getContentText();
+        console.error(`❌ Error ${responseCode} enviando mensaje:`, errorText);
+        return {
+          success: false,
+          error: `Error de Chat API (${responseCode}): ${errorText}`,
+          spaceName: spaceName,
+          spaceId: spaceId
+        };
+      }
+
     } catch (apiError) {
       console.error(`❌ Error enviando mensaje con Chat API:`, apiError);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: `Error de Chat API: ${apiError.toString()}`,
         spaceName: spaceName,
         spaceId: spaceId
