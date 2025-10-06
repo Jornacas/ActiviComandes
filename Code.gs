@@ -1692,53 +1692,109 @@ function createDelivery(deliveryData) {
         // Obtener escola y activitat de la primera orden (asumiendo que todas son de la misma)
         if (processedOrders.length > 0) {
           const firstOrder = processedOrders[0];
-          const escola = firstOrder.escola;
+          const escolaOrigen = firstOrder.escola;
           const activitat = firstOrder.activitat;
-          
-          // Construir nombre del espacio: /EscolaActividad
-          // Ejemplo: "Lestonnac" + "DX1" = "/LestonnacDX1"
-          const spaceName = `/${escola}${activitat}`;
-          
-          console.log(`📍 Espacio calculado: ${spaceName}`);
-          
-          // Construir mensaje de notificación
-          let mensaje = `🚀 **Nova entrega assignada**\n\n`;
-          mensaje += `📦 **Modalitat:** ${deliveryData.modalitat}\n`;
-          mensaje += `🏫 **Escola:** ${escola}\n`;
-          mensaje += `📚 **Activitat:** ${activitat}\n`;
-          mensaje += `📊 **Comandes:** ${updatedRows}\n`;
-          
-          if (deliveryData.modalitat === 'Intermediari') {
-            mensaje += `👤 **Monitor:** ${deliveryData.monitorIntermediaria || 'No especificat'}\n`;
-            mensaje += `🎯 **Escola destí:** ${calculatedEscolaDestino}\n`;
-          }
-          
-          mensaje += `📅 **Data entrega:** ${deliveryData.dataEntrega || 'No especificada'}\n\n`;
-          
-          // Listar materiales
+
+          // Listar materiales para los mensajes
           const materials = processedOrders.map(o => o.material).filter(Boolean);
+          let materialsText = '';
           if (materials.length > 0) {
-            mensaje += `📋 **Materials:**\n`;
-            // Agrupar materiales únicos
             const uniqueMaterials = [...new Set(materials)];
-            uniqueMaterials.forEach(mat => {
+            materialsText = uniqueMaterials.map(mat => {
               const count = materials.filter(m => m === mat).length;
-              mensaje += `  • ${mat} (${count})\n`;
-            });
+              return `${mat} (${count} unitats)`;
+            }).join('\n');
           }
-          
-          // Enviar notificación
-          const notificationResult = sendChatNotification(spaceName, mensaje);
-          
-          if (notificationResult.success) {
-            console.log('✅ Notificación enviada correctamente');
-            result.notificationSent = true;
-            result.notificationSpace = spaceName;
+
+          // 📬 LÓGICA DE ENVÍO DE NOTIFICACIONES
+          const notificationResults = [];
+
+          if (deliveryData.modalitat === 'Intermediari') {
+            // INTERMEDIARI: Enviar a 2 espacios
+
+            // 1. Notificación al monitor intermediario (escuela destino - donde recoge)
+            const spaceDestino = `/${calculatedEscolaDestino}${activitat}`;
+            const mensajeDestino = `🔔 **NOVA ASSIGNACIÓ DE MATERIAL**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 **Intermediari:** ${deliveryData.monitorIntermediaria || 'No especificat'}
+
+📥 **REBRÀS MATERIAL:**
+🏫 **Escola:** ${calculatedEscolaDestino} (la teva escola)
+📅 **Data:** ${deliveryData.dataEntrega || 'No especificada'}
+📦 **Material:**
+${materialsText}
+
+📤 **LLIURARÀS MATERIAL:**
+🏫 **Escola:** ${escolaOrigen}
+📅 **Data:** ${deliveryData.dataEntrega || 'No especificada'}
+👤 **Per:** Monitor de ${escolaOrigen}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+            console.log(`📍 Enviando a espacio DESTINO (intermediario): ${spaceDestino}`);
+            const resultDestino = sendChatNotification(spaceDestino, mensajeDestino);
+            notificationResults.push({ space: spaceDestino, result: resultDestino });
+
+            // 2. Notificación al monitor origen (donde recibe el material)
+            const spaceOrigen = `/${escolaOrigen}${activitat}`;
+            const mensajeOrigen = `📦 **MATERIAL ASSIGNAT PER LLIURAMENT**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏫 **Escola:** ${escolaOrigen}
+
+📦 **MATERIAL:**
+${materialsText}
+
+🚚 **LLIURAMENT:**
+👤 **Intermediari:** ${deliveryData.monitorIntermediaria || 'No especificat'}
+🏫 **Recollirà de:** ${calculatedEscolaDestino}
+📅 **Data:** ${deliveryData.dataEntrega || 'No especificada'}
+⏰ **Hora:** Durant l'activitat
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+            console.log(`📍 Enviando a espacio ORIGEN: ${spaceOrigen}`);
+            const resultOrigen = sendChatNotification(spaceOrigen, mensajeOrigen);
+            notificationResults.push({ space: spaceOrigen, result: resultOrigen });
+
           } else {
-            console.warn('⚠️ No se pudo enviar la notificación:', notificationResult.error);
-            result.notificationSent = false;
-            result.notificationError = notificationResult.error;
+            // DIRECTA: Enviar solo a origen
+            const spaceOrigen = `/${escolaOrigen}${activitat}`;
+            const mensajeDirecto = `📦 **MATERIAL ASSIGNAT (Lliurament Directe)**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏫 **Escola:** ${escolaOrigen}
+
+📦 **MATERIAL:**
+${materialsText}
+
+📅 **Data entrega:** ${deliveryData.dataEntrega || 'No especificada'}
+⏰ **Hora:** Durant l'activitat
+🚚 **Modalitat:** Lliurament directe
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+            console.log(`📍 Enviando a espacio ORIGEN (entrega directa): ${spaceOrigen}`);
+            const resultOrigen = sendChatNotification(spaceOrigen, mensajeDirecto);
+            notificationResults.push({ space: spaceOrigen, result: resultOrigen });
           }
+
+          // Procesar resultados de notificaciones
+          const successfulNotifications = notificationResults.filter(n => n.result.success);
+          const failedNotifications = notificationResults.filter(n => !n.result.success);
+
+          if (successfulNotifications.length > 0) {
+            console.log(`✅ ${successfulNotifications.length} notificación(es) enviada(s) correctamente`);
+            result.notificationSent = true;
+            result.notificationSpaces = successfulNotifications.map(n => n.space);
+          }
+
+          if (failedNotifications.length > 0) {
+            console.warn(`⚠️ ${failedNotifications.length} notificación(es) fallida(s)`);
+            result.notificationErrors = failedNotifications.map(n => ({
+              space: n.space,
+              error: n.result.error
+            }));
+          }
+
         } else {
           console.log('ℹ️ No se pudieron obtener datos de las órdenes para la notificación');
         }
@@ -2272,24 +2328,81 @@ function getSpaceIdByName(spaceName) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('ChatWebhooks');
-    
+
     if (!sheet) {
       console.error('❌ Hoja ChatWebhooks no existe. Ejecuta setupChatWebhooksSheet() primero.');
       return null;
     }
-    
+
     const data = sheet.getDataRange().getValues();
-    
-    // Buscar en la columna A (Nombre Espacio)
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0] === spaceName) {
-        const spaceId = data[i][1]; // Columna B = Space ID
-        console.log(`✅ Space ID encontrado para ${spaceName}: ${spaceId}`);
-        return spaceId;
+
+    // Función auxiliar para buscar un nombre específico
+    const findSpaceId = (name) => {
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === name) {
+          const spaceId = data[i][1]; // Columna B = Space ID
+          console.log(`✅ Space ID encontrado para ${name}: ${spaceId}`);
+          return spaceId;
+        }
+      }
+      return null;
+    };
+
+    // 1. Intentar búsqueda exacta
+    let spaceId = findSpaceId(spaceName);
+    if (spaceId) return spaceId;
+
+    // 2. Si no se encuentra, intentar variaciones con fallback
+    console.log(`🔍 Búsqueda con fallback para: ${spaceName}`);
+
+    // Extraer componentes del nombre
+    // Ejemplos: "/VilaOlimpicaCO1" → "VilaOlimpica" + "CO1"
+    //           "/Espai3DX" → "Espai3" + "DX"
+    //           "/LestonnacHC2" → "Lestonnac" + "HC2"
+    //           "/Espai3CO1DX2" → "Espai3" + "CO1DX2"
+
+    // Buscar el primer patrón de actividad (2-3 letras mayúsculas, opcionalmente seguidas de número)
+    const actividadMatch = spaceName.match(/([A-Z]{2,3}\d*)/);
+
+    if (actividadMatch) {
+      const primeraActividad = actividadMatch[0]; // "CO1", "DX", "HC2", etc.
+      const indexActividad = spaceName.indexOf(primeraActividad);
+      const escola = spaceName.substring(1, indexActividad); // Quitar "/" inicial y extraer escola
+      const todasActividades = spaceName.substring(indexActividad); // "CO1", "DX", "CO1DX2"
+
+      // Extraer actividad sin número (ej: "CO1" → "CO", "DX" → "DX")
+      const activitatSinNumero = primeraActividad.replace(/\d+$/, '');
+
+      // Lista de variaciones a intentar
+      const variaciones = [
+        `/${escola}${activitatSinNumero}`, // "/VilaOlimpicaCO" o "/Espai3DX"
+        `/${escola}`, // "/VilaOlimpica" o "/Espai3"
+        `/${escola.toLowerCase()}${todasActividades}`, // "/vilaolimpicaco1"
+      ];
+
+      // Intentar cada variación
+      for (const variacion of variaciones) {
+        console.log(`   🔎 Intentando: ${variacion}`);
+        spaceId = findSpaceId(variacion);
+        if (spaceId) {
+          console.log(`   ✅ Encontrado con fallback: ${variacion}`);
+          return spaceId;
+        }
+      }
+
+      // Última opción: buscar espacios que contengan la escuela (para casos como /VilaOlimpicaCO-DIMECRES)
+      console.log(`   🔎 Buscando espacios que contengan: ${escola}`);
+      for (let i = 1; i < data.length; i++) {
+        const nombreEspacio = data[i][0];
+        if (nombreEspacio && nombreEspacio.includes(escola)) {
+          const spaceId = data[i][1];
+          console.log(`   ⚠️ Coincidencia parcial encontrada: ${nombreEspacio} → ${spaceId}`);
+          return spaceId;
+        }
       }
     }
-    
-    console.warn(`⚠️ No se encontró Space ID para: ${spaceName}`);
+
+    console.warn(`⚠️ No se encontró Space ID para: ${spaceName} (ni variaciones)`);
     return null;
   } catch (error) {
     console.error('❌ Error buscando Space ID:', error);
@@ -2406,3 +2519,16 @@ Si reps això, el sistema funciona correctament! ✅
   
   return result;
 }
+function testDualNotification() {
+    const testData = {
+      orderIds: ['e7b05f61-d049-4d06-85c1-541a192697dc-001'],
+      modalitat: 'Intermediari',
+      monitorIntermediaria: 'Judit Pesquero',
+      escolaDestinoIntermediaria: 'SantMarti',
+      dataEntrega: '2025-10-02'
+    };
+
+    const result = createDelivery(testData);
+    console.log(JSON.stringify(result, null, 2));
+    return result;
+  }
