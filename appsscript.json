@@ -6,12 +6,18 @@
         "userSymbol": "Maps",
         "serviceId": "maps",
         "version": "v1"
+      },
+      {
+        "userSymbol": "Chat",
+        "serviceId": "chat",
+        "version": "v1"
       }
     ]
   },
   "oauthScopes": [
     "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/script.external_request"
+    "https://www.googleapis.com/auth/chat.messages",
+    "https://www.googleapis.com/auth/chat.spaces.readonly"
   ],
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8"

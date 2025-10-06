@@ -2203,43 +2203,6 @@ function migrateChatWebhooksSheet() {
  * @param {string} spaceName - Nombre del espacio (ej: "/LestonnacDX1")
  * @return {string|null} - Space ID o null si no se encuentra
  */
-/**
- * Obtiene la Webhook URL de un espacio por su nombre
- */
-function getWebhookUrlByName(spaceName) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('ChatWebhooks');
-    
-    if (!sheet) {
-      console.error('❌ Hoja ChatWebhooks no existe. Ejecuta setupChatWebhooksSheet() primero.');
-      return null;
-    }
-    
-    const data = sheet.getDataRange().getValues();
-    
-    // Buscar en la columna A (Nombre Espacio)
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0] === spaceName) {
-        const webhookUrl = data[i][1]; // Columna B = Webhook URL
-        if (webhookUrl && webhookUrl.toString().trim() !== '') {
-          console.log(`✅ Webhook URL encontrada para ${spaceName}`);
-          return webhookUrl;
-        } else {
-          console.warn(`⚠️ Webhook URL vacía para: ${spaceName}`);
-          return null;
-        }
-      }
-    }
-    
-    console.warn(`⚠️ No se encontró espacio con nombre: ${spaceName}`);
-    return null;
-  } catch (error) {
-    console.error('❌ Error buscando Webhook URL:', error);
-    return null;
-  }
-}
-
 function getSpaceIdByName(spaceName) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2270,7 +2233,7 @@ function getSpaceIdByName(spaceName) {
 }
 
 /**
- * Envía una notificación a un espacio de Google Chat
+ * Envía una notificación a un espacio de Google Chat usando Chat API
  * @param {string} spaceName - Nombre del espacio (ej: "/LestonnacDX1")
  * @param {string} message - Mensaje a enviar
  * @return {Object} - Resultado del envío
@@ -2279,11 +2242,11 @@ function sendChatNotification(spaceName, message) {
   try {
     console.log(`📤 Intentando enviar notificación a: ${spaceName}`);
     
-    // Buscar Webhook URL
-    const webhookUrl = getWebhookUrlByName(spaceName);
+    // Buscar Space ID (en lugar de Webhook URL)
+    const spaceId = getSpaceIdByName(spaceName);
     
-    if (!webhookUrl) {
-      const errorMsg = `No se encontró Webhook URL para: ${spaceName}. Verifica la hoja ChatWebhooks.`;
+    if (!spaceId) {
+      const errorMsg = `No se encontró Space ID para: ${spaceName}. Verifica la hoja ChatWebhooks.`;
       console.error(`❌ ${errorMsg}`);
       return { 
         success: false, 
@@ -2292,46 +2255,30 @@ function sendChatNotification(spaceName, message) {
       };
     }
     
-    // Construir mensaje para Google Chat
-    const payload = {
-      text: message
-    };
-    
-    // Configurar la petición HTTP
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
-    
-    // Enviar mensaje usando Webhook
+    // Enviar mensaje usando Chat API (Advanced Service)
     try {
-      const response = UrlFetchApp.fetch(webhookUrl, options);
-      const responseCode = response.getResponseCode();
+      const chatMessage = {
+        text: message
+      };
       
-      if (responseCode === 200) {
-        console.log(`✅ Mensaje enviado correctamente a ${spaceName}`);
-        return { 
-          success: true, 
-          spaceName: spaceName,
-          message: 'Notificación enviada correctamente'
-        };
-      } else {
-        const errorMsg = `Error HTTP ${responseCode}: ${response.getContentText()}`;
-        console.error(`❌ ${errorMsg}`);
-        return { 
-          success: false, 
-          error: errorMsg,
-          spaceName: spaceName
-        };
-      }
-    } catch (fetchError) {
-      console.error(`❌ Error enviando webhook:`, fetchError);
+      const response = Chat.Spaces.Messages.create(chatMessage, spaceId);
+      
+      console.log(`✅ Mensaje enviado correctamente a ${spaceName} (${spaceId})`);
+      return { 
+        success: true, 
+        spaceName: spaceName,
+        spaceId: spaceId,
+        message: 'Notificación enviada correctamente',
+        messageId: response.name
+      };
+      
+    } catch (apiError) {
+      console.error(`❌ Error enviando mensaje con Chat API:`, apiError);
       return { 
         success: false, 
-        error: `Error enviando webhook: ${fetchError.toString()}`,
-        spaceName: spaceName
+        error: `Error de Chat API: ${apiError.toString()}`,
+        spaceName: spaceName,
+        spaceId: spaceId
       };
     }
   } catch (error) {
