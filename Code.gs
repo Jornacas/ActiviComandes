@@ -2088,10 +2088,9 @@ function setupChatWebhooksSheet() {
       console.log('Creando hoja ChatWebhooks...');
       sheet = ss.insertSheet('ChatWebhooks');
       
-      // Configurar headers
+      // Configurar headers (SIN columna Webhook URL)
       const headers = [
         'Nombre Espacio',
-        'Webhook URL',
         'Space ID',
         'Fecha Creación',
         'Miembros',
@@ -2106,17 +2105,17 @@ function setupChatWebhooksSheet() {
       
       // Ajustar anchos de columna
       sheet.setColumnWidth(1, 200); // Nombre Espacio
-      sheet.setColumnWidth(2, 400); // Webhook URL
-      sheet.setColumnWidth(3, 250); // Space ID
-      sheet.setColumnWidth(4, 180); // Fecha Creación
-      sheet.setColumnWidth(5, 100); // Miembros
-      sheet.setColumnWidth(6, 180); // Última Actualización
+      sheet.setColumnWidth(2, 250); // Space ID
+      sheet.setColumnWidth(3, 180); // Fecha Creación
+      sheet.setColumnWidth(4, 100); // Miembros
+      sheet.setColumnWidth(5, 180); // Última Actualización
       
       // Proteger la hoja para evitar ediciones accidentales
       const protection = sheet.protect();
       protection.setDescription('Hoja protegida - datos de Google Chat API');
       
       console.log('✅ Hoja ChatWebhooks creada correctamente');
+      console.log('📊 Estructura: Nombre Espacio | Space ID | Fecha | Miembros | Actualización');
       return { success: true, message: 'Hoja ChatWebhooks creada' };
     } else {
       console.log('ℹ️ La hoja ChatWebhooks ya existe');
@@ -2129,10 +2128,76 @@ function setupChatWebhooksSheet() {
 }
 
 /**
- * Migra la hoja ChatWebhooks de la estructura antigua a la nueva
- * Añade la columna "Webhook URL" entre "Nombre Espacio" y "Space ID"
+ * Elimina la columna "Webhook URL" de la hoja ChatWebhooks si existe
+ * Migra de la estructura antigua (con webhooks) a la nueva (solo Chat API)
  */
-function migrateChatWebhooksSheet() {
+function removeWebhookUrlColumn() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('ChatWebhooks');
+    
+    if (!sheet) {
+      console.error('❌ Hoja ChatWebhooks no existe');
+      return { success: false, error: 'Hoja ChatWebhooks no existe' };
+    }
+    
+    console.log('🔄 Verificando estructura de la hoja ChatWebhooks...');
+    
+    // Leer headers actuales
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    console.log('📋 Headers actuales:', currentHeaders);
+    
+    // Verificar si tiene la columna "Webhook URL" en posición B
+    if (currentHeaders[1] !== 'Webhook URL') {
+      console.log('✅ La hoja ya tiene la estructura correcta (sin Webhook URL)');
+      console.log('📊 Estructura actual:', currentHeaders.join(' | '));
+      return { success: true, message: 'La hoja ya está actualizada' };
+    }
+    
+    console.log('➖ Eliminando columna "Webhook URL"...');
+    
+    // Eliminar columna B (Webhook URL)
+    sheet.deleteColumn(2);
+    
+    // Actualizar formato de headers
+    const headerRange = sheet.getRange(1, 1, 1, 5);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#4285F4');
+    headerRange.setFontColor('#FFFFFF');
+    
+    // Ajustar anchos de columna
+    sheet.setColumnWidth(1, 200); // Nombre Espacio
+    sheet.setColumnWidth(2, 250); // Space ID (ahora en columna B)
+    sheet.setColumnWidth(3, 180); // Fecha Creación
+    sheet.setColumnWidth(4, 100); // Miembros
+    sheet.setColumnWidth(5, 180); // Última Actualización
+    
+    console.log('✅ Columna "Webhook URL" eliminada correctamente');
+    console.log('📊 Nueva estructura:');
+    console.log('   A: Nombre Espacio');
+    console.log('   B: Space ID');
+    console.log('   C: Fecha Creación');
+    console.log('   D: Miembros');
+    console.log('   E: Última Actualización');
+    
+    return { 
+      success: true, 
+      message: 'Columna Webhook URL eliminada. Ahora usando Chat API.',
+      rowsAffected: sheet.getLastRow() - 1
+    };
+    
+  } catch (error) {
+    console.error('❌ Error eliminando columna Webhook URL:', error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * OBSOLETA - Migración antigua de webhooks
+ * Esta función ya no es necesaria con Chat API
+ * @deprecated Usar removeWebhookUrlColumn() en su lugar
+ */
+function migrateChatWebhooksSheet_OBSOLETE() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('ChatWebhooks');
@@ -2218,7 +2283,7 @@ function getSpaceIdByName(spaceName) {
     // Buscar en la columna A (Nombre Espacio)
     for (let i = 1; i < data.length; i++) {
       if (data[i][0] === spaceName) {
-        const spaceId = data[i][2]; // Columna C = Space ID (ahora es la tercera columna)
+        const spaceId = data[i][1]; // Columna B = Space ID
         console.log(`✅ Space ID encontrado para ${spaceName}: ${spaceId}`);
         return spaceId;
       }

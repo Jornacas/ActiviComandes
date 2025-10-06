@@ -164,16 +164,16 @@ def export_spaces():
         room_spaces = [s for s in all_spaces if s.get('type') == 'ROOM' and s.get('displayName')]
         print(f"OK - Filtrados {len(room_spaces)} espacios tipo ROOM\n")
         
-        # 2. Preparar datos para Google Sheets
+        # 2. Preparar datos para Google Sheets (SIN columna Webhook URL)
         print("Preparando datos para Google Sheets...")
         spaces_data = []
         for space in room_spaces:
             spaces_data.append([
-                space['displayName'],  # Nombre Espacio
-                space['name'],  # Space ID
-                space.get('createTime', ''),  # Fecha Creación
-                space.get('membershipCount', {}).get('joinedDirectHumanUserCount', 0),  # Miembros
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Última Actualización
+                space['displayName'],  # Nombre Espacio (Col A)
+                space['name'],  # Space ID (Col B)
+                space.get('createTime', ''),  # Fecha Creación (Col C)
+                space.get('membershipCount', {}).get('joinedDirectHumanUserCount', 0),  # Miembros (Col D)
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Última Actualización (Col E)
             ])
         
         # Ordenar por nombre
@@ -187,10 +187,17 @@ def export_spaces():
         try:
             sheet = spreadsheet.worksheet('ChatWebhooks')
             print("OK - Hoja 'ChatWebhooks' encontrada")
+            
+            # Verificar si tiene la columna "Webhook URL" (estructura antigua)
+            headers = sheet.row_values(1)
+            if len(headers) > 1 and headers[1] == 'Webhook URL':
+                print("⚠️  AVISO: La hoja tiene la columna 'Webhook URL' (estructura antigua)")
+                print("ℹ️  Ejecuta removeWebhookUrlColumn() en Apps Script para actualizar")
+            
         except gspread.exceptions.WorksheetNotFound:
             print("AVISO - Hoja 'ChatWebhooks' no existe. Creandola...")
             sheet = spreadsheet.add_worksheet(title='ChatWebhooks', rows=1000, cols=5)
-            # Agregar headers
+            # Agregar headers (SIN columna Webhook URL)
             sheet.update('A1:E1', [[
                 'Nombre Espacio',
                 'Space ID',
@@ -198,13 +205,27 @@ def export_spaces():
                 'Miembros',
                 'Última Actualización'
             ]])
-            print("OK - Hoja 'ChatWebhooks' creada")
+            print("OK - Hoja 'ChatWebhooks' creada con estructura actualizada")
         
         # 4. Escribir datos
         print(f"Escribiendo {len(spaces_data)} espacios en Google Sheets...")
         if spaces_data:
-            end_row = len(spaces_data) + 1
-            sheet.update(f'A2:E{end_row}', spaces_data)
+            # Detectar estructura de la hoja
+            headers = sheet.row_values(1)
+            
+            if len(headers) > 5 and headers[1] == 'Webhook URL':
+                # Estructura antigua: escribir dejando columna B vacía
+                print("⚠️  Escribiendo con estructura antigua (columna Webhook URL vacía)")
+                print("ℹ️  Recomendación: Ejecuta removeWebhookUrlColumn() en Apps Script")
+                for i, row_data in enumerate(spaces_data, start=2):
+                    # Insertar columna vacía en posición B
+                    row_with_empty = [row_data[0], '', row_data[1], row_data[2], row_data[3], row_data[4]]
+                    sheet.update(f'A{i}:F{i}', [row_with_empty])
+            else:
+                # Estructura nueva: escribir directamente
+                end_row = len(spaces_data) + 1
+                sheet.update(f'A2:E{end_row}', spaces_data)
+            
             print(f"OK - {len(spaces_data)} espacios exportados correctamente\n")
         else:
             print("AVISO - No se encontraron espacios para exportar\n")
