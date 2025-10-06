@@ -67,13 +67,12 @@ Hemos **revertido de Webhooks a Chat API**, eliminando la necesidad de configura
 | Columna | Nombre | Uso Actual | Poblada |
 |---------|--------|------------|---------|
 | A | Nombre Espacio | `/EscolaActividad` | ✅ 215 espacios |
-| B | ~~Webhook URL~~ | ❌ **Ya no se usa** | - |
-| C | **Space ID** | ✅ **Usado por Chat API** | ✅ Poblada |
-| D | Fecha Creación | Informativo | ✅ Poblada |
-| E | Miembros | Informativo | ✅ Poblada |
-| F | Última Actualización | Informativo | ✅ Poblada |
+| B | **Space ID** | ✅ **Usado por Chat API** | ✅ Poblada |
+| C | Fecha Creación | Informativo | ✅ Poblada |
+| D | Miembros | Informativo | ✅ Poblada |
+| E | Última Actualización | Informativo | ✅ Poblada |
 
-**Nota:** La columna B (Webhook URL) se mantiene pero no se utiliza.
+**Nota:** La columna "Webhook URL" ha sido eliminada completamente.
 
 ---
 
@@ -266,21 +265,27 @@ if (notificationResult.success) {
 
 ## 🚀 **Próximos Pasos**
 
-### **Paso 1: Habilitar Chat API en Apps Script** ⚠️ **CRÍTICO**
+### **Paso 1: Limpiar estructura de hoja (SI YA EXISTE)** ⚠️
+Si ya tienes la hoja ChatWebhooks con la columna "Webhook URL":
+- [ ] Abrir Google Apps Script
+- [ ] Ejecutar función `removeWebhookUrlColumn()`
+- [ ] Verificar en logs que se eliminó correctamente
+
+### **Paso 2: Habilitar Chat API en Apps Script** ⚠️ **CRÍTICO**
 - [ ] Ir a script.google.com
 - [ ] Servicios → Añadir → Google Chat API v1
 - [ ] Guardar
 
-### **Paso 2: Subir código actualizado**
+### **Paso 3: Subir código actualizado**
 - [ ] Hacer `clasp push` o copiar manualmente
 - [ ] Verificar que `appsscript.json` tiene Chat API
 
-### **Paso 3: Probar**
+### **Paso 4: Probar**
 - [ ] Ejecutar `testChatNotification()`
 - [ ] Autorizar permisos de Chat
 - [ ] Verificar mensaje en Google Chat
 
-### **Paso 4: Probar con entrega real**
+### **Paso 5: Probar con entrega real**
 - [ ] Crear una entrega desde Admin App
 - [ ] Verificar que llega notificación
 - [ ] Comprobar que incluye todos los datos
@@ -304,7 +309,10 @@ Una vez completados los pasos anteriores:
 ## 📚 **Archivos Actualizados**
 
 - ✅ `Code.gs` - Función `sendChatNotification()` usa Chat API
+- ✅ `Code.gs` - Función `removeWebhookUrlColumn()` para limpiar estructura
+- ✅ `Code.gs` - Función `setupChatWebhooksSheet()` sin columna Webhook URL
 - ✅ `appsscript.json` - Chat API añadida a servicios avanzados
+- ✅ `export_chat_spaces.py` - Adaptado a nueva estructura
 - ✅ `ESTADO_NOTIFICACIONES_CHAT_API.md` - Este documento
 
 ## 📚 **Archivos Obsoletos** (mantener por referencia)
