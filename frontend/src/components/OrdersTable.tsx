@@ -225,6 +225,11 @@ ${order.material || 'N/A'}
     console.log('🔄 Cargando estados de notificaciones para', orders.length, 'órdenes');
     const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
     
+    // Log de todos los IDs que vamos a consultar
+    const allIds = orders.map(order => order.idItem).filter(Boolean);
+    console.log('📋 IDs a consultar:', allIds);
+    console.log('🎯 ID que sabemos que existe:', '7e865f74-2456-4020-992a-f264a33d6846-001');
+    
     for (const order of orders) {
       if (order.idItem) {
         try {
