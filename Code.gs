@@ -28,6 +28,7 @@ function doPost(e) {
 }
 
 function doOptions(e) {
+  // Google Apps Script no soporta .setHeader(), usar solo return simple
   return ContentService
     .createTextOutput('')
     .setMimeType(ContentService.MimeType.TEXT);
@@ -205,7 +206,13 @@ function handleApiRequest(e, method) {
         const postData = e.postData ? JSON.parse(e.postData.contents) : {};
         const spaceName = postData.spaceName || e.parameter.spaceName;
         const message = postData.message || e.parameter.message;
-        result = sendChatNotification(spaceName, message);
+        const orderId = postData.orderId || e.parameter.orderId;
+        const notificationType = postData.notificationType || e.parameter.notificationType;
+        result = sendManualNotificationWithStatus(spaceName, message, orderId, notificationType);
+        break;
+      case 'getNotificationStatus':
+        const statusOrderId = e.parameter.orderId || (e.postData ? JSON.parse(e.postData.contents).orderId : null);
+        result = getNotificationStatus(statusOrderId);
         break;
       case 'removeIntermediaryAssignment':
         const removeOrderIds = e.parameter.orderIds ? JSON.parse(e.parameter.orderIds) :
@@ -2438,11 +2445,11 @@ function testDualNotification() {
   
   // Datos de prueba simulando una entrega con intermediario
   // Usando IDs reales de la hoja Respostes
-  const testData = {
+    const testData = {
     orderIds: ['e7b05f61-d049-4d06-85c1-541a192697dc-001'], // ID real: Auro DX1
-    modalitat: 'Intermediari',
-    monitorIntermediaria: 'Judit Pesquero',
-    escolaDestinoIntermediaria: 'SantMarti',
+      modalitat: 'Intermediari',
+      monitorIntermediaria: 'Judit Pesquero',
+      escolaDestinoIntermediaria: 'SantMarti',
     dataEntrega: '2025-10-09' // Fecha de mañana
   };
   
@@ -2723,6 +2730,326 @@ function testNotificacionReal() {
     
   } catch (error) {
     console.log('❌ Error en test real:', error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+// ======================================================
+// SISTEMA DE NOTIFICACIONES CON PERSISTENCIA EN SHEETS
+// ======================================================
+
+/**
+ * Envía notificación manual y actualiza el estado en Google Sheets
+ */
+function sendManualNotificationWithStatus(spaceName, message, orderId, notificationType) {
+  try {
+    console.log(`📤 Enviando notificación manual:`, {
+      spaceName,
+      orderId,
+      notificationType,
+      messageLength: message.length
+    });
+
+    // Enviar la notificación
+    const notificationResult = sendChatNotification(spaceName, message);
+    
+    // Si la notificación se envió correctamente, actualizar el estado en Sheets
+    if (notificationResult.success) {
+      const updateResult = updateNotificationStatus(orderId, notificationType, 'Enviada');
+      console.log(`✅ Estado actualizado en Sheets:`, updateResult);
+      
+      return {
+        ...notificationResult,
+        statusUpdated: updateResult.success,
+        orderId: orderId,
+        notificationType: notificationType
+      };
+    } else {
+      console.log(`❌ Error enviando notificación, no se actualiza estado`);
+      return notificationResult;
+    }
+    
+  } catch (error) {
+    console.log('❌ Error en sendManualNotificationWithStatus:', error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * Actualiza el estado de notificación en Google Sheets
+ * @param {string} orderId - ID del pedido
+ * @param {string} notificationType - 'intermediario' o 'destinatario'
+ * @param {string} status - 'Enviada' o 'Pendiente'
+ */
+function updateNotificationStatus(orderId, notificationType, status) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+    if (!sheet) {
+      console.error('❌ Hoja Respostes no encontrada');
+      return { success: false, error: 'Hoja Respostes no encontrada' };
+    }
+
+    // Buscar la fila por ID del item en la columna C (ID_Item)
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    for (let i = 1; i < data.length; i++) { // Empezar desde fila 2 (saltar headers)
+      // Buscar en la columna C (ID_Item) - índice 2
+      const idInColC = data[i][2] && data[i][2].toString().includes(orderId);
+      
+      if (idInColC) {
+        rowIndex = i + 1; // +1 porque getValues() es 0-indexed pero getRange() es 1-indexed
+        console.log(`✅ ID encontrado en fila ${rowIndex}, columna C: "${data[i][2]}"`);
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      console.log(`⚠️ No se encontró pedido con ID: ${orderId}`);
+      return { success: false, error: `Pedido ${orderId} no encontrado` };
+    }
+
+    // Determinar la columna según el tipo de notificación
+    let columnIndex;
+    if (notificationType === 'intermediario') {
+      columnIndex = 23; // Columna W (índice 23, 0-based)
+    } else if (notificationType === 'destinatario') {
+      columnIndex = 24; // Columna X (índice 24, 0-based)
+    } else {
+      return { success: false, error: 'Tipo de notificación inválido' };
+    }
+
+    // Actualizar la celda
+    const cell = sheet.getRange(rowIndex, columnIndex);
+    cell.setValue(status);
+    
+    console.log(`✅ Estado actualizado: Fila ${rowIndex}, Columna ${columnIndex}, Valor: ${status}`);
+    
+    return { 
+      success: true, 
+      row: rowIndex, 
+      column: columnIndex, 
+      value: status,
+      orderId: orderId,
+      notificationType: notificationType
+    };
+    
+  } catch (error) {
+    console.error('❌ Error actualizando estado de notificación:', error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * Obtiene el estado de notificaciones para un pedido
+ * @param {string} orderId - ID del pedido
+ */
+function getNotificationStatus(orderId) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+    if (!sheet) {
+      return { success: false, error: 'Hoja Respostes no encontrada' };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    for (let i = 1; i < data.length; i++) {
+      // Buscar en la columna C (ID_Item) - índice 2
+      const idInColC = data[i][2] && data[i][2].toString().includes(orderId);
+      
+      if (idInColC) {
+        rowIndex = i;
+        console.log(`✅ ID encontrado en fila ${rowIndex + 1}, columna C: "${data[i][2]}"`);
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      return { success: false, error: `Pedido ${orderId} no encontrado` };
+    }
+
+    // Leer valores de las columnas W (23) y X (24)
+    const intermediarioStatus = data[rowIndex][23] || 'Pendiente';
+    const destinatarioStatus = data[rowIndex][24] || 'Pendiente';
+    
+    return {
+      success: true,
+      orderId: orderId,
+      intermediario: intermediarioStatus,
+      destinatario: destinatarioStatus
+    };
+    
+  } catch (error) {
+    console.error('❌ Error obteniendo estado de notificaciones:', error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * Función de test para verificar el sistema de notificaciones
+ */
+function testNotificationSystem() {
+  try {
+    console.log('🧪 TESTING NOTIFICATION SYSTEM...');
+    
+    // Test 1: Verificar que la hoja existe
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+    if (!sheet) {
+      console.log('❌ ERROR: Hoja Respostes no encontrada');
+      return { success: false, error: 'Hoja Respostes no encontrada' };
+    }
+    console.log('✅ Hoja Respostes encontrada');
+    
+    // Test 2: Verificar columnas W y X
+    const data = sheet.getDataRange().getValues();
+    console.log(`📊 Total de filas: ${data.length}`);
+    console.log(`📊 Total de columnas: ${data[0].length}`);
+    
+    // Test 3: Verificar si las columnas W y X tienen datos
+    if (data[0].length >= 24) {
+      console.log('✅ Columna X (24) existe');
+      const sampleW = data[1] && data[1][23] ? data[1][23] : 'Vacía';
+      const sampleX = data[1] && data[1][24] ? data[1][24] : 'Vacía';
+      console.log(`📋 Columna W (23): "${sampleW}"`);
+      console.log(`📋 Columna X (24): "${sampleX}"`);
+    } else {
+      console.log('❌ ERROR: No hay suficientes columnas. Necesitas crear columnas W y X');
+    }
+    
+    // Test 4: Buscar un ID de ejemplo
+    let foundId = null;
+    for (let i = 1; i < Math.min(data.length, 5); i++) {
+      for (let j = 0; j < Math.min(data[i].length, 10); j++) {
+        if (data[i][j] && data[i][j].toString().length > 3) {
+          foundId = data[i][j].toString();
+          console.log(`🔍 ID encontrado en fila ${i+1}, columna ${j+1}: "${foundId}"`);
+          break;
+        }
+      }
+      if (foundId) break;
+    }
+    
+    if (foundId) {
+      console.log(`🧪 Probando getNotificationStatus con ID: "${foundId}"`);
+      const result = getNotificationStatus(foundId);
+      console.log('📥 Resultado:', result);
+    } else {
+      console.log('⚠️ No se encontró ningún ID para probar');
+    }
+    
+    return { success: true, message: 'Test completado' };
+    
+  } catch (error) {
+    console.error('❌ Error en test:', error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * Función para debuggear la estructura de la hoja
+ */
+function debugSheetStructure() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+    if (!sheet) {
+      console.log('❌ Hoja Respostes no encontrada');
+      return;
+    }
+
+    const data = sheet.getDataRange().getValues();
+    console.log('📊 ESTRUCTURA DE LA HOJA:');
+    console.log(`Total filas: ${data.length}`);
+    console.log(`Total columnas: ${data[0].length}`);
+    
+    // Mostrar headers
+    console.log('📋 HEADERS (primera fila):');
+    for (let i = 0; i < data[0].length; i++) {
+      const header = data[0][i] || `Columna_${String.fromCharCode(65 + i)}`;
+      console.log(`Columna ${i + 1} (${String.fromCharCode(65 + i)}): "${header}"`);
+    }
+    
+    // Mostrar primeras 3 filas de datos
+    console.log('📋 PRIMERAS 3 FILAS DE DATOS:');
+    for (let row = 1; row < Math.min(4, data.length); row++) {
+      console.log(`\nFila ${row + 1}:`);
+      for (let col = 0; col < Math.min(10, data[row].length); col++) {
+        const value = data[row][col] || 'VACÍO';
+        console.log(`  Columna ${col + 1} (${String.fromCharCode(65 + col)}): "${value}"`);
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Error en debug:', error);
+  }
+}
+
+/**
+ * Función para probar el sistema completo de notificaciones
+ */
+function testCompleteNotificationSystem() {
+  try {
+    console.log('🧪 TESTING COMPLETE NOTIFICATION SYSTEM...');
+    
+    // Test 1: Verificar estructura de la hoja
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+    if (!sheet) {
+      console.log('❌ ERROR: Hoja Respostes no encontrada');
+      return { success: false, error: 'Hoja Respostes no encontrada' };
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    console.log(`📊 Total de filas: ${data.length}`);
+    console.log(`📊 Total de columnas: ${data[0].length}`);
+    
+    // Test 2: Buscar el ID específico que sabemos que existe
+    const targetId = '7e865f74-2456-4020-992a-f264a33d6846-001';
+    let foundRow = -1;
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][2] && data[i][2].toString().includes(targetId)) {
+        foundRow = i;
+        console.log(`✅ ID encontrado en fila ${i + 1}: "${data[i][2]}"`);
+        break;
+      }
+    }
+    
+    if (foundRow === -1) {
+      console.log('❌ ERROR: ID específico no encontrado');
+      return { success: false, error: 'ID específico no encontrado' };
+    }
+    
+    // Test 3: Verificar estado actual de las columnas W y X
+    const currentW = data[foundRow][23] || 'Vacía';
+    const currentX = data[foundRow][24] || 'Vacía';
+    console.log(`📋 Estado actual - Columna W (23): "${currentW}"`);
+    console.log(`📋 Estado actual - Columna X (24): "${currentX}"`);
+    
+    // Test 4: Probar getNotificationStatus
+    console.log('🧪 Probando getNotificationStatus...');
+    const statusResult = getNotificationStatus(targetId);
+    console.log('📥 Resultado getNotificationStatus:', statusResult);
+    
+    // Test 5: Probar updateNotificationStatus
+    console.log('🧪 Probando updateNotificationStatus para intermediario...');
+    const updateResult = updateNotificationStatus(targetId, 'intermediario', 'Enviada');
+    console.log('📥 Resultado updateNotificationStatus:', updateResult);
+    
+    // Test 6: Verificar que se actualizó
+    console.log('🧪 Verificando que se actualizó...');
+    const newStatusResult = getNotificationStatus(targetId);
+    console.log('📥 Resultado después de actualizar:', newStatusResult);
+    
+    return { 
+      success: true, 
+      message: 'Test completo realizado',
+      initialStatus: statusResult,
+      updateResult: updateResult,
+      finalStatus: newStatusResult
+    };
+    
+  } catch (error) {
+    console.error('❌ Error en test completo:', error);
     return { success: false, error: error.toString() };
   }
 }

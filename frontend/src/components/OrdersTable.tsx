@@ -110,6 +110,7 @@ export default function OrdersTable() {
     severity: 'success'
   });
   const [notificationStatuses, setNotificationStatuses] = useState<{[key: string]: {intermediario: boolean, destinatario: boolean}}>({});
+  const [loadingNotificationStatuses, setLoadingNotificationStatuses] = useState(true);
 
   // Guardar el estado en localStorage cuando cambie
   useEffect(() => {
@@ -223,6 +224,7 @@ ${order.material || 'N/A'}
   // Función para cargar todos los estados de notificaciones
   const loadNotificationStatuses = async (orders: any[]) => {
     console.log('🔄 Cargando estados de notificaciones para', orders.length, 'órdenes');
+    setLoadingNotificationStatuses(true);
     const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
     
     // Log de todos los IDs que vamos a consultar
@@ -246,6 +248,8 @@ ${order.material || 'N/A'}
     
     console.log('📊 Estados finales cargados:', statuses);
     setNotificationStatuses(statuses);
+    setLoadingNotificationStatuses(false);
+    console.log('✅ Estado de carga de notificaciones completado');
   };
 
   // Función para enviar la notificación
@@ -665,12 +669,20 @@ ${order.material || 'N/A'}
           
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
+            // Mostrar indicador de carga si aún se están cargando los estados
+            if (loadingNotificationStatuses) {
+              return (
+                <CircularProgress size={16} sx={{ color: '#999' }} />
+              );
+            }
+            
             const isSent = notificationStatuses[order.idItem]?.intermediario || false;
             console.log(`🔍 Renderizando orden ${order.idItem}:`, {
               estado,
               isSent,
               notificationStatuses: notificationStatuses[order.idItem],
-              monitorIntermediari: order.monitorIntermediari
+              monitorIntermediari: order.monitorIntermediari,
+              loadingNotificationStatuses
             });
             const message = generateNotificationMessage(order, 'intermediario');
             
@@ -756,6 +768,13 @@ ${order.material || 'N/A'}
           
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
+            // Mostrar indicador de carga si aún se están cargando los estados
+            if (loadingNotificationStatuses) {
+              return (
+                <CircularProgress size={16} sx={{ color: '#999' }} />
+              );
+            }
+            
             const isSent = notificationStatuses[order.idItem]?.destinatario || false;
             const message = generateNotificationMessage(order, 'destinatario');
             
