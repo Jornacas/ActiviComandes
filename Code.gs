@@ -2856,7 +2856,11 @@ function getNotificationStatus(orderId) {
       return { success: false, error: 'Hoja Respostes no encontrada' };
     }
 
-    const data = sheet.getDataRange().getValues();
+    // Forzar que incluya todas las columnas hasta la X (columna 24, índice 24)
+    const lastRow = sheet.getLastRow();
+    const lastCol = Math.max(sheet.getLastColumn(), 25); // Asegurar que incluya hasta columna X
+    const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+    
     let rowIndex = -1;
     
     for (let i = 1; i < data.length; i++) {
@@ -2877,6 +2881,8 @@ function getNotificationStatus(orderId) {
     // Leer valores de las columnas W (23) y X (24)
     const intermediarioStatus = data[rowIndex][23] || 'Pendiente';
     const destinatarioStatus = data[rowIndex][24] || 'Pendiente';
+    
+    console.log(`🔍 ID ${orderId} - W: "${intermediarioStatus}", X: "${destinatarioStatus}"`);
     
     return {
       success: true,
@@ -3001,7 +3007,13 @@ function getMultipleNotificationStatuses(orderIds) {
       return { success: false, error: 'Hoja Respostes no encontrada' };
     }
 
-    const data = sheet.getDataRange().getValues();
+    // Forzar que incluya todas las columnas hasta la X (columna 24, índice 24)
+    const lastRow = sheet.getLastRow();
+    const lastCol = Math.max(sheet.getLastColumn(), 25); // Asegurar que incluya hasta columna X
+    const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+    
+    console.log(`📊 Rango leído: ${lastRow} filas x ${lastCol} columnas`);
+    
     const results = {};
     
     // Para cada ID solicitado, buscar en la hoja
@@ -3018,6 +3030,8 @@ function getMultipleNotificationStatuses(orderIds) {
       if (foundRow !== -1) {
         const intermediarioStatus = data[foundRow][23] || 'Pendiente';
         const destinatarioStatus = data[foundRow][24] || 'Pendiente';
+        
+        console.log(`🔍 ID ${orderId} - W: "${intermediarioStatus}", X: "${destinatarioStatus}"`);
         
         results[orderId] = {
           intermediario: intermediarioStatus,
@@ -3038,6 +3052,63 @@ function getMultipleNotificationStatuses(orderIds) {
     console.error('❌ Error obteniendo múltiples estados:', error);
     return { success: false, error: error.toString() };
   }
+}
+
+/**
+ * Función para actualizar manualmente el estado de destinatario
+ */
+function updateDestinatarioStatus() {
+  const orderId = '7e865f74-2456-4020-992a-f264a33d6846-001';
+  
+  console.log('🔄 Actualizando estado de destinatario para:', orderId);
+  
+  const result = updateNotificationStatus(orderId, 'destinatario', 'Enviada');
+  console.log('📥 Resultado:', result);
+  
+  // Verificar que se actualizó
+  const verifyResult = getNotificationStatus(orderId);
+  console.log('🔍 Verificación:', verifyResult);
+  
+  return result;
+}
+
+/**
+ * Función para debuggear el problema específico del ID
+ */
+function debugSpecificID() {
+  const orderId = '7e865f74-2456-4020-992a-f264a33d6846-001';
+  
+  console.log('🔍 DEBUGGING ID:', orderId);
+  
+  // Test 1: getNotificationStatus individual
+  const individualResult = getNotificationStatus(orderId);
+  console.log('📥 Resultado individual:', individualResult);
+  
+  // Test 2: getMultipleNotificationStatuses
+  const multipleResult = getMultipleNotificationStatuses([orderId]);
+  console.log('📥 Resultado múltiple:', multipleResult);
+  
+  // Test 3: Verificar directamente en la hoja
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][2] && data[i][2].toString().includes(orderId)) {
+      console.log(`📋 Fila ${i + 1} encontrada:`);
+      console.log(`  Columna W (23): "${data[i][23]}"`);
+      console.log(`  Columna X (24): "${data[i][24]}"`);
+      console.log(`  Tipo de W: ${typeof data[i][23]}`);
+      console.log(`  Tipo de X: ${typeof data[i][24]}`);
+      console.log(`  W === "Enviada": ${data[i][23] === "Enviada"}`);
+      console.log(`  X === "Enviada": ${data[i][24] === "Enviada"}`);
+      break;
+    }
+  }
+  
+  return {
+    individual: individualResult,
+    multiple: multipleResult
+  };
 }
 
 /**
