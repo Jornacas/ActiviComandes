@@ -214,6 +214,11 @@ function handleApiRequest(e, method) {
         const statusOrderId = e.parameter.orderId || (e.postData ? JSON.parse(e.postData.contents).orderId : null);
         result = getNotificationStatus(statusOrderId);
         break;
+      case 'getMultipleNotificationStatuses':
+        const orderIdsParam = e.parameter.orderIds || (e.postData ? JSON.parse(e.postData.contents).orderIds : []);
+        const orderIds = Array.isArray(orderIdsParam) ? orderIdsParam : JSON.parse(orderIdsParam);
+        result = getMultipleNotificationStatuses(orderIds);
+        break;
       case 'removeIntermediaryAssignment':
         const removeOrderIds = e.parameter.orderIds ? JSON.parse(e.parameter.orderIds) :
                               (e.postData ? JSON.parse(e.postData.contents).orderIds : []);
@@ -2981,6 +2986,57 @@ function debugSheetStructure() {
     
   } catch (error) {
     console.error('❌ Error en debug:', error);
+  }
+}
+
+/**
+ * Función para obtener estados de notificaciones de múltiples órdenes de una vez
+ */
+function getMultipleNotificationStatuses(orderIds) {
+  try {
+    console.log('🔄 Obteniendo estados para múltiples IDs:', orderIds);
+    
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+    if (!sheet) {
+      return { success: false, error: 'Hoja Respostes no encontrada' };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const results = {};
+    
+    // Para cada ID solicitado, buscar en la hoja
+    for (const orderId of orderIds) {
+      let foundRow = -1;
+      
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][2] && data[i][2].toString().includes(orderId)) {
+          foundRow = i;
+          break;
+        }
+      }
+      
+      if (foundRow !== -1) {
+        const intermediarioStatus = data[foundRow][23] || 'Pendiente';
+        const destinatarioStatus = data[foundRow][24] || 'Pendiente';
+        
+        results[orderId] = {
+          intermediario: intermediarioStatus,
+          destinatario: destinatarioStatus
+        };
+      } else {
+        results[orderId] = {
+          intermediario: 'Pendiente',
+          destinatario: 'Pendiente'
+        };
+      }
+    }
+    
+    console.log('✅ Estados obtenidos para', Object.keys(results).length, 'IDs');
+    return { success: true, results: results };
+    
+  } catch (error) {
+    console.error('❌ Error obteniendo múltiples estados:', error);
+    return { success: false, error: error.toString() };
   }
 }
 

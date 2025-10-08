@@ -225,31 +225,72 @@ ${order.material || 'N/A'}
   const loadNotificationStatuses = async (orders: any[]) => {
     console.log('🔄 Cargando estados de notificaciones para', orders.length, 'órdenes');
     setLoadingNotificationStatuses(true);
-    const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
     
-    // Log de todos los IDs que vamos a consultar
-    const allIds = orders.map(order => order.idItem).filter(Boolean);
-    console.log('📋 IDs a consultar:', allIds);
-    console.log('🎯 ID que sabemos que existe:', '7e865f74-2456-4020-992a-f264a33d6846-001');
-    
-    for (const order of orders) {
-      if (order.idItem) {
-        try {
-          console.log(`🔍 Consultando estado para ID: ${order.idItem}`);
-          const status = await getNotificationStatusFromSheets(order.idItem);
-          console.log(`📥 Estado recibido para ${order.idItem}:`, status);
-          statuses[order.idItem] = status;
-        } catch (error) {
-          console.error(`❌ Error cargando estado para ${order.idItem}:`, error);
-          statuses[order.idItem] = { intermediario: false, destinatario: false };
-        }
+    try {
+      // Obtener todos los IDs de una vez
+      const allIds = orders.map(order => order.idItem).filter(Boolean);
+      console.log('📋 IDs a consultar:', allIds);
+      
+      if (allIds.length === 0) {
+        console.log('⚠️ No hay IDs para consultar');
+        setLoadingNotificationStatuses(false);
+        return;
       }
+      
+      // Llamar al backend para obtener todos los estados de una vez
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '';
+      
+      if (!API_BASE_URL) {
+        throw new Error('API_BASE_URL no está configurada');
+      }
+      
+      const url = new URL(API_BASE_URL);
+      url.searchParams.append('action', 'getMultipleNotificationStatuses');
+      url.searchParams.append('token', API_TOKEN);
+      url.searchParams.append('orderIds', JSON.stringify(allIds));
+      
+      console.log('🌐 Consultando backend para múltiples IDs:', allIds.length);
+      
+      const response = await fetch(url.toString());
+      const result = await response.json();
+      
+      if (result.success && result.results) {
+        // Procesar los resultados
+        const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
+        
+        for (const [orderId, status] of Object.entries(result.results)) {
+          statuses[orderId] = {
+            intermediario: (status as any).intermediario === 'Enviada',
+            destinatario: (status as any).destinatario === 'Enviada'
+          };
+        }
+        
+        console.log('📊 Estados finales cargados:', statuses);
+        setNotificationStatuses(statuses);
+      } else {
+        console.error('❌ Error obteniendo estados múltiples:', result.error);
+        // Fallback: cargar como si todos fueran pendientes
+        const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
+        for (const orderId of allIds) {
+          statuses[orderId] = { intermediario: false, destinatario: false };
+        }
+        setNotificationStatuses(statuses);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error cargando estados de notificaciones:', error);
+      // Fallback: cargar como si todos fueran pendientes
+      const allIds = orders.map(order => order.idItem).filter(Boolean);
+      const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
+      for (const orderId of allIds) {
+        statuses[orderId] = { intermediario: false, destinatario: false };
+      }
+      setNotificationStatuses(statuses);
+    } finally {
+      setLoadingNotificationStatuses(false);
+      console.log('✅ Estado de carga de notificaciones completado');
     }
-    
-    console.log('📊 Estados finales cargados:', statuses);
-    setNotificationStatuses(statuses);
-    setLoadingNotificationStatuses(false);
-    console.log('✅ Estado de carga de notificaciones completado');
   };
 
   // Función para enviar la notificación
