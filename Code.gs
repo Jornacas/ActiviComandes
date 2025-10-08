@@ -201,6 +201,12 @@ function handleApiRequest(e, method) {
                            (e.postData ? JSON.parse(e.postData.contents).deliveryData : {});
         result = createDelivery(deliveryData);
         break;
+      case 'sendManualNotification':
+        const postData = e.postData ? JSON.parse(e.postData.contents) : {};
+        const spaceName = postData.spaceName || e.parameter.spaceName;
+        const message = postData.message || e.parameter.message;
+        result = sendChatNotification(spaceName, message);
+        break;
       case 'removeIntermediaryAssignment':
         const removeOrderIds = e.parameter.orderIds ? JSON.parse(e.parameter.orderIds) :
                               (e.postData ? JSON.parse(e.postData.contents).orderIds : []);

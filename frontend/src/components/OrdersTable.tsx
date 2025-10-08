@@ -21,6 +21,12 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Tooltip,
 } from '@mui/material';
 import {
   Sync,
@@ -32,6 +38,7 @@ import {
   Clear,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
+import { isFeatureEnabled } from '../lib/featureFlags';
 
 const formatSentenceCase = (text: string | null | undefined): string => {
   if (!text) return '';
@@ -82,6 +89,145 @@ export default function OrdersTable() {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [staleOrders, setStaleOrders] = useState<Order[]>([]);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    // Cargar el estado desde localStorage si existe
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('notificationsEnabled');
+      return saved === 'true';
+    }
+    return false;
+  });
+
+  // Estados para el modal de notificaciones
+  const [notificationModalOpen, setNotificationModalOpen] = useState(false);
+  const [selectedOrderForNotification, setSelectedOrderForNotification] = useState<any>(null);
+  const [notificationType, setNotificationType] = useState<'intermediario' | 'destinatario'>('intermediario');
+  const [customMessage, setCustomMessage] = useState('');
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
+
+  // Guardar el estado en localStorage cuando cambie
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('notificationsEnabled', notificationsEnabled.toString());
+    }
+  }, [notificationsEnabled]);
+
+  // Función para generar el mensaje de notificación
+  const generateNotificationMessage = (order: any, type: 'intermediario' | 'destinatario'): string => {
+    if (type === 'intermediario') {
+      return `🔔 NOVA ASSIGNACIÓ DE MATERIAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
+
+📥 REBRÀS MATERIAL:
+🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
+📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
+📦 Material: ${order.material || 'N/A'}
+📍 Ubicació: Consergeria o caixa de material
+
+📤 LLIURARÀS MATERIAL:
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
+👤 Per: ${order.nomCognoms || 'N/A'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[✅ Confirmar recepció] [❌ Hi ha un problema]`;
+    } else {
+      return `📦 MATERIAL ASSIGNAT PER LLIURAMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Sol·licitant: ${order.nomCognoms || 'N/A'}
+
+📦 MATERIAL:
+${order.material || 'N/A'}
+
+🚚 LLIURAMENT:
+👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
+⏰ Hora: Abans de l'activitat
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[✅ Confirmar recepció] [❌ Hi ha un problema]`;
+    }
+  };
+
+  // Función para abrir el modal de notificación
+  const openNotificationModal = (order: any, type: 'intermediario' | 'destinatario') => {
+    setSelectedOrderForNotification(order);
+    setNotificationType(type);
+    setCustomMessage(generateNotificationMessage(order, type));
+    setNotificationModalOpen(true);
+  };
+
+  // Función para enviar la notificación
+  const sendNotification = async () => {
+    if (!selectedOrderForNotification) return;
+
+    setIsSendingNotification(true);
+    try {
+      console.log(`📱 Enviando notificación ${notificationType}:`, {
+        destinatario: notificationType === 'intermediario' 
+          ? selectedOrderForNotification.monitorIntermediari 
+          : selectedOrderForNotification.solicitant,
+        mensaje: customMessage
+      });
+
+      // Determinar el espacio de Google Chat según el tipo
+      let spaceName = '';
+      if (notificationType === 'intermediario') {
+        // Para intermediario: espacio de la escuela destino + actividad
+        const escolaDestino = selectedOrderForNotification.escolaDestinoIntermediari || '';
+        const activitat = selectedOrderForNotification.activitat || '';
+        spaceName = `/${escolaDestino}${activitat}`;
+      } else {
+        // Para destinatario: espacio de la escuela origen + actividad
+        const escolaOrigen = selectedOrderForNotification.escola || '';
+        const activitat = selectedOrderForNotification.activitat || '';
+        spaceName = `/${escolaOrigen}${activitat}`;
+      }
+
+      // Llamar al backend para enviar la notificación
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '';
+
+      const url = new URL(API_BASE_URL);
+      const requestBody = {
+        action: 'sendManualNotification',
+        token: API_TOKEN,
+        spaceName: spaceName,
+        message: customMessage
+      };
+
+      console.log('🌐 Enviando notificación manual al backend:', requestBody);
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      const result = await response.json();
+      console.log('📥 Respuesta del backend:', result);
+
+      if (result.success) {
+        console.log(`✅ Notificación ${notificationType} enviada correctamente`);
+        
+        // Cerrar modal
+        setNotificationModalOpen(false);
+        setSelectedOrderForNotification(null);
+        setCustomMessage('');
+      } else {
+        throw new Error(result.error || 'Error enviando notificación');
+      }
+    } catch (error) {
+      console.error(`⚠️ Error enviando notificación ${notificationType}:`, error);
+      alert(`Error enviando notificación: ${error}`);
+    } finally {
+      setIsSendingNotification(false);
+    }
+  };
 
   // Function to detect stale orders (no state change in 5 days)
   const detectStaleOrders = (ordersList: Order[]) => {
@@ -388,6 +534,140 @@ export default function OrdersTable() {
         return <span style={{ fontSize: '0.85rem' }}>{notes}</span>;
       },
     },
+    // Columnas de notificación (solo visibles cuando las notificaciones están activadas)
+    ...(notificationsEnabled ? [
+      {
+        field: 'notifIntermediario',
+        headerName: 'Notif. Intermediari',
+        width: 120,
+        renderCell: (params: any) => {
+          const order = params.row;
+          const estado = order.estat;
+          
+          // Si no tiene intermediario asignado, no mostrar nada
+          if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
+            return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
+          }
+          
+          // Lógica de estados de notificación
+          if (estado === 'Assignat') {
+            const message = generateNotificationMessage(order, 'intermediario');
+            return (
+              <Tooltip title={message} placement="top" arrow>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<span>📤</span>}
+                  onClick={() => openNotificationModal(order, 'intermediario')}
+                  sx={{ 
+                    fontSize: '0.7rem',
+                    minWidth: 'auto',
+                    px: 1,
+                    py: 0.5
+                  }}
+                >
+                  Enviar
+                </Button>
+              </Tooltip>
+            );
+          } else if (estado === 'Entregant') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="✅ Confirmat"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          } else if (estado === 'Lliurat') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="✅ Confirmat"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          } else {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="⏳ Pendent"
+                  size="small"
+                  color="warning"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          }
+        },
+      },
+      {
+        field: 'notifDestinatario',
+        headerName: 'Notif. Destinatari',
+        width: 120,
+        renderCell: (params: any) => {
+          const order = params.row;
+          const estado = order.estat;
+          
+          // Si no tiene intermediario asignado, no mostrar nada
+          if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
+            return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
+          }
+          
+          // Lógica de estados de notificación
+          if (estado === 'Assignat') {
+            const message = generateNotificationMessage(order, 'destinatario');
+            return (
+              <Tooltip title={message} placement="top" arrow>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<span>📤</span>}
+                  onClick={() => openNotificationModal(order, 'destinatario')}
+                  sx={{ 
+                    fontSize: '0.7rem',
+                    minWidth: 'auto',
+                    px: 1,
+                    py: 0.5
+                  }}
+                >
+                  Enviar
+                </Button>
+              </Tooltip>
+            );
+          } else if (estado === 'Lliurat') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="✅ Confirmat"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          } else {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label="⏳ Pendent"
+                  size="small"
+                  color="warning"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            );
+          }
+        },
+      },
+    ] : []),
   ];
 
   const handleRemoveIntermediary = async (orderIds: string[]) => {
@@ -609,6 +889,12 @@ export default function OrdersTable() {
         </Alert>
       )}
 
+      {notificationsEnabled && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          🔔 <strong>Notificacions automàtiques activades</strong> - Les assignacions d'intermediaris enviaran notificacions automàtiques
+        </Alert>
+      )}
+
       {staleOrders.length > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           <strong>⚠️ Avisos de Sol·licituds Estancades</strong>
@@ -651,6 +937,15 @@ export default function OrdersTable() {
           disabled={updating}
         >
           Sincronitzar Respostes
+        </Button>
+
+        <Button
+          variant={notificationsEnabled ? "contained" : "outlined"}
+          color={notificationsEnabled ? "success" : "primary"}
+          onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+          startIcon={notificationsEnabled ? <CheckCircle /> : <Pending />}
+        >
+          {notificationsEnabled ? 'Notificacions Actives' : 'Activar Notificacions'}
         </Button>
 
 
@@ -750,6 +1045,65 @@ export default function OrdersTable() {
           }}
         />
       </Box>
+
+      {/* Modal de notificaciones */}
+      <Dialog
+        open={notificationModalOpen}
+        onClose={() => setNotificationModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          📤 Enviar Notificación {notificationType === 'intermediario' ? 'al Intermediario' : 'al Destinatario'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              <strong>Destinatario:</strong> {
+                notificationType === 'intermediario' 
+                  ? selectedOrderForNotification?.monitorIntermediari
+                  : selectedOrderForNotification?.nomCognoms
+              }
+            </Typography>
+            
+            <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+              <strong>Material:</strong> {selectedOrderForNotification?.material}
+            </Typography>
+            
+            <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+              <strong>Mensaje a enviar:</strong>
+            </Typography>
+            
+            <TextField
+              fullWidth
+              multiline
+              rows={8}
+              value={customMessage}
+              onChange={(e) => setCustomMessage(e.target.value)}
+              variant="outlined"
+              sx={{ mt: 1 }}
+              placeholder="Edita el mensaje aquí..."
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setNotificationModalOpen(false)}
+            disabled={isSendingNotification}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={sendNotification}
+            variant="contained"
+            color="primary"
+            disabled={isSendingNotification}
+            startIcon={isSendingNotification ? <CircularProgress size={20} /> : <span>📤</span>}
+          >
+            {isSendingNotification ? 'Enviant...' : 'Enviar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
