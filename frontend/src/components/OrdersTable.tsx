@@ -661,6 +661,12 @@ ${order.material || 'N/A'}
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
             const isSent = notificationStatuses[order.idItem]?.intermediario || false;
+            console.log(`🔍 Renderizando orden ${order.idItem}:`, {
+              estado,
+              isSent,
+              notificationStatuses: notificationStatuses[order.idItem],
+              monitorIntermediari: order.monitorIntermediari
+            });
             const message = generateNotificationMessage(order, 'intermediario');
             
             if (isSent) {
