@@ -2856,31 +2856,26 @@ function getNotificationStatus(orderId) {
       return { success: false, error: 'Hoja Respostes no encontrada' };
     }
 
-    // Forzar que incluya todas las columnas hasta la X (columna 24, índice 24)
+    // Buscar la fila del ID
     const lastRow = sheet.getLastRow();
-    const lastCol = Math.max(sheet.getLastColumn(), 25); // Asegurar que incluya hasta columna X
-    const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+    let foundRow = -1;
     
-    let rowIndex = -1;
-    
-    for (let i = 1; i < data.length; i++) {
-      // Buscar en la columna C (ID_Item) - índice 2
-      const idInColC = data[i][2] && data[i][2].toString().includes(orderId);
-      
-      if (idInColC) {
-        rowIndex = i;
-        console.log(`✅ ID encontrado en fila ${rowIndex + 1}, columna C: "${data[i][2]}"`);
+    for (let i = 2; i <= lastRow; i++) {
+      const idCell = sheet.getRange(i, 3).getValue(); // Columna C
+      if (idCell && idCell.toString().includes(orderId)) {
+        foundRow = i;
+        console.log(`✅ ID encontrado en fila ${foundRow}, columna C: "${idCell}"`);
         break;
       }
     }
     
-    if (rowIndex === -1) {
+    if (foundRow === -1) {
       return { success: false, error: `Pedido ${orderId} no encontrado` };
     }
 
-    // Leer valores de las columnas W (23) y X (24)
-    const intermediarioStatus = data[rowIndex][23] || 'Pendiente';
-    const destinatarioStatus = data[rowIndex][24] || 'Pendiente';
+    // Leer directamente de las celdas individuales para evitar problemas de caché
+    const intermediarioStatus = sheet.getRange(foundRow, 23).getValue() || 'Pendiente';
+    const destinatarioStatus = sheet.getRange(foundRow, 24).getValue() || 'Pendiente';
     
     console.log(`🔍 ID ${orderId} - W: "${intermediarioStatus}", X: "${destinatarioStatus}"`);
     
@@ -3007,29 +3002,26 @@ function getMultipleNotificationStatuses(orderIds) {
       return { success: false, error: 'Hoja Respostes no encontrada' };
     }
 
-    // Forzar que incluya todas las columnas hasta la X (columna 24, índice 24)
-    const lastRow = sheet.getLastRow();
-    const lastCol = Math.max(sheet.getLastColumn(), 25); // Asegurar que incluya hasta columna X
-    const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-    
-    console.log(`📊 Rango leído: ${lastRow} filas x ${lastCol} columnas`);
-    
     const results = {};
     
     // Para cada ID solicitado, buscar en la hoja
     for (const orderId of orderIds) {
       let foundRow = -1;
       
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][2] && data[i][2].toString().includes(orderId)) {
+      // Buscar la fila del ID
+      const lastRow = sheet.getLastRow();
+      for (let i = 2; i <= lastRow; i++) {
+        const idCell = sheet.getRange(i, 3).getValue(); // Columna C
+        if (idCell && idCell.toString().includes(orderId)) {
           foundRow = i;
           break;
         }
       }
       
       if (foundRow !== -1) {
-        const intermediarioStatus = data[foundRow][23] || 'Pendiente';
-        const destinatarioStatus = data[foundRow][24] || 'Pendiente';
+        // Leer directamente de las celdas individuales para evitar problemas de caché
+        const intermediarioStatus = sheet.getRange(foundRow, 23).getValue() || 'Pendiente';
+        const destinatarioStatus = sheet.getRange(foundRow, 24).getValue() || 'Pendiente';
         
         console.log(`🔍 ID ${orderId} - W: "${intermediarioStatus}", X: "${destinatarioStatus}"`);
         
@@ -3055,6 +3047,39 @@ function getMultipleNotificationStatuses(orderIds) {
 }
 
 /**
+ * Función para verificar si los cambios están activos
+ */
+function testColumnReading() {
+  const orderId = '7e865f74-2456-4020-992a-f264a33d6846-001';
+  
+  console.log('🧪 TESTING COLUMN READING...');
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), 25);
+  
+  console.log(`📊 Rango: ${lastRow} filas x ${lastCol} columnas`);
+  
+  const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][2] && data[i][2].toString().includes(orderId)) {
+      console.log(`📋 Fila ${i + 1} encontrada:`);
+      console.log(`  W (23): "${data[i][23]}" (tipo: ${typeof data[i][23]})`);
+      console.log(`  X (24): "${data[i][24]}" (tipo: ${typeof data[i][24]})`);
+      
+      // Test de la función
+      const result = getMultipleNotificationStatuses([orderId]);
+      console.log('📥 Resultado función:', result);
+      
+      return result;
+    }
+  }
+  
+  return { error: 'ID no encontrado' };
+}
+
+/**
  * Función para actualizar manualmente el estado de destinatario
  */
 function updateDestinatarioStatus() {
@@ -3070,6 +3095,75 @@ function updateDestinatarioStatus() {
   console.log('🔍 Verificación:', verifyResult);
   
   return result;
+}
+
+/**
+ * Función para verificar directamente sin usar getNotificationStatus
+ */
+function verifyDirectly() {
+  const orderId = '7e865f74-2456-4020-992a-f264a33d6846-001';
+  
+  console.log('🔍 VERIFICANDO DIRECTAMENTE...');
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), 25);
+  const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][2] && data[i][2].toString().includes(orderId)) {
+      console.log(`📋 Fila ${i + 1} - Valores directos:`);
+      console.log(`  W (23): "${data[i][23]}"`);
+      console.log(`  X (24): "${data[i][24]}"`);
+      
+      // También leer directamente de la celda
+      const cellW = sheet.getRange(i + 1, 23).getValue();
+      const cellX = sheet.getRange(i + 1, 24).getValue();
+      console.log(`📋 Celdas directas:`);
+      console.log(`  W (23): "${cellW}"`);
+      console.log(`  X (24): "${cellX}"`);
+      
+      return {
+        fromData: { W: data[i][23], X: data[i][24] },
+        fromCell: { W: cellW, X: cellX }
+      };
+    }
+  }
+  
+  return { error: 'ID no encontrado' };
+}
+
+/**
+ * Función para verificar y actualizar directamente en la hoja
+ */
+function fixDestinatarioStatus() {
+  const orderId = '7e865f74-2456-4020-992a-f264a33d6846-001';
+  
+  console.log('🔧 FIXING DESTINATARIO STATUS...');
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), 25);
+  const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][2] && data[i][2].toString().includes(orderId)) {
+      console.log(`📋 Fila ${i + 1} encontrada, actualizando columna X...`);
+      
+      // Actualizar directamente la celda X (columna 24)
+      sheet.getRange(i + 1, 24).setValue('Enviada');
+      
+      console.log('✅ Columna X actualizada a "Enviada"');
+      
+      // Verificar
+      const verifyResult = getNotificationStatus(orderId);
+      console.log('🔍 Verificación final:', verifyResult);
+      
+      return { success: true, message: 'Columna X actualizada' };
+    }
+  }
+  
+  return { success: false, error: 'ID no encontrado' };
 }
 
 /**
