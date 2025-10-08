@@ -196,14 +196,20 @@ ${order.material || 'N/A'}
       url.searchParams.append('token', API_TOKEN);
       url.searchParams.append('orderId', orderId);
 
+      console.log('🌐 Consultando backend para orderId:', orderId, 'URL:', url.toString());
+
       const response = await fetch(url.toString());
       const result = await response.json();
 
+      console.log('📥 Respuesta del backend:', result);
+
       if (result.success) {
-        return {
+        const status = {
           intermediario: result.intermediario === 'Enviada',
           destinatario: result.destinatario === 'Enviada'
         };
+        console.log('✅ Estado procesado:', status);
+        return status;
       } else {
         console.log('⚠️ Error obteniendo estado de notificaciones:', result.error);
         return { intermediario: false, destinatario: false };
@@ -216,20 +222,24 @@ ${order.material || 'N/A'}
 
   // Función para cargar todos los estados de notificaciones
   const loadNotificationStatuses = async (orders: any[]) => {
+    console.log('🔄 Cargando estados de notificaciones para', orders.length, 'órdenes');
     const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
     
     for (const order of orders) {
       if (order.idItem) {
         try {
+          console.log(`🔍 Consultando estado para ID: ${order.idItem}`);
           const status = await getNotificationStatusFromSheets(order.idItem);
+          console.log(`📥 Estado recibido para ${order.idItem}:`, status);
           statuses[order.idItem] = status;
         } catch (error) {
-          console.error(`Error cargando estado para ${order.idItem}:`, error);
+          console.error(`❌ Error cargando estado para ${order.idItem}:`, error);
           statuses[order.idItem] = { intermediario: false, destinatario: false };
         }
       }
     }
     
+    console.log('📊 Estados finales cargados:', statuses);
     setNotificationStatuses(statuses);
   };
 
