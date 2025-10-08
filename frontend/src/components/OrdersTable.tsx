@@ -193,23 +193,20 @@ ${order.material || 'N/A'}
         throw new Error('API_BASE_URL no está configurada');
       }
 
+      // Usar GET para evitar problemas de CORS con POST
       const url = new URL(API_BASE_URL);
-      const requestBody = {
+      url.searchParams.append('action', 'sendManualNotification');
+      url.searchParams.append('token', API_TOKEN);
+      url.searchParams.append('spaceName', spaceName);
+      url.searchParams.append('message', customMessage);
+
+      console.log('🌐 Enviando notificación manual al backend (GET):', {
         action: 'sendManualNotification',
-        token: API_TOKEN,
-        spaceName: spaceName,
-        message: customMessage
-      };
-
-      console.log('🌐 Enviando notificación manual al backend:', requestBody);
-
-      const response = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
+        spaceName,
+        messageLength: customMessage.length
       });
+
+      const response = await fetch(url.toString());
 
       const result = await response.json();
       console.log('📥 Respuesta del backend:', result);
