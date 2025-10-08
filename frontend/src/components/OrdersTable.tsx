@@ -1012,9 +1012,15 @@ ${order.material || 'N/A'}
   // Cargar estados de notificaciones cuando cambien los datos
   useEffect(() => {
     if (orders.length > 0) {
+      console.log('🔄 useEffect: Cargando estados para', orders.length, 'órdenes');
       loadNotificationStatuses(orders);
     }
   }, [orders]);
+
+  // Forzar re-render cuando cambien los estados de notificaciones
+  useEffect(() => {
+    console.log('📊 useEffect: Estados de notificaciones actualizados:', notificationStatuses);
+  }, [notificationStatuses]);
 
   if (loading) {
     return (
