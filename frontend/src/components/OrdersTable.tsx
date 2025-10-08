@@ -252,7 +252,15 @@ ${order.material || 'N/A'}
       
       console.log('🌐 Consultando backend para múltiples IDs:', allIds.length);
       
-      const response = await fetch(url.toString());
+      // Agregar timeout de 30 segundos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      const response = await fetch(url.toString(), {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
       const result = await response.json();
       
       if (result.success && result.results) {
@@ -1112,7 +1120,7 @@ ${order.material || 'N/A'}
 
       {notificationsEnabled && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          🔔 <strong>Notificacions automàtiques activades</strong> - Les assignacions d'intermediaris enviaran notificacions automàtiques
+          🔔 <strong>Sistema de notificacions manual activat</strong> - Pots enviar notificacions manualment des de la taula
         </Alert>
       )}
 
@@ -1166,7 +1174,7 @@ ${order.material || 'N/A'}
           onClick={() => setNotificationsEnabled(!notificationsEnabled)}
           startIcon={notificationsEnabled ? <CheckCircle /> : <Pending />}
         >
-          {notificationsEnabled ? 'Notificacions Actives' : 'Activar Notificacions'}
+          {notificationsEnabled ? 'Sistema Manual Actiu' : 'Activar Sistema Manual'}
         </Button>
 
 

@@ -2997,6 +2997,12 @@ function getMultipleNotificationStatuses(orderIds) {
   try {
     console.log('🔄 Obteniendo estados para múltiples IDs:', orderIds);
     
+    // Validar que orderIds sea un array
+    if (!Array.isArray(orderIds)) {
+      console.error('❌ orderIds no es un array:', orderIds);
+      return { success: false, error: 'orderIds debe ser un array' };
+    }
+    
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
     if (!sheet) {
       return { success: false, error: 'Hoja Respostes no encontrada' };
@@ -3004,24 +3010,36 @@ function getMultipleNotificationStatuses(orderIds) {
 
     const results = {};
     
-    // Para cada ID solicitado, buscar en la hoja
+    // Optimización: leer toda la hoja una sola vez
+    const lastRow = sheet.getLastRow();
+    const lastCol = Math.max(sheet.getLastColumn(), 25);
+    const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+    
+    // Crear un mapa de IDs para búsqueda rápida
+    const idMap = new Map();
+    for (let i = 1; i < data.length; i++) {
+      const idCell = data[i][2]; // Columna C
+      if (idCell) {
+        idMap.set(idCell.toString(), i);
+      }
+    }
+    
+    // Para cada ID solicitado, buscar en el mapa
     for (const orderId of orderIds) {
       let foundRow = -1;
       
-      // Buscar la fila del ID
-      const lastRow = sheet.getLastRow();
-      for (let i = 2; i <= lastRow; i++) {
-        const idCell = sheet.getRange(i, 3).getValue(); // Columna C
-        if (idCell && idCell.toString().includes(orderId)) {
-          foundRow = i;
+      // Buscar en el mapa
+      for (const [id, rowIndex] of idMap) {
+        if (id.includes(orderId)) {
+          foundRow = rowIndex;
           break;
         }
       }
       
       if (foundRow !== -1) {
-        // Leer directamente de las celdas individuales para evitar problemas de caché
-        const intermediarioStatus = sheet.getRange(foundRow, 23).getValue() || 'Pendiente';
-        const destinatarioStatus = sheet.getRange(foundRow, 24).getValue() || 'Pendiente';
+        // Leer desde el array de datos (más rápido que celdas individuales)
+        const intermediarioStatus = data[foundRow][23] || 'Pendiente';
+        const destinatarioStatus = data[foundRow][24] || 'Pendiente';
         
         console.log(`🔍 ID ${orderId} - W: "${intermediarioStatus}", X: "${destinatarioStatus}"`);
         
@@ -3095,6 +3113,70 @@ function updateDestinatarioStatus() {
   console.log('🔍 Verificación:', verifyResult);
   
   return result;
+}
+
+/**
+ * Función simple para test
+ */
+function testSimple() {
+  const orderId = '7e865f74-2456-4020-992a-f264a33d6846-001';
+  
+  console.log('🧪 TEST SIMPLE...');
+  
+  // Test 1: Función individual
+  const individual = getNotificationStatus(orderId);
+  console.log('📥 Resultado individual:', individual);
+  
+  // Test 2: Verificar directamente en la hoja
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+  const cellW = sheet.getRange(41, 23).getValue();
+  const cellX = sheet.getRange(41, 24).getValue();
+  console.log(`📋 Celda directa W: "${cellW}"`);
+  console.log(`📋 Celda directa X: "${cellX}"`);
+  
+  return {
+    individual,
+    directW: cellW,
+    directX: cellX
+  };
+}
+
+/**
+ * Función para test directo del problema
+ */
+function testDirecto() {
+  const orderId = '7e865f74-2456-4020-992a-f264a33d6846-001';
+  
+  console.log('🧪 TEST DIRECTO DEL PROBLEMA...');
+  
+  try {
+    // Test 1: Función individual
+    console.log('📥 Test getNotificationStatus:');
+    const individual = getNotificationStatus(orderId);
+    console.log('Resultado individual:', individual);
+    
+    // Test 2: Función múltiple
+    console.log('📥 Test getMultipleNotificationStatuses:');
+    const multiple = getMultipleNotificationStatuses([orderId]);
+    console.log('Resultado múltiple:', multiple);
+    
+    // Test 3: Verificar directamente en la hoja
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respostes');
+    const cellW = sheet.getRange(41, 23).getValue();
+    const cellX = sheet.getRange(41, 24).getValue();
+    console.log(`📋 Celda directa W: "${cellW}"`);
+    console.log(`📋 Celda directa X: "${cellX}"`);
+    
+    return {
+      individual,
+      multiple,
+      directW: cellW,
+      directX: cellX
+    };
+  } catch (error) {
+    console.error('❌ Error en test:', error);
+    return { error: error.toString() };
+  }
 }
 
 /**
