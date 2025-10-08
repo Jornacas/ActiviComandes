@@ -109,7 +109,7 @@ export default function OrdersTable() {
     message: '',
     severity: 'success'
   });
-  const [sentNotifications, setSentNotifications] = useState<Set<string>>(new Set());
+  const [notificationStatuses, setNotificationStatuses] = useState<{[key: string]: {intermediario: boolean, destinatario: boolean}}>({});
 
   // Guardar el estado en localStorage cuando cambie
   useEffect(() => {
@@ -181,6 +181,58 @@ ${order.material || 'N/A'}
     setNotificationModalOpen(true);
   };
 
+  // Función para obtener el estado de notificaciones desde Google Sheets
+  const getNotificationStatusFromSheets = async (orderId: string) => {
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '';
+
+      if (!API_BASE_URL) {
+        throw new Error('API_BASE_URL no está configurada');
+      }
+
+      const url = new URL(API_BASE_URL);
+      url.searchParams.append('action', 'getNotificationStatus');
+      url.searchParams.append('token', API_TOKEN);
+      url.searchParams.append('orderId', orderId);
+
+      const response = await fetch(url.toString());
+      const result = await response.json();
+
+      if (result.success) {
+        return {
+          intermediario: result.intermediario === 'Enviada',
+          destinatario: result.destinatario === 'Enviada'
+        };
+      } else {
+        console.log('⚠️ Error obteniendo estado de notificaciones:', result.error);
+        return { intermediario: false, destinatario: false };
+      }
+    } catch (error) {
+      console.error('❌ Error obteniendo estado de notificaciones:', error);
+      return { intermediario: false, destinatario: false };
+    }
+  };
+
+  // Función para cargar todos los estados de notificaciones
+  const loadNotificationStatuses = async (orders: any[]) => {
+    const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
+    
+    for (const order of orders) {
+      if (order.idItem) {
+        try {
+          const status = await getNotificationStatusFromSheets(order.idItem);
+          statuses[order.idItem] = status;
+        } catch (error) {
+          console.error(`Error cargando estado para ${order.idItem}:`, error);
+          statuses[order.idItem] = { intermediario: false, destinatario: false };
+        }
+      }
+    }
+    
+    setNotificationStatuses(statuses);
+  };
+
   // Función para enviar la notificación
   const sendNotification = async () => {
     if (!selectedOrderForNotification) return;
@@ -222,6 +274,8 @@ ${order.material || 'N/A'}
       url.searchParams.append('token', API_TOKEN);
       url.searchParams.append('spaceName', spaceName);
       url.searchParams.append('message', customMessage);
+      url.searchParams.append('orderId', selectedOrderForNotification.idItem);
+      url.searchParams.append('notificationType', notificationType);
 
       console.log('🌐 Enviando notificación manual al backend (GET):', {
         action: 'sendManualNotification',
@@ -237,9 +291,14 @@ ${order.material || 'N/A'}
       if (result.success) {
         console.log(`✅ Notificación ${notificationType} enviada correctamente`);
         
-        // Marcar como enviado
-        const notifKey = `${selectedOrderForNotification.idItem}-${notificationType}`;
-        setSentNotifications(prev => new Set(prev).add(notifKey));
+        // Marcar como enviado en el estado local
+        setNotificationStatuses(prev => ({
+          ...prev,
+          [selectedOrderForNotification.idItem]: {
+            ...prev[selectedOrderForNotification.idItem],
+            [notificationType]: true
+          }
+        }));
         
         // Mostrar mensaje de éxito con el espacio donde se envió
         setNotificationStatus({
@@ -591,8 +650,7 @@ ${order.material || 'N/A'}
           
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
-            const notifKey = `${order.idItem}-intermediario`;
-            const isSent = sentNotifications.has(notifKey);
+            const isSent = notificationStatuses[order.idItem]?.intermediario || false;
             const message = generateNotificationMessage(order, 'intermediario');
             
             if (isSent) {
@@ -677,8 +735,7 @@ ${order.material || 'N/A'}
           
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
-            const notifKey = `${order.idItem}-destinatario`;
-            const isSent = sentNotifications.has(notifKey);
+            const isSent = notificationStatuses[order.idItem]?.destinatario || false;
             const message = generateNotificationMessage(order, 'destinatario');
             
             if (isSent) {
@@ -935,6 +992,13 @@ ${order.material || 'N/A'}
   useEffect(() => {
     loadData();
   }, []);
+
+  // Cargar estados de notificaciones cuando cambien los datos
+  useEffect(() => {
+    if (orders.length > 0) {
+      loadNotificationStatuses(orders);
+    }
+  }, [orders]);
 
   if (loading) {
     return (
