@@ -310,14 +310,23 @@ export default function DeliveryManager() {
         deliveryOptions: deliveryOptions.length
       });
 
-      // Back to GET method like before, but with shorter URL
+      // Usar POST para createDelivery
       const url = new URL(API_BASE_URL);
-      url.searchParams.append('action', 'createDelivery');
-      url.searchParams.append('token', API_TOKEN);
-      url.searchParams.append('deliveryData', JSON.stringify(deliveryData));
+      
+      const requestBody = {
+        action: 'createDelivery',
+        token: API_TOKEN,
+        deliveryData: deliveryData
+      };
 
-      console.log('🌐 DEBUG - URL enviada:', url.toString());
-      const response = await fetch(url.toString());
+      console.log('🌐 DEBUG - Request body:', requestBody);
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
       console.log('📡 DEBUG - Response status:', response.status);
       const result = await response.json();
       console.log('📥 DEBUG - Backend response:', result);
