@@ -686,7 +686,7 @@ ${order.material || 'N/A'}
                 <Chip
                   label="Enviat ✅"
                   size="small"
-                  color="success"
+                  color="primary"
                   sx={{ fontSize: '0.7rem' }}
                   onClick={() => openNotificationModal(order, 'destinatario')}
                 />
