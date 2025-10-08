@@ -51,6 +51,10 @@ import {
   Schedule,
 } from '@mui/icons-material';
 
+// Importar sistema de notificaciones
+import { sendAllNotifications, type NotificationData } from '../lib/notifications';
+import { isFeatureEnabled } from '../lib/featureFlags';
+
 // Types
 interface PreparatedOrder {
   idPedido: string;
@@ -306,14 +310,23 @@ export default function DeliveryManager() {
         deliveryOptions: deliveryOptions.length
       });
 
-      // Back to GET method like before, but with shorter URL
+      // Usar POST para createDelivery
       const url = new URL(API_BASE_URL);
-      url.searchParams.append('action', 'createDelivery');
-      url.searchParams.append('token', API_TOKEN);
-      url.searchParams.append('deliveryData', JSON.stringify(deliveryData));
+      
+      const requestBody = {
+        action: 'createDelivery',
+        token: API_TOKEN,
+        deliveryData: deliveryData
+      };
 
-      console.log('🌐 DEBUG - URL enviada:', url.toString());
-      const response = await fetch(url.toString());
+      console.log('🌐 DEBUG - Request body:', requestBody);
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
       console.log('📡 DEBUG - Response status:', response.status);
       const result = await response.json();
       console.log('📥 DEBUG - Backend response:', result);
@@ -321,6 +334,39 @@ export default function DeliveryManager() {
 
       if (result.success) {
         setSuccess(result.message || 'Lliurament assignat correctament');
+        
+        // Enviar notificaciones automáticas si las notificaciones están activadas
+        if (selectedModalitat === 'Intermediari') {
+          try {
+            console.log('🚀 Enviando notificaciones automáticas...');
+            
+            // Obtener datos de las órdenes seleccionadas para las notificaciones
+            const selectedOrdersData = preparatedOrders.filter(order =>
+              selectedOrders.includes(order.idItem)
+            );
+            
+            // Enviar notificación por cada orden
+            for (const order of selectedOrdersData) {
+              const notificationData: NotificationData = {
+                orderId: order.idItem,
+                monitorIntermediario: selectedMonitor,
+                escolaDestino: escolaDestino,
+                dataEntrega: dataEntrega,
+                material: order.material,
+                solicitante: order.solicitant,
+                escolaDestinoIntermediario: escolaDestino // Por ahora usamos la misma escuela
+              };
+              
+              await sendAllNotifications(notificationData);
+            }
+            
+            console.log('✅ Notificaciones enviadas correctamente');
+          } catch (notificationError) {
+            console.error('⚠️ Error enviando notificaciones:', notificationError);
+            // No fallar la creación si las notificaciones fallan
+          }
+        }
+        
         setDeliveryDialogOpen(false);
         setSelectedOrders([]);
         setSelectedModalitat('Directa');
