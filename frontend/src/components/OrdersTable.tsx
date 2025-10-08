@@ -38,7 +38,6 @@ import {
   Clear,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
-import { isFeatureEnabled } from '../lib/featureFlags';
 
 const formatSentenceCase = (text: string | null | undefined): string => {
   if (!text) return '';
