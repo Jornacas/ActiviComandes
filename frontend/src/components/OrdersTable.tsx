@@ -118,28 +118,44 @@ export default function OrdersTable() {
     }
   }, [notificationsEnabled]);
 
+  // Función para formatear fecha a DD/MM/YYYY
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver original
+      
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      return dateString; // Si hay error, devolver original
+    }
+  };
+
   // Función para generar el mensaje de notificación
   const generateNotificationMessage = (order: any, type: 'intermediario' | 'destinatario'): string => {
     if (type === 'intermediario') {
-      return `🔔 NOVA ASSIGNACIÓ DE MATERIAL
+      return `🔔 NOVA ASSIGNACIÓ DE MATERIAL COM INTERMEDIARI PER ${order.monitorIntermediari || 'N/A'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
 
 📥 REBRÀS MATERIAL:
 🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
-📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
+📅 Data: ${formatDate(order.Data_Lliurament_Prevista)}
 📦 Material: ${order.material || 'N/A'}
 📍 Ubicació: Consergeria o caixa de material
 
 📤 LLIURARÀS MATERIAL:
 🏫 Escola: ${order.escola || 'N/A'}
-📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
+📅 Data que necessita: ${formatDate(order.dataNecessitat || order.Data_Necessitat)}
 👤 Per: ${order.nomCognoms || 'N/A'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [✅ Confirmar recepció] [❌ Hi ha un problema]`;
     } else {
-      return `📦 MATERIAL ASSIGNAT PER LLIURAMENT
+      return `📦 MATERIAL ASSIGNAT PER LLIURAMENT PER ${order.nomCognoms || 'N/A'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Sol·licitant: ${order.nomCognoms || 'N/A'}
 
@@ -149,7 +165,7 @@ ${order.material || 'N/A'}
 🚚 LLIURAMENT:
 👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
 🏫 Escola: ${order.escola || 'N/A'}
-📅 Data que necessites: ${order.dataNecessitat || order.Data_Necessitat || 'N/A'}
+📅 Data que necessites: ${formatDate(order.dataNecessitat || order.Data_Necessitat)}
 ⏰ Hora: Abans de l'activitat
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -225,10 +241,10 @@ ${order.material || 'N/A'}
         const notifKey = `${selectedOrderForNotification.idItem}-${notificationType}`;
         setSentNotifications(prev => new Set(prev).add(notifKey));
         
-        // Mostrar mensaje de éxito
+        // Mostrar mensaje de éxito con el espacio donde se envió
         setNotificationStatus({
           open: true,
-          message: `✅ Notificación enviada correctamente a ${notificationType === 'intermediario' ? 'intermediario' : 'destinatario'}`,
+          message: `✅ Notificación enviada correctamente a ${notificationType === 'intermediario' ? 'intermediario' : 'destinatario'} en el espacio: ${spaceName}`,
           severity: 'success'
         });
         
