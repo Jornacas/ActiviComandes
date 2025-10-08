@@ -27,6 +27,7 @@ import {
   DialogActions,
   TextField,
   Tooltip,
+  Snackbar,
 } from '@mui/material';
 import {
   Sync,
@@ -103,6 +104,12 @@ export default function OrdersTable() {
   const [notificationType, setNotificationType] = useState<'intermediario' | 'destinatario'>('intermediario');
   const [customMessage, setCustomMessage] = useState('');
   const [isSendingNotification, setIsSendingNotification] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<{open: boolean; message: string; severity: 'success' | 'error'}>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  const [sentNotifications, setSentNotifications] = useState<Set<string>>(new Set());
 
   // Guardar el estado en localStorage cuando cambie
   useEffect(() => {
@@ -142,7 +149,7 @@ ${order.material || 'N/A'}
 🚚 LLIURAMENT:
 👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
 🏫 Escola: ${order.escola || 'N/A'}
-📅 Data: ${order.Data_Lliurament_Prevista || 'N/A'}
+📅 Data que necessites: ${order.dataNecessitat || order.Data_Necessitat || 'N/A'}
 ⏰ Hora: Abans de l'activitat
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -214,6 +221,17 @@ ${order.material || 'N/A'}
       if (result.success) {
         console.log(`✅ Notificación ${notificationType} enviada correctamente`);
         
+        // Marcar como enviado
+        const notifKey = `${selectedOrderForNotification.idItem}-${notificationType}`;
+        setSentNotifications(prev => new Set(prev).add(notifKey));
+        
+        // Mostrar mensaje de éxito
+        setNotificationStatus({
+          open: true,
+          message: `✅ Notificación enviada correctamente a ${notificationType === 'intermediario' ? 'intermediario' : 'destinatario'}`,
+          severity: 'success'
+        });
+        
         // Cerrar modal
         setNotificationModalOpen(false);
         setSelectedOrderForNotification(null);
@@ -223,7 +241,13 @@ ${order.material || 'N/A'}
       }
     } catch (error) {
       console.error(`⚠️ Error enviando notificación ${notificationType}:`, error);
-      alert(`Error enviando notificación: ${error}`);
+      
+      // Mostrar mensaje de error
+      setNotificationStatus({
+        open: true,
+        message: `❌ Error enviando notificación: ${error}`,
+        severity: 'error'
+      });
     } finally {
       setIsSendingNotification(false);
     }
@@ -551,7 +575,22 @@ ${order.material || 'N/A'}
           
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
+            const notifKey = `${order.idItem}-intermediario`;
+            const isSent = sentNotifications.has(notifKey);
             const message = generateNotificationMessage(order, 'intermediario');
+            
+            if (isSent) {
+              return (
+                <Chip
+                  label="Enviat ✅"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: '0.7rem' }}
+                  onClick={() => openNotificationModal(order, 'intermediario')}
+                />
+              );
+            }
+            
             return (
               <Tooltip title={message} placement="top" arrow>
                 <Button
@@ -622,7 +661,22 @@ ${order.material || 'N/A'}
           
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
+            const notifKey = `${order.idItem}-destinatario`;
+            const isSent = sentNotifications.has(notifKey);
             const message = generateNotificationMessage(order, 'destinatario');
+            
+            if (isSent) {
+              return (
+                <Chip
+                  label="Enviat ✅"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: '0.7rem' }}
+                  onClick={() => openNotificationModal(order, 'destinatario')}
+                />
+              );
+            }
+            
             return (
               <Tooltip title={message} placement="top" arrow>
                 <Button
@@ -1104,6 +1158,22 @@ ${order.material || 'N/A'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar para notificaciones de estado */}
+      <Snackbar
+        open={notificationStatus.open}
+        autoHideDuration={6000}
+        onClose={() => setNotificationStatus(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setNotificationStatus(prev => ({ ...prev, open: false }))}
+          severity={notificationStatus.severity}
+          sx={{ width: '100%' }}
+        >
+          {notificationStatus.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
