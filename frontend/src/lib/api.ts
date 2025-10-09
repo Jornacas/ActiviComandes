@@ -61,22 +61,15 @@ export interface Stats {
 }
 
 class ApiClient {
-  private isPreviewDomain(): boolean {
-    if (typeof window === 'undefined') return false;
-    return window.location.hostname.includes('vercel.app') && !window.location.hostname.includes('activi-comandes-admin.vercel.app');
-  }
-
   private async request<T>(action: string, data?: any, method: 'GET' | 'POST' = 'GET'): Promise<ApiResponse<T>> {
     // DEMO MODE: Return mock data if no real API configured
     if (!API_BASE_URL || API_BASE_URL.includes('DEMO')) {
       return this.getMockData(action);
     }
 
-    // Use JSONP for preview domains to avoid CORS issues
-    if (this.isPreviewDomain() && method === 'GET') {
-      console.log('🌐 Using JSONP for action:', action, 'on preview domain');
-      return this.requestWithJsonp(action, data);
-    }
+    // Always use GET to avoid CORS issues with Google Apps Script
+    // Google Apps Script doesn't handle OPTIONS preflight requests well
+    method = 'GET';
 
     const url = new URL(API_BASE_URL);
 
@@ -126,92 +119,6 @@ class ApiClient {
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
-  }
-
-  private async requestWithJsonp<T>(action: string, data?: any): Promise<ApiResponse<T>> {
-    return new Promise((resolve, reject) => {
-      const callbackName = `jsonp_callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Set timeout for JSONP request
-      const timeout = setTimeout(() => {
-        if ((window as any)[callbackName]) {
-          // Clean up
-          if (script && script.parentNode) {
-            document.head.removeChild(script);
-          }
-          delete (window as any)[callbackName];
-          
-          console.error('JSONP request timeout for action:', action);
-          resolve({
-            success: false,
-            error: 'Request timeout'
-          } as ApiResponse<T>);
-        }
-      }, 30000); // 30 second timeout
-      
-      // Create script element
-      const script = document.createElement('script');
-      script.type = 'text/javascript';
-      script.async = true;
-      const jsonpUrl = this.buildJsonpUrl(action, data, callbackName);
-      script.src = jsonpUrl;
-      
-      console.log('📡 JSONP URL:', jsonpUrl);
-
-      // Create global callback function
-      (window as any)[callbackName] = (result: ApiResponse<T>) => {
-        clearTimeout(timeout);
-        
-        console.log('✅ JSONP callback received for', action, result);
-        
-        // Clean up
-        if (script && script.parentNode) {
-          document.head.removeChild(script);
-        }
-        delete (window as any)[callbackName];
-        
-        resolve(result);
-      };
-
-      // Handle errors
-      script.onerror = (error) => {
-        clearTimeout(timeout);
-        
-        if (script && script.parentNode) {
-          document.head.removeChild(script);
-        }
-        delete (window as any)[callbackName];
-        
-        console.error('JSONP script error for action:', action, error);
-        resolve({
-          success: false,
-          error: 'JSONP request failed'
-        } as ApiResponse<T>);
-      };
-
-      // Add script to head
-      document.head.appendChild(script);
-    });
-  }
-
-  private buildJsonpUrl(action: string, data?: any, callback?: string): string {
-    const url = new URL(API_BASE_URL);
-    url.searchParams.append('action', action);
-    url.searchParams.append('token', API_TOKEN);
-
-    if (callback) {
-      url.searchParams.append('callback', callback);
-    }
-
-    if (data) {
-      Object.keys(data).forEach(key => {
-        const value = data[key];
-        const serializedValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
-        url.searchParams.append(key, serializedValue);
-      });
-    }
-
-    return url.toString();
   }
 
   private getMockData(action: string): Promise<ApiResponse> {
