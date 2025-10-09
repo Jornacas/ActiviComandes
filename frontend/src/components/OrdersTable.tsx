@@ -39,6 +39,7 @@ import {
   Clear,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
+import OrderDetailPanel from './OrderDetailPanel';
 
 const formatSentenceCase = (text: string | null | undefined): string => {
   if (!text) return '';
@@ -417,21 +418,25 @@ ${order.material || 'N/A'}
 
   const columns: GridColDef[] = [
     {
-      field: 'timestamp',
-      headerName: 'Data',
-      width: 70,
-      type: 'dateTime',
-      valueFormatter: (params) => {
-        if (!params.value) return '';
-        const date = new Date(params.value);
-        return date.toLocaleDateString('ca-ES', { day: '2-digit', month: '2-digit' });
-      },
+      field: 'escola',
+      headerName: 'Escola',
+      width: 120,
+      flex: 1,
     },
     {
-      field: 'nomCognoms',
-      headerName: 'Monitor',
-      width: 100,
-      flex: 0.8,
+      field: 'material',
+      headerName: 'Material',
+      width: 200,
+      flex: 1.5,
+      renderCell: (params) => {
+        const material = formatSentenceCase(params.value as string);
+        const unitats = params.row.unitats;
+        return (
+          <span style={{ fontSize: '0.85rem' }}>
+            {material} {unitats ? `(${unitats})` : ''}
+          </span>
+        );
+      },
     },
     {
       field: 'dataNecessitat',
@@ -481,81 +486,6 @@ ${order.material || 'N/A'}
       },
     },
     {
-      field: 'escola',
-      headerName: 'Escola',
-      width: 100,
-      flex: 0.8,
-    },
-    {
-      field: 'activitat',
-      headerName: 'Activitat',
-      width: 60,
-    },
-    {
-      field: 'material',
-      headerName: 'Material',
-      width: 200,
-      flex: 1.5,
-      valueFormatter: (params) => formatSentenceCase(params.value as string),
-    },
-    {
-      field: 'esMaterialPersonalitzat',
-      headerName: 'Altres',
-      width: 60,
-      renderCell: (params) => (
-        params.value === 'TRUE' ?
-          <Chip label="SÍ" size="small" color="warning" sx={{ fontSize: '0.7rem' }} /> :
-          null
-      ),
-    },
-    {
-      field: 'unitats',
-      headerName: 'Units',
-      width: 50,
-      type: 'number',
-    },
-    {
-      field: 'comentarisGenerals',
-      headerName: 'Comentaris',
-      width: 100,
-      flex: 0.7,
-      renderCell: (params) => {
-        const comentaris = params.value as string;
-        if (!comentaris || comentaris.trim() === '') {
-          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
-        }
-        return (
-          <div 
-            style={{ 
-              whiteSpace: 'nowrap', 
-              overflow: 'hidden', 
-              textOverflow: 'ellipsis',
-              maxWidth: '100%',
-              fontSize: '0.85rem'
-            }}
-            title={comentaris}
-          >
-            {comentaris}
-          </div>
-        );
-      },
-    },
-    {
-      field: 'modalitatEntrega',
-      headerName: 'Lliurament',
-      width: 95,
-      renderCell: (params) => (
-        params.value === 'MANUAL' ?
-          <Chip
-            label="MANUAL"
-            size="small"
-            color="error"
-            sx={{ fontWeight: 'bold', fontSize: '0.7rem', minWidth: '70px' }}
-          /> :
-          null
-      ),
-    },
-    {
       field: 'estat',
       headerName: 'Estat',
       width: 120,
@@ -572,318 +502,6 @@ ${order.material || 'N/A'}
         );
       },
     },
-    {
-      field: 'responsablePreparacio',
-      headerName: 'Responsable',
-      width: 100,
-      editable: true,
-    },
-    {
-      field: 'monitorIntermediari',
-      headerName: 'Monitor Lliurament',
-      width: 120,
-      flex: 0.8,
-      renderCell: (params) => {
-        const monitor = params.value as string;
-        if (!monitor || monitor.trim() === '') {
-          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
-        }
-        return (
-          <span style={{ 
-            color: '#1976d2', 
-            fontSize: '0.85rem', 
-            fontWeight: '500' 
-          }}>
-            {monitor}
-          </span>
-        );
-      },
-    },
-    {
-      field: 'escolaDestinoIntermediari',
-      headerName: 'Escola Destí',
-      width: 120,
-      flex: 0.8,
-      renderCell: (params) => {
-        const escola = params.value as string;
-        if (!escola || escola.trim() === '') {
-          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
-        }
-        return (
-          <span style={{ 
-            color: '#1976d2', 
-            fontSize: '0.85rem', 
-            fontWeight: '500' 
-          }}>
-            {escola}
-          </span>
-        );
-      },
-    },
-    {
-      field: 'Data_Lliurament_Prevista',
-      headerName: 'Data Lliurament',
-      width: 120,
-      flex: 0.9,
-      renderCell: (params) => {
-        const date = params.value as string;
-        if (!date || date.trim() === '') {
-          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
-        }
-        
-        // Usar la misma función formatDate que funciona en DeliveryManager
-        const formatDate = (dateString: string) => {
-          if (!dateString) return '';
-          
-          // Si es una fecha ISO con Z (UTC), extraer solo la parte de fecha
-          if (dateString.includes('T') && dateString.includes('Z')) {
-            const dateOnly = dateString.split('T')[0]; // "2025-10-01"
-            const [year, month, day] = dateOnly.split('-');
-            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-            
-            const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
-            const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
-
-            return `${days[date.getDay()]} ${date.getDate()} de ${months[date.getMonth()]}`;
-          }
-          
-          // Para fechas normales
-          const dateObj = new Date(dateString);
-          const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
-          const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
-
-          return `${days[dateObj.getDay()]} ${dateObj.getDate()} de ${months[dateObj.getMonth()]}`;
-        };
-        
-        try {
-          const formattedDate = formatDate(date);
-          return (
-            <span style={{ 
-              fontSize: '0.85rem', 
-              color: '#1976d2', 
-              fontWeight: '500' 
-            }}>
-              {formattedDate}
-            </span>
-          );
-        } catch {
-          return <span style={{ 
-            fontSize: '0.85rem', 
-            color: '#1976d2', 
-            fontWeight: '500' 
-          }}>
-            {date}
-          </span>;
-        }
-      },
-    },
-    {
-      field: 'distanciaAcademia',
-      headerName: 'Distància',
-      width: 100,
-      renderCell: (params) => {
-        const distancia = params.value as string;
-        if (!distancia || distancia.trim() === '') {
-          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
-        }
-        return <span style={{ fontSize: '0.85rem' }}>{distancia}</span>;
-      },
-    },
-    {
-      field: 'notesEntrega',
-      headerName: 'Notes Lliurament',
-      width: 150,
-      renderCell: (params) => {
-        const notes = params.value as string;
-        if (!notes || notes.trim() === '') {
-          return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
-        }
-        return <span style={{ fontSize: '0.85rem' }}>{notes}</span>;
-      },
-    },
-    // Columnas de notificación (solo visibles cuando las notificaciones están activadas)
-    ...(notificationsEnabled ? [
-      {
-        field: 'notifIntermediario',
-        headerName: 'Notif. Intermediari',
-        width: 120,
-        renderCell: (params: any) => {
-          const order = params.row;
-          const estado = order.estat;
-          
-          // Si no tiene intermediario asignado, no mostrar nada
-          if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
-            return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
-          }
-          
-          // Lógica de estados de notificación
-          if (estado === 'Assignat') {
-            // Mostrar indicador de carga si aún se están cargando los estados
-            if (loadingNotificationStatuses) {
-              return (
-                <CircularProgress size={16} sx={{ color: '#999' }} />
-              );
-            }
-            
-            const isSent = notificationStatuses[order.idItem]?.intermediario || false;
-            console.log(`🔍 Renderizando orden ${order.idItem}:`, {
-              estado,
-              isSent,
-              notificationStatuses: notificationStatuses[order.idItem],
-              monitorIntermediari: order.monitorIntermediari,
-              loadingNotificationStatuses
-            });
-            const message = generateNotificationMessage(order, 'intermediario');
-            
-            if (isSent) {
-              return (
-                <Chip
-                  label="Enviat ✅"
-                  size="small"
-                  color="primary"
-                  sx={{ fontSize: '0.7rem' }}
-                  onClick={() => openNotificationModal(order, 'intermediario')}
-                />
-              );
-            }
-            
-            return (
-              <Tooltip title={message} placement="top" arrow>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<span>📤</span>}
-                  onClick={() => openNotificationModal(order, 'intermediario')}
-                  sx={{ 
-                    fontSize: '0.7rem',
-                    minWidth: 'auto',
-                    px: 1,
-                    py: 0.5
-                  }}
-                >
-                  Enviar
-                </Button>
-              </Tooltip>
-            );
-          } else if (estado === 'Entregant') {
-            return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Chip
-                  label="✅ Confirmat"
-                  size="small"
-                  color="success"
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              </Box>
-            );
-          } else if (estado === 'Lliurat') {
-            return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Chip
-                  label="✅ Confirmat"
-                  size="small"
-                  color="success"
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              </Box>
-            );
-          } else {
-            return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Chip
-                  label="⏳ Pendent"
-                  size="small"
-                  color="warning"
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              </Box>
-            );
-          }
-        },
-      },
-      {
-        field: 'notifDestinatario',
-        headerName: 'Notif. Destinatari',
-        width: 120,
-        renderCell: (params: any) => {
-          const order = params.row;
-          const estado = order.estat;
-          
-          // Si no tiene intermediario asignado, no mostrar nada
-          if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
-            return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
-          }
-          
-          // Lógica de estados de notificación
-          if (estado === 'Assignat') {
-            // Mostrar indicador de carga si aún se están cargando los estados
-            if (loadingNotificationStatuses) {
-              return (
-                <CircularProgress size={16} sx={{ color: '#999' }} />
-              );
-            }
-            
-            const isSent = notificationStatuses[order.idItem]?.destinatario || false;
-            const message = generateNotificationMessage(order, 'destinatario');
-            
-            if (isSent) {
-              return (
-                <Chip
-                  label="Enviat ✅"
-                  size="small"
-                  color="primary"
-                  sx={{ fontSize: '0.7rem' }}
-                  onClick={() => openNotificationModal(order, 'destinatario')}
-                />
-              );
-            }
-            
-            return (
-              <Tooltip title={message} placement="top" arrow>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<span>📤</span>}
-                  onClick={() => openNotificationModal(order, 'destinatario')}
-                  sx={{ 
-                    fontSize: '0.7rem',
-                    minWidth: 'auto',
-                    px: 1,
-                    py: 0.5
-                  }}
-                >
-                  Enviar
-                </Button>
-              </Tooltip>
-            );
-          } else if (estado === 'Lliurat') {
-            return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Chip
-                  label="✅ Confirmat"
-                  size="small"
-                  color="success"
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              </Box>
-            );
-          } else {
-            return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Chip
-                  label="⏳ Pendent"
-                  size="small"
-                  color="warning"
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              </Box>
-            );
-          }
-        },
-      },
-    ] : []),
   ];
 
   const handleRemoveIntermediary = async (orderIds: string[]) => {
@@ -1235,13 +853,17 @@ ${order.material || 'N/A'}
           disableRowSelectionOnClick
           onRowSelectionModelChange={setSelectedRows}
           rowSelectionModel={selectedRows}
-          columnVisibilityModel={{
-            esMaterialPersonalitzat: false,
-            distanciaAcademia: false,
-          }}
+          getDetailPanelContent={({ row }) => (
+            <OrderDetailPanel
+              order={row}
+              notificationStatuses={notificationStatuses}
+              onSendNotification={(order, type) => openNotificationModal(order, type)}
+            />
+          )}
+          getDetailPanelHeight={() => 'auto'}
           initialState={{
             sorting: {
-              sortModel: [{ field: 'timestamp', sort: 'desc' }],
+              sortModel: [{ field: 'dataNecessitat', sort: 'asc' }],
             },
           }}
           slots={{
