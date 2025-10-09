@@ -62,58 +62,73 @@ export default function OrderDetailPanel({
   const notifStatus = notificationStatuses[order.idItem];
 
   return (
-    <Paper 
-      elevation={0} 
-      sx={{ 
-        p: 2, 
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1.5,
         bgcolor: '#f8f9fa',
         borderTop: '2px solid #e0e0e0'
       }}
     >
-      <Stack spacing={2}>
-        {/* Fila 1: Info Básica + Fechas */}
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <Stack direction="row" spacing={2} flexWrap="wrap">
-              <Typography variant="body2"><strong>Activitat:</strong> {order.activitat}</Typography>
-              <Typography variant="body2"><strong>Unitats:</strong> {order.unitats}</Typography>
-              {order.esMaterialPersonalitzat === 'TRUE' && (
-                <Chip label="Personalitzat" size="small" color="warning" sx={{ height: 20 }} />
-              )}
-            </Stack>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Stack direction="row" spacing={2} flexWrap="wrap" justifyContent="flex-end">
-              <Typography variant="body2"><strong>Necessitat:</strong> {formatDate(order.dataNecessitat)}</Typography>
-              {order.Data_Lliurament_Prevista && (
-                <Typography variant="body2"><strong>Lliurament:</strong> {formatDate(order.Data_Lliurament_Prevista)}</Typography>
-              )}
-            </Stack>
-          </Grid>
-        </Grid>
+      <Stack spacing={1.5}>
+        {/* Fila 1: Información básica del pedido */}
+        <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2">
+            <strong>Activitat:</strong> {order.activitat}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Unitats:</strong> {order.unitats}
+          </Typography>
+          {order.esMaterialPersonalitzat === 'TRUE' && (
+            <Chip label="Personalitzat" size="small" color="warning" sx={{ height: 18, fontSize: '0.7rem' }} />
+          )}
+        </Stack>
 
-        {/* Fila 2: Entrega (si tiene intermediario) */}
+        {/* Fila 2: Fechas importantes */}
+        <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2">
+            <strong>📅 Sol·licitud:</strong> {order.timestamp ? new Date(order.timestamp).toLocaleDateString('ca-ES') : '--'}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Necessitat:</strong> {formatDate(order.dataNecessitat)}
+          </Typography>
+          {order.Data_Lliurament_Prevista && (
+            <Typography variant="body2">
+              <strong>Lliurament:</strong> {formatDate(order.Data_Lliurament_Prevista)}
+            </Typography>
+          )}
+        </Stack>
+
+        {/* Fila 3: Entrega (si tiene intermediario) */}
         {hasIntermediary && (
-          <Box sx={{ bgcolor: '#fff', p: 1.5, borderRadius: 1 }}>
-            <Stack direction="row" spacing={3} flexWrap="wrap" alignItems="center">
+          <Box sx={{ bgcolor: '#fff', p: 1, borderRadius: 1, border: '1px solid #e0e0e0' }}>
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
               <Typography variant="body2">
                 <strong>🚚 Lliurament:</strong> {order.monitorIntermediari} → {order.escolaDestinoIntermediari}
               </Typography>
               {order.modalitatEntrega === 'MANUAL' && (
-                <Chip label="MANUAL" size="small" color="error" sx={{ fontWeight: 'bold' }} />
+                <Chip label="MANUAL" size="small" color="error" sx={{ fontWeight: 'bold', height: 18 }} />
               )}
             </Stack>
           </Box>
         )}
 
-        {/* Fila 3: Notificaciones + Acciones */}
+        {/* Fila 4: Notificaciones + Acciones */}
         <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center" flexWrap="wrap">
           {/* Notificaciones */}
           {hasIntermediary && order.estat === 'Assignat' && (
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>📨</Typography>
               {notifStatus?.intermediario ? (
-                <Chip label="✅ Intermediari" size="small" color="success" sx={{ fontSize: '0.7rem' }} />
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="primary"
+                  onClick={() => onSendNotification && onSendNotification(order, 'intermediario')}
+                  sx={{ fontSize: '0.7rem', py: 0.2, px: 0.8, minWidth: 'auto' }}
+                >
+                  ✅ Inter. Enviat
+                </Button>
               ) : (
                 onSendNotification && (
                   <Button
@@ -121,14 +136,22 @@ export default function OrderDetailPanel({
                     variant="outlined"
                     color="primary"
                     onClick={() => onSendNotification(order, 'intermediario')}
-                    sx={{ fontSize: '0.7rem', py: 0.3, px: 1 }}
+                    sx={{ fontSize: '0.7rem', py: 0.2, px: 0.8, minWidth: 'auto' }}
                   >
-                    Notif. Inter.
+                    Enviar Inter.
                   </Button>
                 )
               )}
               {notifStatus?.destinatario ? (
-                <Chip label="✅ Destinatari" size="small" color="success" sx={{ fontSize: '0.7rem' }} />
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="primary"
+                  onClick={() => onSendNotification && onSendNotification(order, 'destinatario')}
+                  sx={{ fontSize: '0.7rem', py: 0.2, px: 0.8, minWidth: 'auto' }}
+                >
+                  ✅ Dest. Enviat
+                </Button>
               ) : (
                 onSendNotification && (
                   <Button
@@ -136,9 +159,9 @@ export default function OrderDetailPanel({
                     variant="outlined"
                     color="primary"
                     onClick={() => onSendNotification(order, 'destinatario')}
-                    sx={{ fontSize: '0.7rem', py: 0.3, px: 1 }}
+                    sx={{ fontSize: '0.7rem', py: 0.2, px: 0.8, minWidth: 'auto' }}
                   >
-                    Notif. Dest.
+                    Enviar Dest.
                   </Button>
                 )
               )}
@@ -153,7 +176,7 @@ export default function OrderDetailPanel({
                 size="small"
                 startIcon={<EditIcon />}
                 onClick={() => onEdit(order)}
-                sx={{ fontSize: '0.75rem', py: 0.5 }}
+                sx={{ fontSize: '0.75rem', py: 0.4 }}
               >
                 Editar
               </Button>
@@ -165,7 +188,7 @@ export default function OrderDetailPanel({
                 size="small"
                 startIcon={<DeleteIcon />}
                 onClick={() => onDelete(order.idItem)}
-                sx={{ fontSize: '0.75rem', py: 0.5 }}
+                sx={{ fontSize: '0.75rem', py: 0.4 }}
               >
                 Eliminar
               </Button>
@@ -173,7 +196,7 @@ export default function OrderDetailPanel({
           </Stack>
         </Stack>
 
-        {/* Fila 4: Comentarios (si existen) */}
+        {/* Fila 5: Comentarios (si existen) */}
         {(order.comentarisGenerals || order.notesEntrega) && (
           <Box sx={{ bgcolor: '#fff3cd', p: 1, borderRadius: 1, borderLeft: '3px solid #ffc107' }}>
             {order.comentarisGenerals && (
