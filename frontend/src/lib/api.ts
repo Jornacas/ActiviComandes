@@ -74,6 +74,7 @@ class ApiClient {
 
     // Use JSONP for preview domains to avoid CORS issues
     if (this.isPreviewDomain() && method === 'GET') {
+      console.log('🌐 Using JSONP for action:', action, 'on preview domain');
       return this.requestWithJsonp(action, data);
     }
 
@@ -131,26 +132,61 @@ class ApiClient {
     return new Promise((resolve, reject) => {
       const callbackName = `jsonp_callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      // Set timeout for JSONP request
+      const timeout = setTimeout(() => {
+        if ((window as any)[callbackName]) {
+          // Clean up
+          if (script && script.parentNode) {
+            document.head.removeChild(script);
+          }
+          delete (window as any)[callbackName];
+          
+          console.error('JSONP request timeout for action:', action);
+          resolve({
+            success: false,
+            error: 'Request timeout'
+          } as ApiResponse<T>);
+        }
+      }, 30000); // 30 second timeout
+      
       // Create script element
       const script = document.createElement('script');
       script.type = 'text/javascript';
       script.async = true;
-      script.src = this.buildJsonpUrl(action, data, callbackName);
+      const jsonpUrl = this.buildJsonpUrl(action, data, callbackName);
+      script.src = jsonpUrl;
+      
+      console.log('📡 JSONP URL:', jsonpUrl);
 
       // Create global callback function
       (window as any)[callbackName] = (result: ApiResponse<T>) => {
+        clearTimeout(timeout);
+        
+        console.log('✅ JSONP callback received for', action, result);
+        
         // Clean up
-        document.head.removeChild(script);
+        if (script && script.parentNode) {
+          document.head.removeChild(script);
+        }
         delete (window as any)[callbackName];
         
         resolve(result);
       };
 
       // Handle errors
-      script.onerror = () => {
-        document.head.removeChild(script);
+      script.onerror = (error) => {
+        clearTimeout(timeout);
+        
+        if (script && script.parentNode) {
+          document.head.removeChild(script);
+        }
         delete (window as any)[callbackName];
-        reject(new Error('JSONP request failed'));
+        
+        console.error('JSONP script error for action:', action, error);
+        resolve({
+          success: false,
+          error: 'JSONP request failed'
+        } as ApiResponse<T>);
       };
 
       // Add script to head
