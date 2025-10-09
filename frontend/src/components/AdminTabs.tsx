@@ -15,10 +15,12 @@ import {
   LocalShipping,
   PhoneAndroid,
   OpenInNew,
+  Help,
 } from '@mui/icons-material';
 
 import OrdersTable from './OrdersTable';
 import DeliveryManager from './DeliveryManager';
+import HelpSection from './HelpSection';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -152,10 +154,16 @@ export default function AdminTabs() {
             {...a11yProps(0)}
           />
           <Tab
-                          label="Lliuraments"
+            label="Lliuraments"
             icon={<LocalShipping />}
             iconPosition="start"
             {...a11yProps(1)}
+          />
+          <Tab
+            label="Ajuda"
+            icon={<Help />}
+            iconPosition="start"
+            {...a11yProps(2)}
           />
         </Tabs>
       </Paper>
@@ -168,6 +176,10 @@ export default function AdminTabs() {
 
         <TabPanel value={value} index={1}>
           <DeliveryManager />
+        </TabPanel>
+
+        <TabPanel value={value} index={2}>
+          <HelpSection />
         </TabPanel>
       </Box>
     </Box>
