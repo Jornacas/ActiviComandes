@@ -66,7 +66,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem
     activitat: '',
     material: '',
     customMaterial: '',
-    unitats: 1,
+    unitats: '',
   });
   
   const [filteredEscoles, setFilteredEscoles] = useState<string[]>([]);
@@ -235,7 +235,8 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem
       return;
     }
 
-    if (formData.unitats <= 0) {
+    const unitats = parseInt(formData.unitats) || 1;
+    if (unitats <= 0) {
       setError('Les unitats han de ser un nombre positiu');
       return;
     }
@@ -246,7 +247,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem
       activitat: formData.activitat,
       material: formData.material === 'Altres materials' ? formData.customMaterial : formData.material,
       customMaterial: formData.material === 'Altres materials' ? formData.customMaterial : undefined,
-      unitats: formData.unitats,
+      unitats: unitats,
     };
 
     onAddItem(newItem);
@@ -256,7 +257,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem
       ...prev,
       material: '',
       customMaterial: '',
-      unitats: 1,
+      unitats: '',
     }));
   };
 
@@ -413,8 +414,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem
             label="Unitats *"
             value={formData.unitats}
             onChange={(e) => {
-              const value = parseInt(e.target.value) || 1;
-              handleInputChange('unitats')(value);
+              handleInputChange('unitats')(e.target.value);
             }}
             inputProps={{ min: 1 }}
             placeholder="1"
