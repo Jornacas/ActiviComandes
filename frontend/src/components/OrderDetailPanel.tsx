@@ -19,7 +19,7 @@ import {
 
 interface OrderDetailPanelProps {
   order: any;
-  notificationStatuses: {[key: string]: {intermediario: boolean, destinatario: boolean}};
+  notificationStatuses: {[key: string]: {intermediario: string, destinatario: string}};
   onEdit?: (order: any) => void;
   onDelete?: (orderId: string) => void;
   onSendNotification?: (order: any, type: 'intermediario' | 'destinatario') => void;
