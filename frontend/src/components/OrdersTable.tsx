@@ -469,6 +469,16 @@ ${order.material || 'N/A'}
       },
     },
     {
+      field: 'nomCognoms',
+      headerName: 'Monitor',
+      width: 120,
+      flex: 0.9,
+      renderCell: (params) => {
+        if (params.row._isDetail) return null;
+        return params.value;
+      },
+    },
+    {
       field: 'escola',
       headerName: 'Escola',
       width: 120,

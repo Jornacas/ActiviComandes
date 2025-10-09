@@ -58,23 +58,6 @@ export default function OrderDetailPanel({
     }
   };
 
-  const Section = ({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) => (
-    <Box sx={{ mb: 3 }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        {icon} {title}
-      </Typography>
-      <Box sx={{ pl: 3 }}>
-        {children}
-      </Box>
-    </Box>
-  );
-
-  const InfoRow = ({ label, value }: { label: string; value: any }) => (
-    <Typography variant="body2" sx={{ mb: 0.5 }}>
-      <strong>{label}:</strong> {value || '--'}
-    </Typography>
-  );
-
   const hasIntermediary = order.monitorIntermediari && order.monitorIntermediari.trim() !== '';
   const notifStatus = notificationStatuses[order.idItem];
 
@@ -82,190 +65,130 @@ export default function OrderDetailPanel({
     <Paper 
       elevation={0} 
       sx={{ 
-        p: 3, 
+        p: 2, 
         bgcolor: '#f8f9fa',
         borderTop: '2px solid #e0e0e0'
       }}
     >
-      <Grid container spacing={3}>
-        {/* Columna Izquierda */}
-        <Grid item xs={12} md={6}>
-          
-          {/* Información Básica */}
-          <Section title="INFORMACIÓ BÀSICA" icon="📋">
-            <InfoRow label="ID" value={order.idItem} />
-            <InfoRow label="Sol·licitant" value={order.nomCognoms} />
-            <InfoRow label="Activitat" value={order.activitat} />
-            <InfoRow label="Material" value={order.material} />
-            <InfoRow label="Unitats" value={order.unitats} />
-            {order.esMaterialPersonalitzat === 'TRUE' && (
-              <Chip label="Material Personalitzat" size="small" color="warning" sx={{ mt: 1 }} />
-            )}
-          </Section>
-
-          {/* Dates */}
-          <Section title="DATES" icon="📅">
-            <InfoRow label="Sol·licitud" value={order.timestamp ? new Date(order.timestamp).toLocaleDateString('ca-ES') : '--'} />
-            <InfoRow label="Necessitat" value={formatDate(order.dataNecessitat)} />
-            {order.Data_Lliurament_Prevista && (
-              <InfoRow label="Lliurament Previst" value={formatDate(order.Data_Lliurament_Prevista)} />
-            )}
-          </Section>
-
-          {/* Comentaris */}
-          {(order.comentarisGenerals || order.notesEntrega) && (
-            <Section title="COMENTARIS I NOTES" icon="💬">
-              {order.comentarisGenerals && (
-                <InfoRow label="Comentaris Generals" value={order.comentarisGenerals} />
+      <Stack spacing={2}>
+        {/* Fila 1: Info Básica + Fechas */}
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <Stack direction="row" spacing={2} flexWrap="wrap">
+              <Typography variant="body2"><strong>Activitat:</strong> {order.activitat}</Typography>
+              <Typography variant="body2"><strong>Unitats:</strong> {order.unitats}</Typography>
+              {order.esMaterialPersonalitzat === 'TRUE' && (
+                <Chip label="Personalitzat" size="small" color="warning" sx={{ height: 20 }} />
               )}
-              {order.notesEntrega && (
-                <InfoRow label="Notes Entrega" value={order.notesEntrega} />
+            </Stack>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <Stack direction="row" spacing={2} flexWrap="wrap" justifyContent="flex-end">
+              <Typography variant="body2"><strong>Necessitat:</strong> {formatDate(order.dataNecessitat)}</Typography>
+              {order.Data_Lliurament_Prevista && (
+                <Typography variant="body2"><strong>Lliurament:</strong> {formatDate(order.Data_Lliurament_Prevista)}</Typography>
               )}
-            </Section>
-          )}
+            </Stack>
+          </Grid>
         </Grid>
 
-        {/* Columna Derecha */}
-        <Grid item xs={12} md={6}>
-          
-          {/* Entrega */}
-          {hasIntermediary && (
-            <Section title="ENTREGA" icon="🚚">
-              <InfoRow 
-                label="Modalitat" 
-                value={order.modalitatEntrega === 'MANUAL' ? 
-                  <Chip label="MANUAL" size="small" color="error" sx={{ fontWeight: 'bold' }} /> : 
-                  'Intermediari'
-                } 
-              />
-              <InfoRow label="Monitor" value={order.monitorIntermediari} />
-              <InfoRow label="Escola Destí" value={order.escolaDestinoIntermediari} />
-              {order.responsablePreparacio && (
-                <InfoRow label="Responsable Preparació" value={order.responsablePreparacio} />
+        {/* Fila 2: Entrega (si tiene intermediario) */}
+        {hasIntermediary && (
+          <Box sx={{ bgcolor: '#fff', p: 1.5, borderRadius: 1 }}>
+            <Stack direction="row" spacing={3} flexWrap="wrap" alignItems="center">
+              <Typography variant="body2">
+                <strong>🚚 Lliurament:</strong> {order.monitorIntermediari} → {order.escolaDestinoIntermediari}
+              </Typography>
+              {order.modalitatEntrega === 'MANUAL' && (
+                <Chip label="MANUAL" size="small" color="error" sx={{ fontWeight: 'bold' }} />
               )}
-              {order.distanciaAcademia && (
-                <InfoRow label="Distància" value={order.distanciaAcademia} />
-              )}
-            </Section>
-          )}
+            </Stack>
+          </Box>
+        )}
 
-          {/* Notificacions */}
+        {/* Fila 3: Notificaciones + Acciones */}
+        <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center" flexWrap="wrap">
+          {/* Notificaciones */}
           {hasIntermediary && order.estat === 'Assignat' && (
-            <Section title="NOTIFICACIONS" icon="📨">
-              <Stack spacing={2}>
-                {/* Notificació Intermediari */}
-                <Box>
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    <strong>Intermediari:</strong>
-                  </Typography>
-                  {notifStatus?.intermediario ? (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip 
-                        label="✅ Enviat" 
-                        size="small" 
-                        color="success"
-                        sx={{ fontSize: '0.75rem' }}
-                      />
-                      {onSendNotification && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<SendIcon />}
-                          onClick={() => onSendNotification(order, 'intermediario')}
-                          sx={{ fontSize: '0.7rem' }}
-                        >
-                          Reenviar
-                        </Button>
-                      )}
-                    </Stack>
-                  ) : (
-                    onSendNotification && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="primary"
-                        startIcon={<SendIcon />}
-                        onClick={() => onSendNotification(order, 'intermediario')}
-                        sx={{ fontSize: '0.75rem' }}
-                      >
-                        Enviar Notificació
-                      </Button>
-                    )
-                  )}
-                </Box>
-
-                {/* Notificació Destinatari */}
-                <Box>
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    <strong>Destinatari:</strong>
-                  </Typography>
-                  {notifStatus?.destinatario ? (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip 
-                        label="✅ Enviat" 
-                        size="small" 
-                        color="success"
-                        sx={{ fontSize: '0.75rem' }}
-                      />
-                      {onSendNotification && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<SendIcon />}
-                          onClick={() => onSendNotification(order, 'destinatario')}
-                          sx={{ fontSize: '0.7rem' }}
-                        >
-                          Reenviar
-                        </Button>
-                      )}
-                    </Stack>
-                  ) : (
-                    onSendNotification && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="primary"
-                        startIcon={<SendIcon />}
-                        onClick={() => onSendNotification(order, 'destinatario')}
-                        sx={{ fontSize: '0.75rem' }}
-                      >
-                        Enviar Notificació
-                      </Button>
-                    )
-                  )}
-                </Box>
-              </Stack>
-            </Section>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>📨</Typography>
+              {notifStatus?.intermediario ? (
+                <Chip label="✅ Intermediari" size="small" color="success" sx={{ fontSize: '0.7rem' }} />
+              ) : (
+                onSendNotification && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => onSendNotification(order, 'intermediario')}
+                    sx={{ fontSize: '0.7rem', py: 0.3, px: 1 }}
+                  >
+                    Notif. Inter.
+                  </Button>
+                )
+              )}
+              {notifStatus?.destinatario ? (
+                <Chip label="✅ Destinatari" size="small" color="success" sx={{ fontSize: '0.7rem' }} />
+              ) : (
+                onSendNotification && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => onSendNotification(order, 'destinatario')}
+                    sx={{ fontSize: '0.7rem', py: 0.3, px: 1 }}
+                  >
+                    Notif. Dest.
+                  </Button>
+                )
+              )}
+            </Stack>
           )}
 
           {/* Acciones */}
-          <Section title="ACCIONS" icon="⚙️">
-            <Stack direction="row" spacing={1}>
-              {onEdit && (
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<EditIcon />}
-                  onClick={() => onEdit(order)}
-                >
-                  Editar
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  startIcon={<DeleteIcon />}
-                  onClick={() => onDelete(order.idItem)}
-                >
-                  Eliminar
-                </Button>
-              )}
-            </Stack>
-          </Section>
-        </Grid>
-      </Grid>
+          <Stack direction="row" spacing={1}>
+            {onEdit && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<EditIcon />}
+                onClick={() => onEdit(order)}
+                sx={{ fontSize: '0.75rem', py: 0.5 }}
+              >
+                Editar
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                startIcon={<DeleteIcon />}
+                onClick={() => onDelete(order.idItem)}
+                sx={{ fontSize: '0.75rem', py: 0.5 }}
+              >
+                Eliminar
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+
+        {/* Fila 4: Comentarios (si existen) */}
+        {(order.comentarisGenerals || order.notesEntrega) && (
+          <Box sx={{ bgcolor: '#fff3cd', p: 1, borderRadius: 1, borderLeft: '3px solid #ffc107' }}>
+            {order.comentarisGenerals && (
+              <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                💬 {order.comentarisGenerals}
+              </Typography>
+            )}
+            {order.notesEntrega && (
+              <Typography variant="body2" sx={{ fontSize: '0.8rem', mt: 0.5 }}>
+                📝 {order.notesEntrega}
+              </Typography>
+            )}
+          </Box>
+        )}
+      </Stack>
     </Paper>
   );
 }
