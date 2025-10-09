@@ -112,6 +112,31 @@ export default function OrdersTable() {
   });
   const [notificationStatuses, setNotificationStatuses] = useState<{[key: string]: {intermediario: boolean, destinatario: boolean}}>({});
   const [loadingNotificationStatuses, setLoadingNotificationStatuses] = useState(true);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRowExpansion = (id: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedRows(newExpanded);
+  };
+
+  // Transformar orders para incluir filas expandidas
+  const transformedOrders = orders.flatMap((order: any) => {
+    const rows = [order];
+    if (expandedRows.has(order.id)) {
+      // Agregar fila de detalle
+      rows.push({
+        ...order,
+        id: `${order.id}-detail`,
+        _isDetail: true,
+      } as any);
+    }
+    return rows;
+  });
 
   // Guardar el estado en localStorage cuando cambie
   useEffect(() => {
@@ -418,10 +443,55 @@ ${order.material || 'N/A'}
 
   const columns: GridColDef[] = [
     {
+      field: 'actions',
+      headerName: '',
+      width: 60,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        // Si es fila de detalle, no mostrar botón
+        if (params.row._isDetail) {
+          return null;
+        }
+        return (
+          <Button
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              const actualId = params.row.id.replace('-detail', '');
+              toggleRowExpansion(actualId);
+            }}
+            sx={{ minWidth: 'auto', p: 0.5 }}
+          >
+            {expandedRows.has(params.row.id) ? '▼' : '▶'}
+          </Button>
+        );
+      },
+    },
+    {
       field: 'escola',
       headerName: 'Escola',
       width: 120,
       flex: 1,
+      renderCell: (params) => {
+        // Si es fila de detalle, renderizar el panel completo
+        if (params.row._isDetail) {
+          const originalId = params.row.id.replace('-detail', '');
+          const originalOrder = orders.find(o => o.id === originalId);
+          if (!originalOrder) return null;
+          
+          return (
+            <Box sx={{ gridColumn: '1 / -1', width: '100%', p: 0 }}>
+              <OrderDetailPanel
+                order={originalOrder}
+                notificationStatuses={notificationStatuses}
+                onSendNotification={(order, type) => openNotificationModal(order, type)}
+              />
+            </Box>
+          );
+        }
+        return params.value;
+      },
     },
     {
       field: 'material',
@@ -429,6 +499,7 @@ ${order.material || 'N/A'}
       width: 200,
       flex: 1.5,
       renderCell: (params) => {
+        if (params.row._isDetail) return null;
         const material = formatSentenceCase(params.value as string);
         const unitats = params.row.unitats;
         return (
@@ -444,6 +515,7 @@ ${order.material || 'N/A'}
       width: 120,
       flex: 0.9,
       renderCell: (params) => {
+        if (params.row._isDetail) return null;
         const date = params.value as string;
         if (!date || date.trim() === '') {
           return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
@@ -490,6 +562,7 @@ ${order.material || 'N/A'}
       headerName: 'Estat',
       width: 120,
       renderCell: (params) => {
+        if (params.row._isDetail) return null;
         const normalized = formatSentenceCase(params.value as string);
         return (
           <Chip
@@ -847,20 +920,14 @@ ${order.material || 'N/A'}
 
       <Box sx={{ height: 600, width: '100%' }}>
         <DataGrid
-          rows={orders}
+          rows={transformedOrders}
           columns={columns}
           checkboxSelection
           disableRowSelectionOnClick
           onRowSelectionModelChange={setSelectedRows}
           rowSelectionModel={selectedRows}
-          getDetailPanelContent={({ row }) => (
-            <OrderDetailPanel
-              order={row}
-              notificationStatuses={notificationStatuses}
-              onSendNotification={(order, type) => openNotificationModal(order, type)}
-            />
-          )}
-          getDetailPanelHeight={() => 'auto'}
+          isRowSelectable={(params) => !params.row._isDetail}
+          getRowHeight={(params) => params.model._isDetail ? 'auto' : 52}
           initialState={{
             sorting: {
               sortModel: [{ field: 'dataNecessitat', sort: 'asc' }],
