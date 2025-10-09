@@ -110,7 +110,7 @@ export default function OrdersTable() {
     message: '',
     severity: 'success'
   });
-  const [notificationStatuses, setNotificationStatuses] = useState<{[key: string]: {intermediario: string, destinatario: string}}>({});
+  const [notificationStatuses, setNotificationStatuses] = useState<{[key: string]: {intermediario: boolean, destinatario: boolean}}>({});
   const [loadingNotificationStatuses, setLoadingNotificationStatuses] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
@@ -232,18 +232,18 @@ ${order.material || 'N/A'}
 
       if (result.success) {
         const status = {
-          intermediario: result.intermediario || 'Pendiente',
-          destinatario: result.destinatario || 'Pendiente'
+          intermediario: result.intermediario === 'Enviada',
+          destinatario: result.destinatario === 'Enviada'
         };
         console.log('✅ Estado procesado:', status);
         return status;
       } else {
         console.log('⚠️ Error obteniendo estado de notificaciones:', result.error);
-        return { intermediario: 'Pendiente', destinatario: 'Pendiente' };
+        return { intermediario: false, destinatario: false };
       }
     } catch (error) {
       console.error('❌ Error obteniendo estado de notificaciones:', error);
-      return { intermediario: 'Pendiente', destinatario: 'Pendiente' };
+      return { intermediario: false, destinatario: false };
     }
   };
 
@@ -291,12 +291,12 @@ ${order.material || 'N/A'}
       
       if (result.success && result.results) {
         // Procesar los resultados
-        const statuses: {[key: string]: {intermediario: string, destinatario: string}} = {};
+        const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
         
         for (const [orderId, status] of Object.entries(result.results)) {
           statuses[orderId] = {
-            intermediario: (status as any).intermediario || 'Pendiente',
-            destinatario: (status as any).destinatario || 'Pendiente'
+            intermediario: (status as any).intermediario === 'Enviada',
+            destinatario: (status as any).destinatario === 'Enviada'
           };
         }
         
@@ -305,9 +305,9 @@ ${order.material || 'N/A'}
       } else {
         console.error('❌ Error obteniendo estados múltiples:', result.error);
         // Fallback: cargar como si todos fueran pendientes
-        const statuses: {[key: string]: {intermediario: string, destinatario: string}} = {};
+        const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
         for (const orderId of allIds) {
-          statuses[orderId] = { intermediario: 'Pendiente', destinatario: 'Pendiente' };
+          statuses[orderId] = { intermediario: false, destinatario: false };
         }
         setNotificationStatuses(statuses);
       }
@@ -316,9 +316,9 @@ ${order.material || 'N/A'}
       console.error('❌ Error cargando estados de notificaciones:', error);
       // Fallback: cargar como si todos fueran pendientes
       const allIds = orders.map(order => order.idItem).filter(Boolean);
-      const statuses: {[key: string]: {intermediario: string, destinatario: string}} = {};
+      const statuses: {[key: string]: {intermediario: boolean, destinatario: boolean}} = {};
       for (const orderId of allIds) {
-        statuses[orderId] = { intermediario: 'Pendiente', destinatario: 'Pendiente' };
+        statuses[orderId] = { intermediario: false, destinatario: false };
       }
       setNotificationStatuses(statuses);
     } finally {

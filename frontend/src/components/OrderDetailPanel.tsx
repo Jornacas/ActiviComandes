@@ -19,7 +19,7 @@ import {
 
 interface OrderDetailPanelProps {
   order: any;
-  notificationStatuses: {[key: string]: {intermediario: string, destinatario: string}};
+  notificationStatuses: {[key: string]: {intermediario: boolean, destinatario: boolean}};
   onEdit?: (order: any) => void;
   onDelete?: (orderId: string) => void;
   onSendNotification?: (order: any, type: 'intermediario' | 'destinatario') => void;
@@ -119,7 +119,7 @@ export default function OrderDetailPanel({
           {hasIntermediary && order.estat === 'Assignat' && (
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>📨</Typography>
-              {notifStatus?.intermediario === 'Enviada' ? (
+              {notifStatus?.intermediario ? (
                 <Button
                   size="small"
                   variant="contained"
@@ -142,7 +142,7 @@ export default function OrderDetailPanel({
                   </Button>
                 )
               )}
-              {notifStatus?.destinatario === 'Enviada' ? (
+              {notifStatus?.destinatario ? (
                 <Button
                   size="small"
                   variant="contained"
