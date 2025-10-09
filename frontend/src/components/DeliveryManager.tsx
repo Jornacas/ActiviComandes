@@ -75,6 +75,7 @@ interface DeliveryOption {
     escola: string;
     dies: string[];
     adreça: string;
+    activitat?: string;
     tipus?: string;
     destinoFinal?: {
       escola: string;
@@ -681,7 +682,7 @@ export default function DeliveryManager() {
                               <Chip
                                 key={idx}
                                 icon={<Person />}
-                                label={`${monitor.nom} (${monitor.dies?.join(', ') || 'N/A'})`}
+                                label={`${monitor.nom} (${monitor.dies?.join(', ') || 'N/A'}) (${monitor.activitat || 'N/A'})`}
                                 size="small"
                                 variant={monitor.tipus === 'directa' ? 'filled' : 'outlined'}
                                 color={monitor.tipus === 'intermèdia' ? 'success' : 'default'}
@@ -734,7 +735,7 @@ export default function DeliveryManager() {
                     >
                       {getAvailableMonitors().map((monitor, index) => (
                         <MenuItem key={index} value={monitor.nom}>
-                          {monitor.nom} - {monitor.escola} ({monitor.dies.join(', ')})
+                          {monitor.nom} ({monitor.dies.join(', ')}) ({monitor.activitat || 'N/A'})
                         </MenuItem>
                       ))}
                     </Select>
