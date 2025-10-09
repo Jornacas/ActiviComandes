@@ -119,7 +119,7 @@ export default function OrderDetailPanel({
           {hasIntermediary && order.estat === 'Assignat' && (
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>📨</Typography>
-              {notifStatus?.intermediario === true ? (
+              {notifStatus?.intermediario === 'Enviada' ? (
                 <Button
                   size="small"
                   variant="contained"
@@ -142,7 +142,7 @@ export default function OrderDetailPanel({
                   </Button>
                 )
               )}
-              {notifStatus?.destinatario === true ? (
+              {notifStatus?.destinatario === 'Enviada' ? (
                 <Button
                   size="small"
                   variant="contained"
