@@ -381,7 +381,7 @@ export default function DeliveryManager() {
   };
 
   const getAvailableMonitors = () => {
-    const monitors: Array<{nom: string; escola: string; dies: string[]}> = [];
+    const monitors: Array<{nom: string; escola: string; dies: string[]; activitat?: string}> = [];
     deliveryOptions.forEach(option => {
       option.monitorsDisponibles.forEach(monitor => {
         if (!monitors.find(m => m.nom === monitor.nom)) {
