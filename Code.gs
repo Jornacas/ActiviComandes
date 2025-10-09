@@ -1415,7 +1415,6 @@ function getSchoolMonitorData() {
     const monitoraIdx = headers.findIndex(h => h === "MONITORA");
     const diaIdx = headers.findIndex(h => h === "DIA");
     const adreçaIdx = headers.findIndex(h => h === "ADREÇA");
-    const activitatIdx = headers.findIndex(h => h === "ACTIVITAT");
 
     if (escolaIdx === -1 || monitoraIdx === -1) {
       return { success: false, error: "No s'han trobat les columnes necessàries (ESCOLA, MONITORA)" };
@@ -1430,7 +1429,6 @@ function getSchoolMonitorData() {
       const monitora = row[monitoraIdx]?.toString().trim();
       const dia = row[diaIdx]?.toString().trim() || '';
       const adreça = row[adreçaIdx]?.toString().trim() || '';
-      const activitat = row[activitatIdx]?.toString().trim() || '';
 
       if (!escola || !monitora) continue;
 
@@ -1454,17 +1452,9 @@ function getSchoolMonitorData() {
       const existingSchool = monitorData.escoles.find(s => s.escola === escola);
       
       if (!existingSchool) {
-        monitorData.escoles.push({ 
-          escola: escola, 
-          adreça: adreça, 
-          dies: dia ? [dia] : [],
-          activitat: activitat
-        });
+        monitorData.escoles.push({ escola: escola, adreça: adreça, dies: dia ? [dia] : [] });
       } else if (dia && !existingSchool.dies.includes(dia)) {
         existingSchool.dies.push(dia);
-      }
-      if (activitat && !existingSchool.activitat) {
-        existingSchool.activitat = activitat;
       }
     }
 
