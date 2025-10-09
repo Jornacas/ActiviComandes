@@ -316,12 +316,16 @@ export default function DeliveryManager() {
       };
 
       console.log('🌐 DEBUG - Request body:', requestBody);
+      
+      // Usar GET en lugar de POST para evitar problemas de CORS con Google Apps Script
+      url.searchParams.append('action', 'createDelivery');
+      url.searchParams.append('token', API_TOKEN);
+      url.searchParams.append('deliveryData', JSON.stringify(deliveryData));
+
+      console.log('🌐 DEBUG - Request URL:', url.toString());
+      
       const response = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
+        method: 'GET'
       });
       console.log('📡 DEBUG - Response status:', response.status);
       const result = await response.json();
