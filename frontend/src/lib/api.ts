@@ -61,10 +61,20 @@ export interface Stats {
 }
 
 class ApiClient {
+  private isPreviewDomain(): boolean {
+    if (typeof window === 'undefined') return false;
+    return window.location.hostname.includes('vercel.app') && !window.location.hostname.includes('activi-comandes-admin.vercel.app');
+  }
+
   private async request<T>(action: string, data?: any, method: 'GET' | 'POST' = 'GET'): Promise<ApiResponse<T>> {
     // DEMO MODE: Return mock data if no real API configured
     if (!API_BASE_URL || API_BASE_URL.includes('DEMO')) {
       return this.getMockData(action);
+    }
+
+    // Use JSONP for preview domains to avoid CORS issues
+    if (this.isPreviewDomain() && method === 'GET') {
+      return this.requestWithJsonp(action, data);
     }
 
     const url = new URL(API_BASE_URL);
@@ -115,6 +125,57 @@ class ApiClient {
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
+  }
+
+  private async requestWithJsonp<T>(action: string, data?: any): Promise<ApiResponse<T>> {
+    return new Promise((resolve, reject) => {
+      const callbackName = `jsonp_callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create script element
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.async = true;
+      script.src = this.buildJsonpUrl(action, data, callbackName);
+
+      // Create global callback function
+      (window as any)[callbackName] = (result: ApiResponse<T>) => {
+        // Clean up
+        document.head.removeChild(script);
+        delete (window as any)[callbackName];
+        
+        resolve(result);
+      };
+
+      // Handle errors
+      script.onerror = () => {
+        document.head.removeChild(script);
+        delete (window as any)[callbackName];
+        reject(new Error('JSONP request failed'));
+      };
+
+      // Add script to head
+      document.head.appendChild(script);
+    });
+  }
+
+  private buildJsonpUrl(action: string, data?: any, callback?: string): string {
+    const url = new URL(API_BASE_URL);
+    url.searchParams.append('action', action);
+    url.searchParams.append('token', API_TOKEN);
+
+    if (callback) {
+      url.searchParams.append('callback', callback);
+    }
+
+    if (data) {
+      Object.keys(data).forEach(key => {
+        const value = data[key];
+        const serializedValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+        url.searchParams.append(key, serializedValue);
+      });
+    }
+
+    return url.toString();
   }
 
   private getMockData(action: string): Promise<ApiResponse> {
