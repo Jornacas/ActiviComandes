@@ -119,12 +119,6 @@ export default function OrderDetailPanel({
           {hasIntermediary && order.estat === 'Assignat' && (
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>📨</Typography>
-              {/* Debug: Mostrar estado actual */}
-              {notifStatus === undefined && (
-                <Typography variant="caption" sx={{ color: 'orange', fontSize: '0.6rem' }}>
-                  Estado no cargado
-                </Typography>
-              )}
               {notifStatus?.intermediario === true ? (
                 <Button
                   size="small"

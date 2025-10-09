@@ -2879,11 +2879,18 @@ function getNotificationStatus(orderId) {
     
     console.log(`🔍 ID ${orderId} - W: "${intermediarioStatus}", X: "${destinatarioStatus}"`);
     
+    // Normalizar los valores para comparación
+    const normalizeStatus = (status) => {
+      if (!status || typeof status !== 'string') return 'Pendiente';
+      const normalized = status.trim().toLowerCase();
+      return (normalized === 'enviada' || normalized === 'enviado') ? 'Enviada' : 'Pendiente';
+    };
+    
     return {
       success: true,
       orderId: orderId,
-      intermediario: intermediarioStatus,
-      destinatario: destinatarioStatus
+      intermediario: normalizeStatus(intermediarioStatus),
+      destinatario: normalizeStatus(destinatarioStatus)
     };
     
   } catch (error) {
@@ -3010,42 +3017,37 @@ function getMultipleNotificationStatuses(orderIds) {
 
     const results = {};
     
-    // Optimización: leer toda la hoja una sola vez
-    const lastRow = sheet.getLastRow();
-    const lastCol = Math.max(sheet.getLastColumn(), 25);
-    const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-    
-    // Crear un mapa de IDs para búsqueda rápida
-    const idMap = new Map();
-    for (let i = 1; i < data.length; i++) {
-      const idCell = data[i][2]; // Columna C
-      if (idCell) {
-        idMap.set(idCell.toString(), i);
-      }
-    }
-    
-    // Para cada ID solicitado, buscar en el mapa
+    // Para cada ID solicitado, buscar en la hoja
     for (const orderId of orderIds) {
       let foundRow = -1;
       
-      // Buscar en el mapa
-      for (const [id, rowIndex] of idMap) {
-        if (id.includes(orderId)) {
-          foundRow = rowIndex;
+      // Buscar la fila del ID
+      const lastRow = sheet.getLastRow();
+      for (let i = 2; i <= lastRow; i++) {
+        const idCell = sheet.getRange(i, 3).getValue(); // Columna C
+        if (idCell && idCell.toString().includes(orderId)) {
+          foundRow = i;
           break;
         }
       }
       
       if (foundRow !== -1) {
-        // Leer desde el array de datos (más rápido que celdas individuales)
-        const intermediarioStatus = data[foundRow][23] || 'Pendiente';
-        const destinatarioStatus = data[foundRow][24] || 'Pendiente';
+        // Leer directamente de las celdas individuales para evitar problemas de caché
+        const intermediarioStatus = sheet.getRange(foundRow, 23).getValue() || 'Pendiente';
+        const destinatarioStatus = sheet.getRange(foundRow, 24).getValue() || 'Pendiente';
         
         console.log(`🔍 ID ${orderId} - W: "${intermediarioStatus}", X: "${destinatarioStatus}"`);
         
+        // Normalizar los valores para comparación
+        const normalizeStatus = (status) => {
+          if (!status || typeof status !== 'string') return 'Pendiente';
+          const normalized = status.trim().toLowerCase();
+          return (normalized === 'enviada' || normalized === 'enviado') ? 'Enviada' : 'Pendiente';
+        };
+        
         results[orderId] = {
-          intermediario: intermediarioStatus,
-          destinatario: destinatarioStatus
+          intermediario: normalizeStatus(intermediarioStatus),
+          destinatario: normalizeStatus(destinatarioStatus)
         };
       } else {
         results[orderId] = {
@@ -3111,6 +3113,34 @@ function updateDestinatarioStatus() {
   // Verificar que se actualizó
   const verifyResult = getNotificationStatus(orderId);
   console.log('🔍 Verificación:', verifyResult);
+  
+  return result;
+}
+
+/**
+ * Función para test directo del frontend
+ */
+function testFrontendCall() {
+  const orderIds = ['7e865f74-2456-4020-992a-f264a33d6846-001'];
+  
+  console.log('🧪 TESTING FRONTEND CALL...');
+  
+  const result = getMultipleNotificationStatuses(orderIds);
+  console.log('📥 Resultado completo:', result);
+  
+  // Simular lo que hace el frontend
+  if (result.success && result.results) {
+    for (const [orderId, status] of Object.entries(result.results)) {
+      const processedStatus = {
+        intermediario: status.intermediario === 'Enviada' || status.intermediario === 'enviada' || status.intermediario === 'ENVIADA',
+        destinatario: status.destinatario === 'Enviada' || status.destinatario === 'enviada' || status.destinatario === 'ENVIADA'
+      };
+      console.log(`🔍 ID ${orderId}:`, {
+        original: status,
+        processed: processedStatus
+      });
+    }
+  }
   
   return result;
 }
