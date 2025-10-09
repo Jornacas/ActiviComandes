@@ -72,36 +72,21 @@ class ApiClient {
     method = 'GET';
 
     const url = new URL(API_BASE_URL);
+    url.searchParams.append('action', action);
+    url.searchParams.append('token', API_TOKEN);
 
-    if (method === 'GET') {
-      url.searchParams.append('action', action);
-      url.searchParams.append('token', API_TOKEN);
-
-      if (data) {
-        Object.keys(data).forEach(key => {
-          const value = data[key];
-          // Serializar objetos complejos como JSON para evitar [object Object]
-          const serializedValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
-          url.searchParams.append(key, serializedValue);
-        });
-      }
+    if (data) {
+      Object.keys(data).forEach(key => {
+        const value = data[key];
+        // Serializar objetos complejos como JSON para evitar [object Object]
+        const serializedValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+        url.searchParams.append(key, serializedValue);
+      });
     }
 
     const config: RequestInit = {
-      method,
+      method: 'GET',
     };
-
-    // Only add Content-Type header for POST requests with body
-    if (method === 'POST') {
-      config.headers = {
-        'Content-Type': 'application/json',
-      };
-      config.body = JSON.stringify({
-        action,
-        token: API_TOKEN,
-        ...data
-      });
-    }
 
     try {
       const response = await fetch(url.toString(), config);
