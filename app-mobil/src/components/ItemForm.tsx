@@ -411,13 +411,13 @@ const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem
             fullWidth
             type="number"
             label="Unitats *"
-            value={formData.unitats === 1 ? '' : formData.unitats}
+            value={formData.unitats}
             onChange={(e) => {
-              const value = e.target.value;
-              handleInputChange('unitats')(value === '' ? 1 : parseInt(value) || 1);
+              const value = parseInt(e.target.value) || 1;
+              handleInputChange('unitats')(value);
             }}
-            inputProps={{ min: 1, placeholder: "1" }}
-            placeholder="Introdueix la quantitat"
+            inputProps={{ min: 1 }}
+            placeholder="1"
           />
         </Grid>
 
