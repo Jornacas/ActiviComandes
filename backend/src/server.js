@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mobileRoutes = require('./routes/mobile');
 const adminRoutes = require('./routes/admin');
+const { legacyCompatibility } = require('./middleware/legacy');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,6 +18,9 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// Compatibilidad con formato antiguo de Apps Script (?action=xxx)
+app.use(legacyCompatibility);
 
 // Health check
 app.get('/', (req, res) => {
