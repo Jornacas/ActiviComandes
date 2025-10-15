@@ -43,7 +43,8 @@ function legacyCompatibility(req, res, next) {
     'calculateDistances': { method: 'POST', path: '/api/admin/calculate-distances' },
     'sendManualNotification': { method: 'POST', path: '/api/admin/notifications/send' },
     'getNotificationStatus': { method: 'GET', path: '/api/admin/notifications/status' },
-    'getMultipleNotificationStatuses': { method: 'POST', path: '/api/admin/notifications/statuses' }
+    'getMultipleNotificationStatuses': { method: 'POST', path: '/api/admin/notifications/statuses' },
+    'updateInternalNotes': { method: 'POST', path: '/api/admin/orders/update-notes' }
   };
 
   const mapping = actionMap[action];
@@ -56,11 +57,42 @@ function legacyCompatibility(req, res, next) {
   // Reescribir la request para que use la ruta REST
   req.url = mapping.path;
   req.path = mapping.path;
+
+  // Si cambiamos de GET a POST, trasladar query params a body
+  const originalMethod = req.method;
   req.method = mapping.method;
+
+  if (originalMethod === 'GET' && mapping.method === 'POST') {
+    // Trasladar todos los query params al body (excepto action)
+    const { action, ...queryParams } = req.query;
+
+    // Parsear valores que son JSON strings
+    const parsedParams = {};
+    for (const [key, value] of Object.entries(queryParams)) {
+      try {
+        // Intentar parsear como JSON si parece un array o objeto
+        if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+          parsedParams[key] = JSON.parse(value);
+        } else {
+          parsedParams[key] = value;
+        }
+      } catch (e) {
+        // Si falla el parse, usar el valor original
+        parsedParams[key] = value;
+      }
+    }
+
+    req.body = { ...req.body, ...parsedParams };
+    req.query = {};
+  }
 
   // Agregar parámetros adicionales si existen en el mapeo
   if (mapping.params) {
-    Object.assign(req.query, mapping.params);
+    if (mapping.method === 'POST') {
+      Object.assign(req.body, mapping.params);
+    } else {
+      Object.assign(req.query, mapping.params);
+    }
   }
 
   // Limpiar el action de los parámetros

@@ -8,13 +8,6 @@ import {
   Typography,
   Button,
   Checkbox,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Alert,
   Dialog,
   DialogTitle,
@@ -35,6 +28,12 @@ import {
   CircularProgress,
 } from '@mui/material';
 import {
+  DataGrid,
+  GridColDef,
+  GridRowSelectionModel,
+  GridToolbar,
+} from '@mui/x-data-grid';
+import {
   LocalShipping,
   Person,
   School,
@@ -50,17 +49,19 @@ import {
   Place,
   Schedule,
 } from '@mui/icons-material';
+import { apiClient } from '../lib/api';
 
 // Types
 interface PreparatedOrder {
+  id: string; // For DataGrid
   idPedido: string;
   idItem: string;
-  solicitant: string;
+  nomCognoms: string; // Changed from solicitant to match backend
   escola: string;
   dataNecessitat: string;
   material: string;
-  quantitat: number;
-  dataLliurament: string;
+  unitats: number; // Changed from quantitat to match backend
+  dataLliuramentPrevista: string; // Changed from dataLliurament to match backend
   rowIndex: number;
 }
 
@@ -93,12 +94,9 @@ interface DeliveryOption {
   };
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
-const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '';
-
 export default function DeliveryManager() {
   const [preparatedOrders, setPreparatedOrders] = useState<PreparatedOrder[]>([]);
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [selectedOrders, setSelectedOrders] = useState<GridRowSelectionModel>([]);
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,14 +176,16 @@ export default function DeliveryManager() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}?action=getPreparatedOrders&token=${API_TOKEN}`);
-      const result = await response.json();
+      const result = await apiClient.getPreparatedOrders();
 
       if (result.success) {
         console.log('📋 DEBUG - Preparated orders from backend:', result.data);
-        
-        
-        setPreparatedOrders(result.data || []);
+        // Add id field for DataGrid
+        const ordersWithId = (result.data || []).map((order: any) => ({
+          ...order,
+          id: order.idItem || order.idPedido, // Use idItem as primary ID
+        }));
+        setPreparatedOrders(ordersWithId);
       } else {
         setError(result.error || 'Error carregant comandes preparades');
       }
@@ -197,23 +197,11 @@ export default function DeliveryManager() {
     }
   };
 
-  const handleOrderSelection = (orderId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedOrders([...selectedOrders, orderId]);
-    } else {
-      setSelectedOrders(selectedOrders.filter(id => id !== orderId));
-    }
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedOrders(preparatedOrders.map(order => order.idItem));
-    } else {
-      setSelectedOrders([]);
-    }
-  };
-
   const getDeliveryOptionsForSelected = async () => {
+    console.log('🚀 DEBUG - getDeliveryOptionsForSelected CALLED!');
+    console.log('🚀 DEBUG - selectedOrders:', selectedOrders);
+    console.log('🚀 DEBUG - selectedOrders.length:', selectedOrders.length);
+
     if (selectedOrders.length === 0) {
       setError('Selecciona almenys una comanda');
       return;
@@ -224,22 +212,19 @@ export default function DeliveryManager() {
 
     try {
       const selectedOrdersData = preparatedOrders.filter(order =>
-        selectedOrders.includes(order.idItem)
+        selectedOrders.includes(order.id)
       );
 
-      const url = new URL(API_BASE_URL);
-      url.searchParams.append('action', 'getDeliveryOptions');
-      url.searchParams.append('token', API_TOKEN);
-      url.searchParams.append('orders', JSON.stringify(selectedOrdersData));
+      console.log('🚀 DEBUG - selectedOrdersData:', selectedOrdersData);
 
-      const response = await fetch(url.toString());
-      const result = await response.json();
+      const result = await apiClient.getDeliveryOptions(selectedOrdersData);
+      console.log('🚀 DEBUG - Response data:', result);
 
       if (result.success) {
         setDeliveryOptions(result.data || []);
         setDeliveryDialogOpen(true);
       } else {
-                    setError(result.error || 'Error obtenint opcions de lliurament');
+        setError(result.error || 'Error obtenint opcions de lliurament');
       }
     } catch (err) {
       console.error('Error getting delivery options:', err);
@@ -287,7 +272,7 @@ export default function DeliveryManager() {
       }
 
       const deliveryData = {
-        orderIds: selectedOrders,
+        orderIds: selectedOrders as string[], // Convert GridRowSelectionModel to string[]
         modalitat: selectedModalitat,
         monitorIntermediaria: selectedModalitat === 'Intermediari' ? selectedMonitor : '',
         escolaDestino: escolaDestino,
@@ -306,31 +291,8 @@ export default function DeliveryManager() {
         deliveryOptions: deliveryOptions.length
       });
 
-      // Usar POST para createDelivery
-      const url = new URL(API_BASE_URL);
-      
-      const requestBody = {
-        action: 'createDelivery',
-        token: API_TOKEN,
-        deliveryData: deliveryData
-      };
-
-      console.log('🌐 DEBUG - Request body:', requestBody);
-      
-      // Usar GET en lugar de POST para evitar problemas de CORS con Google Apps Script
-      url.searchParams.append('action', 'createDelivery');
-      url.searchParams.append('token', API_TOKEN);
-      url.searchParams.append('deliveryData', JSON.stringify(deliveryData));
-
-      console.log('🌐 DEBUG - Request URL:', url.toString());
-      
-      const response = await fetch(url.toString(), {
-        method: 'GET'
-      });
-      console.log('📡 DEBUG - Response status:', response.status);
-      const result = await response.json();
+      const result = await apiClient.createDelivery(deliveryData);
       console.log('📥 DEBUG - Backend response:', result);
-      console.log('📥 DEBUG - processedData:', result.processedData);
 
       if (result.success) {
         setSuccess(result.message || 'Lliurament assignat correctament');
@@ -391,6 +353,67 @@ export default function DeliveryManager() {
     return monitors;
   };
 
+  // DataGrid columns definition
+  const columns: GridColDef[] = [
+    {
+      field: 'nomCognoms',
+      headerName: 'Sol·licitant',
+      width: 150,
+      flex: 1,
+    },
+    {
+      field: 'escola',
+      headerName: 'Escola',
+      width: 120,
+      flex: 0.8,
+    },
+    {
+      field: 'material',
+      headerName: 'Material',
+      width: 200,
+      flex: 1.5,
+    },
+    {
+      field: 'unitats',
+      headerName: 'Quantitat',
+      width: 90,
+      type: 'number',
+    },
+    {
+      field: 'dataNecessitat',
+      headerName: 'Data Necessitat',
+      width: 150,
+      flex: 1,
+      renderCell: (params) => {
+        const date = params.value as string;
+        if (!date) return '';
+        return <span style={{ fontSize: '0.85rem' }}>{formatDate(date)}</span>;
+      },
+    },
+    {
+      field: 'dataLliuramentPrevista',
+      headerName: 'Data Lliurament',
+      width: 150,
+      flex: 1,
+      renderCell: (params) => {
+        const date = params.value as string;
+        if (!date || date.trim() === '') {
+          return (
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+              No assignada
+            </Typography>
+          );
+        }
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Schedule fontSize="small" color="primary" />
+            <span style={{ fontSize: '0.85rem' }}>{formatDate(date)}</span>
+          </Box>
+        );
+      },
+    },
+  ];
+
   if (loading && preparatedOrders.length === 0) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
@@ -431,13 +454,8 @@ export default function DeliveryManager() {
             <>
               <Box sx={{ mb: 2 }}>
                 <Stack direction="row" spacing={2} alignItems="center">
-                  <Checkbox
-                    checked={selectedOrders.length === preparatedOrders.length}
-                    indeterminate={selectedOrders.length > 0 && selectedOrders.length < preparatedOrders.length}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                  />
                   <Typography variant="body2">
-                    Seleccionar totes ({selectedOrders.length} seleccionades)
+                    {selectedOrders.length} seleccionades
                   </Typography>
                   <Button
                     variant="contained"
@@ -451,64 +469,66 @@ export default function DeliveryManager() {
                 </Stack>
               </Box>
 
-              <TableContainer component={Paper}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell padding="checkbox">Sel.</TableCell>
-                      <TableCell>Sol·licitant</TableCell>
-                      <TableCell>Escola</TableCell>
-                      <TableCell>Material</TableCell>
-                      <TableCell>Quantitat</TableCell>
-                      <TableCell>Data Necessitat</TableCell>
-                      <TableCell>Data Lliurament</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {preparatedOrders.map((order) => (
-                      <TableRow key={order.idItem}>
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            checked={selectedOrders.includes(order.idItem)}
-                            onChange={(e) => handleOrderSelection(order.idItem, e.target.checked)}
-                          />
-                        </TableCell>
-                        <TableCell>{order.solicitant}</TableCell>
-                        <TableCell>{order.escola}</TableCell>
-                        <TableCell>{order.material}</TableCell>
-                        <TableCell>{order.quantitat}</TableCell>
-                        <TableCell>{formatDate(order.dataNecessitat)}</TableCell>
-                        <TableCell>
-                          {(() => {
-                            console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: dataLliurament = "${order.dataLliurament}"`);
-                            console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: typeof dataLliurament = "${typeof order.dataLliurament}"`);
-                            console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: dataLliurament length = ${order.dataLliurament?.length}`);
-                            console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: dataLliurament truthy = ${!!order.dataLliurament}`);
-                            
-                            if (order.dataLliurament && order.dataLliurament.trim() !== '') {
-                              const formattedDate = formatDate(order.dataLliurament);
-                              console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: Showing date with icon: "${formattedDate}"`);
-                              return (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <Schedule fontSize="small" color="primary" />
-                                  {formattedDate}
-                                </Box>
-                              );
-                            } else {
-                              console.log(`🔍 RENDER DEBUG - Order ${order.idItem}: Showing "No assignada"`);
-                              return (
-                                <Typography variant="body2" color="text.secondary">
-                                  No assignada
-                                </Typography>
-                              );
-                            }
-                          })()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <Box sx={{ height: 700, width: '100%' }}>
+                <DataGrid
+                  rows={preparatedOrders}
+                  columns={columns}
+                  checkboxSelection
+                  disableRowSelectionOnClick
+                  onRowSelectionModelChange={setSelectedOrders}
+                  rowSelectionModel={selectedOrders}
+                  density="compact"
+                  slots={{
+                    toolbar: GridToolbar,
+                  }}
+                  slotProps={{
+                    toolbar: {
+                      showQuickFilter: true,
+                    },
+                  }}
+                  autoHeight={false}
+                  disableColumnMenu={false}
+                  disableColumnFilter={false}
+                  disableColumnSelector={false}
+                  disableDensitySelector={false}
+                  pageSizeOptions={[10, 25, 50, 100]}
+                  initialState={{
+                    pagination: {
+                      paginationModel: { pageSize: 25 },
+                    },
+                  }}
+                  getRowClassName={(params) => {
+                    // Si tiene fecha de lliurament asignada -> verde suave
+                    if (params.row.dataLliuramentPrevista && params.row.dataLliuramentPrevista.trim() !== '') {
+                      return 'row-assigned';
+                    }
+                    // Si NO tiene fecha -> amarillo suave (pendiente de asignar)
+                    return 'row-pending';
+                  }}
+                  sx={{
+                    '& .row-pending': {
+                      backgroundColor: '#fff9e6', // Amarillo muy suave
+                      '&:hover': {
+                        backgroundColor: '#fff3cc',
+                      },
+                    },
+                    '& .row-assigned': {
+                      backgroundColor: '#f0f9f4', // Verde muy suave
+                      '&:hover': {
+                        backgroundColor: '#e6f5ed',
+                      },
+                    },
+                    '& .MuiDataGrid-cell': {
+                      fontSize: '0.8rem',
+                      padding: '4px 8px',
+                    },
+                    '& .MuiDataGrid-columnHeader': {
+                      fontSize: '0.8rem',
+                      fontWeight: 'bold',
+                    },
+                  }}
+                />
+              </Box>
             </>
           )}
         </CardContent>
@@ -664,8 +684,8 @@ export default function DeliveryManager() {
                         {option.comandes.map((comanda) => (
                           <ListItem key={comanda.idItem} sx={{ py: 0.5 }}>
                             <ListItemText
-                              primary={`${comanda.material} (${comanda.quantitat})`}
-                              secondary={`${comanda.solicitant} • ${formatDate(comanda.dataNecessitat)}`}
+                              primary={`${comanda.material} (${comanda.unitats})`}
+                              secondary={`${comanda.nomCognoms} • ${formatDate(comanda.dataNecessitat)}`}
                             />
                           </ListItem>
                         ))}

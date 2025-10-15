@@ -8,6 +8,7 @@ const router = express.Router();
 const { authenticateRequest } = require('../middleware/auth');
 const sheets = require('../services/sheets');
 const cache = require('../services/cache');
+const maps = require('../services/maps');
 
 // Aplicar autenticación a todas las rutas
 router.use(authenticateRequest);
@@ -49,7 +50,52 @@ router.get('/orders', async (req, res) => {
     }
 
     const headersRow = data[0];
-    let rows = data.slice(1).map(row => row.slice(0, headersRow.length));
+    let rows = data.slice(1)
+      .map(row => row.slice(0, headersRow.length))
+      .filter(row => {
+        // Filtrar filas vacías: verificar que al menos tenga timestamp o ID
+        const hasTimestamp = row[0] && String(row[0]).trim() !== '';
+        const hasIdPedido = row[1] && String(row[1]).trim() !== '';
+        const hasIdItem = row[2] && String(row[2]).trim() !== '';
+        return hasTimestamp || hasIdPedido || hasIdItem;
+      });
+
+    // Ordenar por timestamp (más nuevos primero)
+    const timestampIdx = headersRow.findIndex(h => h === 'Timestamp');
+    console.log('📅 timestampIdx:', timestampIdx);
+    console.log('📅 First 3 timestamps BEFORE sort:', rows.slice(0, 3).map(r => r[timestampIdx]));
+
+    if (timestampIdx !== -1) {
+      rows.sort((a, b) => {
+        // Convertir timestamps en formato DD/MM/YYYY HH:MM:SS a objetos Date
+        const parseTimestamp = (ts) => {
+          if (!ts) return new Date(0);
+
+          // Si ya es un objeto Date, devolverlo
+          if (ts instanceof Date) return ts;
+
+          const str = String(ts);
+
+          // Formato: DD/MM/YYYY HH:MM:SS
+          const match = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+          if (match) {
+            const [_, day, month, year, hour, minute, second] = match;
+            // Los meses en JavaScript son 0-indexed
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day),
+                          parseInt(hour), parseInt(minute), parseInt(second));
+          }
+
+          // Intentar parsear como fecha normal si no coincide con el formato
+          return new Date(ts);
+        };
+
+        const dateA = parseTimestamp(a[timestampIdx]);
+        const dateB = parseTimestamp(b[timestampIdx]);
+
+        return dateB - dateA; // Orden descendente (más nuevos primero)
+      });
+      console.log('📅 First 3 timestamps AFTER sort:', rows.slice(0, 3).map(r => r[timestampIdx]));
+    }
 
     if (limit && limit > 0) {
       rows = rows.slice(0, limit);
@@ -213,7 +259,16 @@ router.post('/orders/update-status', async (req, res) => {
   try {
     const { uuids, newStatus } = req.body;
 
+    console.log('🔄 UPDATE STATUS request received');
+    console.log('🔄 req.body:', req.body);
+    console.log('🔄 uuids:', uuids);
+    console.log('🔄 uuids type:', typeof uuids);
+    console.log('🔄 uuids isArray:', Array.isArray(uuids));
+    console.log('🔄 uuids length:', uuids?.length);
+    console.log('🔄 newStatus:', newStatus);
+
     if (!uuids || !Array.isArray(uuids) || uuids.length === 0) {
+      console.log('🔄 VALIDATION FAILED - returning error');
       return res.json({
         success: false,
         error: "No s'han proporcionat UUIDs vàlids"
@@ -311,6 +366,95 @@ router.post('/orders/update-status', async (req, res) => {
 });
 
 /**
+ * POST /api/admin/orders/update-notes
+ * Actualiza las notas internas de un pedido
+ */
+router.post('/orders/update-notes', async (req, res) => {
+  try {
+    const { orderId, notes } = req.body;
+
+    console.log('📝 UPDATE NOTES request received');
+    console.log('📝 orderId:', orderId);
+    console.log('📝 notes:', notes);
+
+    if (!orderId) {
+      return res.json({
+        success: false,
+        error: "No s'ha proporcionat l'ID de la comanda"
+      });
+    }
+
+    const data = await sheets.getSheetData('Respostes');
+
+    if (!data || data.length <= 1) {
+      return res.json({
+        success: false,
+        error: "No hi ha dades a la fulla 'Respostes'"
+      });
+    }
+
+    const headers = data[0];
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+    const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
+    const notesInternesIndex = headers.findIndex(h => h === "Notes_Internes");
+
+    if (idItemIndex === -1 && idPedidoIndex === -1) {
+      return res.json({
+        success: false,
+        error: "No s'han trobat les columnes d'identificador"
+      });
+    }
+
+    if (notesInternesIndex === -1) {
+      return res.json({
+        success: false,
+        error: "No s'ha trobat la columna 'Notes_Internes'"
+      });
+    }
+
+    let updated = false;
+
+    const updatedData = data.map((row, index) => {
+      if (index === 0) return row;
+
+      const rowIdItem = row[idItemIndex];
+      const rowIdPedido = row[idPedidoIndex];
+
+      if (orderId === rowIdItem || orderId === rowIdPedido) {
+        row[notesInternesIndex] = notes || '';
+        updated = true;
+      }
+
+      return row;
+    });
+
+    if (updated) {
+      // Actualizar en Sheets
+      await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+
+      // Invalidar caché
+      cache.del('cache_respostes_data');
+
+      return res.json({
+        success: true,
+        message: "Notes actualitzades correctament"
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: "No s'ha trobat la comanda amb l'ID proporcionat"
+      });
+    }
+  } catch (error) {
+    console.error('Error updating notes:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error actualitzant les notes: ' + error.message
+    });
+  }
+});
+
+/**
  * POST /api/admin/orders/delete
  * Elimina pedidos
  */
@@ -318,7 +462,15 @@ router.post('/orders/delete', async (req, res) => {
   try {
     const { uuids } = req.body;
 
+    console.log('🗑️ DELETE request received');
+    console.log('🗑️ req.body:', req.body);
+    console.log('🗑️ uuids:', uuids);
+    console.log('🗑️ uuids type:', typeof uuids);
+    console.log('🗑️ uuids isArray:', Array.isArray(uuids));
+    console.log('🗑️ uuids length:', uuids?.length);
+
     if (!uuids || !Array.isArray(uuids) || uuids.length === 0) {
+      console.log('🗑️ VALIDATION FAILED - returning error');
       return res.json({
         success: false,
         error: "No s'han proporcionat UUIDs per eliminar"
@@ -589,16 +741,144 @@ router.post('/delivery/options', async (req, res) => {
       });
     }
 
-    // TODO: Implementar lógica completa de getDeliveryOptions
-    // Por ahora devolvemos estructura básica
+    // Obtener datos de escuelas y monitores
+    const schoolData = await getSchoolMonitorData();
+    if (!schoolData.success) {
+      return res.json(schoolData);
+    }
+
+    const deliveryOptions = [];
+
+    for (const order of orders) {
+      console.log('🎯 Processing order for school:', order.escola);
+
+      // Buscar información de la escuela
+      const directSchool = schoolData.data.schoolsMap.get(order.escola);
+
+      if (directSchool) {
+        // OPCIÓN 1: Entrega directa
+        const directOption = {
+          tipus: "Lliurament Directe",
+          escola: order.escola,
+          adreça: directSchool.adreça,
+          eficiencia: "Calculant...",
+          prioritat: 99999,
+          monitorsDisponibles: directSchool.monitors.map(monitor => ({
+            nom: monitor,
+            dies: directSchool.dies,
+            tipus: "directa"
+          })),
+          descripció: `Entrega directa a ${order.escola}`,
+          distanciaAcademia: "Calculant...",
+          tempsAcademia: "Calculant...",
+          comandes: [order],
+          orderDetails: {
+            idItem: order.idItem,
+            solicitant: order.nomCognoms,
+            material: order.material,
+            quantitat: order.unitats
+          }
+        };
+
+        deliveryOptions.push(directOption);
+
+        // OPCIÓN 2: Entrega con intermediario (buscar monitores multicentre)
+        if (schoolData.data.monitors) {
+          schoolData.data.monitors.forEach(monitor => {
+            if (monitor.escoles?.length > 1) {
+              const targetSchoolInfo = monitor.escoles.find(s => s.escola === order.escola);
+
+              if (targetSchoolInfo) {
+                monitor.escoles.forEach(intermediarySchoolInfo => {
+                  if (intermediarySchoolInfo.escola !== order.escola) {
+                    const intermediaryOption = {
+                      tipus: "Lliurament amb Intermediari",
+                      escola: intermediarySchoolInfo.escola,
+                      escolaDestino: order.escola,
+                      adreça: intermediarySchoolInfo.adreça,
+                      eficiencia: "Calculant...",
+                      prioritat: 99999,
+                      monitorsDisponibles: [{
+                        nom: monitor.nom,
+                        dies: intermediarySchoolInfo.dies,
+                        tipus: "intermediari",
+                        escolaOrigen: intermediarySchoolInfo.escola,
+                        destinoFinal: {
+                          escola: order.escola,
+                          dies: targetSchoolInfo.dies
+                        }
+                      }],
+                      descripció: `Entrega a ${intermediarySchoolInfo.escola} → Monitor transporta a ${order.escola}`,
+                      distanciaAcademia: "Calculant...",
+                      tempsAcademia: "Calculant...",
+                      notes: "Monitor multicentre",
+                      comandes: [order],
+                      orderDetails: {
+                        idItem: order.idItem,
+                        solicitant: order.nomCognoms,
+                        material: order.material,
+                        quantitat: order.unitats
+                      }
+                    };
+
+                    deliveryOptions.push(intermediaryOption);
+                  }
+                });
+              }
+            }
+          });
+        }
+      }
+    }
+
+    // Calcular distancias reales para todas las opciones
+    const addressesMap = new Map();
+    deliveryOptions.forEach(option => {
+      if (option.adreça) {
+        addressesMap.set(option.adreça, option.escola);
+      }
+    });
+
+    const addresses = Array.from(addressesMap.keys());
+    console.log('🗺️ Calculating distances for addresses:', addresses);
+
+    // Calcular distancias usando Google Maps API
+    const distanceResults = await maps.calculateDistances(addresses);
+
+    if (distanceResults.success) {
+      // Aplicar distancias calculadas a las opciones
+      deliveryOptions.forEach(option => {
+        const distanceData = distanceResults.data.find(d => d.address === option.adreça);
+        if (distanceData) {
+          option.distanciaAcademia = distanceData.distance;
+          option.tempsAcademia = distanceData.duration;
+          option.prioritat = distanceData.distanceValue;
+
+          // Calcular eficiencia basada en distancia
+          const km = distanceData.distanceValue / 1000;
+          if (km < 2) option.eficiencia = "Màxima";
+          else if (km < 4) option.eficiencia = "Alta";
+          else if (km < 6) option.eficiencia = "Mitjana";
+          else option.eficiencia = "Baixa";
+        }
+      });
+    } else {
+      // Si falla el cálculo de distancias, asignar valores por defecto
+      console.warn('⚠️ Distance calculation failed, using default values');
+      deliveryOptions.forEach((option, index) => {
+        option.distanciaAcademia = "N/A";
+        option.tempsAcademia = "N/A";
+        option.prioritat = index + 1;
+        option.eficiencia = "Alta";
+      });
+    }
+
+    // Ordenar por prioridad (menor distancia = mayor eficiencia = primero)
+    deliveryOptions.sort((a, b) => a.prioritat - b.prioritat);
 
     res.json({
       success: true,
-      message: 'Endpoint en desarrollo',
-      data: {
-        modalitats: ['Entrega directa', 'Recollida intermediària'],
-        monitors: []
-      }
+      data: deliveryOptions
     });
   } catch (error) {
     console.error('Error getting delivery options:', error);
@@ -608,6 +888,77 @@ router.post('/delivery/options', async (req, res) => {
     });
   }
 });
+
+async function getSchoolMonitorData() {
+  try {
+    const data = await sheets.getSheetData('Dades');
+
+    if (!data || data.length === 0) {
+      return { success: false, error: "La hoja 'Dades' está vacía" };
+    }
+
+    const headers = data[0];
+    const escolaIdx = headers.findIndex(h => h === 'ESCOLA');
+    const monitoraIdx = headers.findIndex(h => h === 'MONITORA');
+    const diaIdx = headers.findIndex(h => h === 'DIA');
+    const adreçaIdx = headers.findIndex(h => h === 'ADREÇA');
+
+    if (escolaIdx === -1 || monitoraIdx === -1) {
+      return { success: false, error: "No s'han trobat les columnes necessàries (ESCOLA, MONITORA)" };
+    }
+
+    const schools = new Map();
+    const monitors = new Map();
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const escola = row[escolaIdx]?.toString().trim();
+      const monitora = row[monitoraIdx]?.toString().trim();
+      const dia = row[diaIdx]?.toString().trim() || '';
+      const adreça = row[adreçaIdx]?.toString().trim() || '';
+
+      if (!escola || !monitora) continue;
+
+      if (!schools.has(escola)) {
+        schools.set(escola, { nom: escola, adreça: adreça, monitors: [], dies: [] });
+      }
+
+      const schoolData = schools.get(escola);
+      if (!schoolData.monitors.includes(monitora)) {
+        schoolData.monitors.push(monitora);
+      }
+      if (dia && !schoolData.dies.includes(dia)) {
+        schoolData.dies.push(dia);
+      }
+
+      if (!monitors.has(monitora)) {
+        monitors.set(monitora, { nom: monitora, escoles: [] });
+      }
+
+      const monitorData = monitors.get(monitora);
+      const existingSchool = monitorData.escoles.find(s => s.escola === escola);
+
+      if (!existingSchool) {
+        monitorData.escoles.push({ escola: escola, adreça: adreça, dies: dia ? [dia] : [] });
+      } else if (dia && !existingSchool.dies.includes(dia)) {
+        existingSchool.dies.push(dia);
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        schools: Array.from(schools.values()),
+        monitors: Array.from(monitors.values()),
+        schoolsMap: schools,
+        monitorsMap: monitors
+      }
+    };
+  } catch (error) {
+    console.error('Error in getSchoolMonitorData:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 /**
  * POST /api/admin/delivery/create
@@ -740,6 +1091,9 @@ router.post('/notifications/statuses', async (req, res) => {
   try {
     const { orderIds } = req.body;
 
+    console.log('[NOTIFICATIONS] Request body:', req.body);
+    console.log('[NOTIFICATIONS] orderIds:', orderIds);
+
     if (!orderIds || !Array.isArray(orderIds)) {
       return res.json({
         success: false,
@@ -747,12 +1101,57 @@ router.post('/notifications/statuses', async (req, res) => {
       });
     }
 
-    // TODO: Implementar lógica de getMultipleNotificationStatuses
+    // Obtener datos del sheet Respostes
+    const data = await sheets.getSheetData('Respostes');
+
+    if (!data || data.length < 2) {
+      return res.json({
+        success: true,
+        results: {}
+      });
+    }
+
+    const headers = data[0];
+    const idItemIndex = headers.findIndex(h => h === 'ID_Item');
+    const notifIntermediarioIndex = headers.findIndex(h => h === 'Notificacion_Intermediari');
+    const notifDestinatarioIndex = headers.findIndex(h => h === 'Notificacion_Destinatari');
+
+    console.log('[NOTIFICATIONS] Headers:', headers);
+    console.log('[NOTIFICATIONS] Indices:', { idItemIndex, notifIntermediarioIndex, notifDestinatarioIndex });
+
+    if (idItemIndex === -1) {
+      return res.json({
+        success: false,
+        error: "Columna ID_Item no trobada"
+      });
+    }
+
+    // Buscar estados de notificación para cada orderId
+    const results = {};
+
+    for (const orderId of orderIds) {
+      // Buscar la fila correspondiente
+      const row = data.slice(1).find(r => r[idItemIndex] === orderId);
+
+      if (row) {
+        results[orderId] = {
+          intermediario: notifIntermediarioIndex !== -1 ? (row[notifIntermediarioIndex] || 'Pendent') : 'Pendent',
+          destinatario: notifDestinatarioIndex !== -1 ? (row[notifDestinatarioIndex] || 'Pendent') : 'Pendent'
+        };
+      } else {
+        // Si no se encuentra la fila, devolver estados por defecto
+        results[orderId] = {
+          intermediario: 'Pendent',
+          destinatario: 'Pendent'
+        };
+      }
+    }
+
+    console.log('[NOTIFICATIONS] Results:', results);
 
     res.json({
       success: true,
-      message: 'Endpoint en desarrollo',
-      data: []
+      results: results
     });
   } catch (error) {
     console.error('Error getting notification statuses:', error);

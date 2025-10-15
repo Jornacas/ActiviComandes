@@ -112,6 +112,12 @@ export default function OrdersTable() {
   const [notificationStatuses, setNotificationStatuses] = useState<{[key: string]: {intermediario: boolean, destinatario: boolean}}>({});
   const [loadingNotificationStatuses, setLoadingNotificationStatuses] = useState(true);
 
+  // Estados para el modal de notas "En procés"
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [selectedOrderForNotes, setSelectedOrderForNotes] = useState<any>(null);
+  const [internalNotes, setInternalNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+
   // Guardar el estado en localStorage cuando cambie
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -423,7 +429,26 @@ ${order.material || 'N/A'}
       type: 'dateTime',
       valueFormatter: (params) => {
         if (!params.value) return '';
-        const date = new Date(params.value);
+
+        let date: Date;
+        const value = params.value as string;
+
+        // Si es formato DD/MM/YYYY (formato europeo del Google Sheet)
+        if (typeof value === 'string' && value.includes('/')) {
+          const parts = value.split('/');
+          if (parts.length === 3) {
+            const day = parseInt(parts[0]);
+            const month = parseInt(parts[1]) - 1;
+            const year = parseInt(parts[2]);
+            date = new Date(year, month, day);
+          } else {
+            date = new Date(value);
+          }
+        } else {
+          date = new Date(value);
+        }
+
+        if (isNaN(date.getTime())) return value; // Si no es válida, devolver original
         return date.toLocaleDateString('ca-ES', { day: '2-digit', month: '2-digit' });
       },
     },
@@ -447,21 +472,39 @@ ${order.material || 'N/A'}
         // Función para formatear la fecha en formato "martes 03 noviembre"
         const formatDataNecessitat = (dateString: string) => {
           if (!dateString) return '';
-          
+
           // Si es una fecha ISO con Z (UTC), extraer solo la parte de fecha
           if (dateString.includes('T') && dateString.includes('Z')) {
             const dateOnly = dateString.split('T')[0]; // "2025-10-01"
             const [year, month, day] = dateOnly.split('-');
             const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-            
+
             const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
             const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
 
             return `${days[date.getDay()]} ${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]}`;
           }
-          
-          // Para fechas normales
+
+          // Si es formato DD/MM/YYYY (formato europeo del Google Sheet)
+          if (dateString.includes('/')) {
+            const parts = dateString.split('/');
+            if (parts.length === 3) {
+              const day = parseInt(parts[0]);
+              const month = parseInt(parts[1]) - 1; // Meses en JS son 0-indexed
+              const year = parseInt(parts[2]);
+              const date = new Date(year, month, day);
+
+              const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+              const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+
+              return `${days[date.getDay()]} ${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]}`;
+            }
+          }
+
+          // Para fechas normales (ISO 8601 sin Z)
           const dateObj = new Date(dateString);
+          if (isNaN(dateObj.getTime())) return dateString; // Si no es válida, devolver original
+
           const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
           const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
 
@@ -561,14 +604,29 @@ ${order.material || 'N/A'}
       width: 120,
       renderCell: (params) => {
         const normalized = formatSentenceCase(params.value as string);
+        const order = params.row;
+        const hasNotes = order.notesInternes && order.notesInternes.trim() !== '';
+        const isEnProces = normalized === 'En proces';
+
         return (
-          <Chip
-            icon={statusIcons[normalized as keyof typeof statusIcons] || statusIcons['']}
-            label={normalized || 'Pendent'}
-            color={statusColors[normalized as keyof typeof statusColors] || 'default'}
-            size="small"
-            sx={{ fontSize: '0.75rem' }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Chip
+              icon={statusIcons[normalized as keyof typeof statusIcons] || statusIcons['']}
+              label={normalized || 'Pendent'}
+              color={statusColors[normalized as keyof typeof statusColors] || 'default'}
+              size="small"
+              sx={{ fontSize: '0.75rem' }}
+              onClick={isEnProces && hasNotes ? () => handleOpenNotesFromChip(order) : undefined}
+              clickable={!!(isEnProces && hasNotes)}
+            />
+            {isEnProces && hasNotes && (
+              <Tooltip title="Veure notes" placement="top">
+                <span style={{ fontSize: '1rem', cursor: 'pointer' }} onClick={() => handleOpenNotesFromChip(order)}>
+                  📝
+                </span>
+              </Tooltip>
+            )}
+          </Box>
         );
       },
     },
@@ -894,7 +952,7 @@ ${order.material || 'N/A'}
     try {
       setLoading(true);
       const result = await apiClient.removeIntermediaryAssignment(orderIds);
-      
+
       if (result.success) {
         // Refresh data after successful removal
         await loadData();
@@ -908,6 +966,61 @@ ${order.material || 'N/A'}
     } finally {
       setLoading(false);
     }
+  };
+
+  // Función para actualizar las notas internas
+  const updateInternalNotes = async (orderId: string, notes: string) => {
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '';
+
+      if (!API_BASE_URL) {
+        throw new Error('API_BASE_URL no está configurada');
+      }
+
+      const url = new URL(API_BASE_URL);
+      url.searchParams.append('action', 'updateInternalNotes');
+      url.searchParams.append('token', API_TOKEN);
+      url.searchParams.append('orderId', orderId);
+      url.searchParams.append('notes', notes);
+
+      const response = await fetch(url.toString());
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('Error actualizando notas:', result.error);
+      }
+    } catch (error) {
+      console.error('Error actualizando notas:', error);
+    }
+  };
+
+  // Guardar notas y actualizar estado
+  const handleSaveNotes = async () => {
+    if (!selectedOrderForNotes) return;
+
+    setSavingNotes(true);
+    try {
+      // Actualizar el estado y las notas
+      await performStatusUpdate([selectedOrderForNotes.id], newStatus, internalNotes);
+
+      // Cerrar el modal
+      setNotesDialogOpen(false);
+      setSelectedOrderForNotes(null);
+      setInternalNotes('');
+    } catch (error) {
+      console.error('Error guardando notas:', error);
+      setError('Error guardant les notes');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  // Abrir el modal de notas desde el chip de estado
+  const handleOpenNotesFromChip = (order: any) => {
+    setSelectedOrderForNotes(order);
+    setInternalNotes(order.notesInternes || '');
+    setNotesDialogOpen(true);
   };
 
   const loadData = async () => {
@@ -960,11 +1073,13 @@ ${order.material || 'N/A'}
 
         // Transform raw data to Order objects (same as loadData)
         const transformedOrders = rows.map((row, index) => {
-          const order: any = { id: index };
+          const order: any = {};
           headers.forEach((header, headerIndex) => {
             // Use headers as they come from backend (already normalized)
             order[header] = row[headerIndex] || '';
           });
+          // Use idItem as the primary ID, fallback to index if not available
+          order.id = order.idItem || order.idPedido || `row-${index}`;
           return order;
         });
 
@@ -1012,16 +1127,51 @@ ${order.material || 'N/A'}
   const updateStatus = async () => {
     if (!newStatus || selectedRows.length === 0) return;
 
+    // Si el nuevo estado es "En proces" y hay una sola orden seleccionada, abrir modal de notas
+    if (newStatus === 'En proces' && selectedRows.length === 1) {
+      const order = orders.find(o => o.id === selectedRows[0]);
+      if (order) {
+        setSelectedOrderForNotes(order);
+        setInternalNotes(order.notesInternes || '');
+        setNotesDialogOpen(true);
+        return; // No continuar con la actualización aún
+      }
+    }
+
+    await performStatusUpdate(selectedRows, newStatus);
+  };
+
+  const performStatusUpdate = async (rowIds: GridRowSelectionModel, status: string, notes?: string) => {
     setUpdating(true);
     try {
       // Get UUIDs of selected orders (use idPedido or idItem)
-      const selectedUuids = selectedRows.map(rowId => {
-        const order = orders.find(o => o.id === rowId);
-        return order?.idPedido || order?.idItem || order?.uuid || '';
-      }).filter(uuid => uuid);
+      console.log('🔄 selectedRows:', rowIds);
+      console.log('🔄 orders:', orders);
 
-      const response = await apiClient.updateOrderStatus(selectedUuids, newStatus);
+      const selectedOrders = rowIds.map(rowId => orders.find(o => o.id === rowId)).filter(Boolean);
+      const selectedUuids = selectedOrders.map(order => order?.idItem || order?.idPedido || order?.uuid || '').filter(uuid => uuid);
+
+      console.log('🔄 selectedUuids to update:', selectedUuids);
+      console.log('🔄 newStatus:', status);
+
+      const response = await apiClient.updateOrderStatus(selectedUuids, status);
       if (response.success) {
+        // Si el nuevo estado es "En proces" y hay notas, actualizar las notas
+        if (status === 'En proces' && notes !== undefined && selectedUuids.length === 1) {
+          await updateInternalNotes(selectedUuids[0], notes);
+        }
+        // Si el nuevo estado NO es "En proces", eliminar las notas si existían
+        else if (status !== 'En proces') {
+          for (let i = 0; i < selectedUuids.length; i++) {
+            const order = selectedOrders[i];
+            // Si la orden tenía notas y ahora no está en "En proces", eliminarlas
+            if (order?.notesInternes && order.notesInternes.trim() !== '') {
+              console.log('🗑️ Eliminando notas de orden:', selectedUuids[i]);
+              await updateInternalNotes(selectedUuids[i], '');
+            }
+          }
+        }
+
         // Try fast reload first, fallback to full reload
         try {
           await loadDataFast();
@@ -1051,10 +1201,17 @@ ${order.material || 'N/A'}
     setDeleting(true);
     try {
       // Get UUIDs of selected orders
+      console.log('🔍 selectedRows:', selectedRows);
+      console.log('🔍 orders:', orders);
+
       const selectedUuids = selectedRows.map(rowId => {
         const order = orders.find(o => o.id === rowId);
+        console.log(`🔍 Looking for rowId ${rowId}, found:`, order);
+        console.log(`🔍 idPedido: ${order?.idPedido}, idItem: ${order?.idItem}, uuid: ${order?.uuid}`);
         return order?.idPedido || order?.idItem || order?.uuid || '';
       }).filter(uuid => uuid);
+
+      console.log('🔍 selectedUuids to delete:', selectedUuids);
 
       const response = await apiClient.deleteOrders(selectedUuids);
       if (response.success) {
@@ -1239,11 +1396,6 @@ ${order.material || 'N/A'}
             esMaterialPersonalitzat: false,
             distanciaAcademia: false,
           }}
-          initialState={{
-            sorting: {
-              sortModel: [{ field: 'timestamp', sort: 'desc' }],
-            },
-          }}
           slots={{
             toolbar: GridToolbar,
           }}
@@ -1349,6 +1501,69 @@ ${order.material || 'N/A'}
           {notificationStatus.message}
         </Alert>
       </Snackbar>
+
+      {/* Modal de notes per "En procés" */}
+      <Dialog
+        open={notesDialogOpen}
+        onClose={() => !savingNotes && setNotesDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          📝 Notes Internes - Material En Procés
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 1 }}>
+            {selectedOrderForNotes && (
+              <>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <strong>Material:</strong> {selectedOrderForNotes.material}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
+                  <strong>Sol·licitant:</strong> {selectedOrderForNotes.nomCognoms}
+                </Typography>
+              </>
+            )}
+
+            <Typography variant="body2" gutterBottom sx={{ mt: 2, mb: 1 }}>
+              Afegeix notes sobre què falta o cal completar:
+            </Typography>
+
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              value={internalNotes}
+              onChange={(e) => setInternalNotes(e.target.value)}
+              variant="outlined"
+              placeholder="Ex: Falta comprar 3 unitats més, arriba divendres..."
+              disabled={savingNotes}
+              autoFocus
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => {
+              setNotesDialogOpen(false);
+              setSelectedOrderForNotes(null);
+              setInternalNotes('');
+            }}
+            disabled={savingNotes}
+          >
+            Cancel·lar
+          </Button>
+          <Button
+            onClick={handleSaveNotes}
+            variant="contained"
+            color="primary"
+            disabled={savingNotes}
+            startIcon={savingNotes ? <CircularProgress size={20} /> : null}
+          >
+            {savingNotes ? 'Guardant...' : 'Guardar i Actualitzar Estat'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

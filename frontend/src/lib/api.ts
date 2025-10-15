@@ -173,7 +173,7 @@ class ApiClient {
   }
 
   async updateOrderStatus(uuids: string[], newStatus: string): Promise<ApiResponse<{ changesMade: number }>> {
-    return this.request('updateOrderStatus', { uuids: uuids.join(','), newStatus }, 'GET');
+    return this.request('updateOrderStatus', { uuids, newStatus }, 'POST');
   }
 
   async deleteOrders(uuids: string[]): Promise<ApiResponse<{ deletedCount: number }>> {
@@ -204,17 +204,89 @@ class ApiClient {
     return this.request('getStats', { filters });
   }
 
-  // New delivery management methods
+  // New delivery management methods (Node.js REST API)
   async getPreparatedOrders(): Promise<ApiResponse<any[]>> {
-    return this.request('getPreparatedOrders');
+    // Node.js backend: GET /api/admin/orders/preparated
+    const url = `${API_BASE_URL}/api/admin/orders/preparated`;
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 
   async getDeliveryOptions(orders: any[]): Promise<ApiResponse<any[]>> {
-    return this.request('getDeliveryOptions', { orders }, 'POST');
+    // Node.js backend: POST /api/admin/delivery/options
+    const url = `${API_BASE_URL}/api/admin/delivery/options`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orders }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 
   async createDelivery(deliveryData: any): Promise<ApiResponse<{ updatedRows: number; message: string }>> {
-    return this.request('createDelivery', { deliveryData }, 'POST');
+    // Node.js backend: POST /api/admin/delivery/create
+    const url = `${API_BASE_URL}/api/admin/delivery/create`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deliveryData }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 
   async calculateDistances(addresses: string[]): Promise<ApiResponse<any[]>> {

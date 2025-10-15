@@ -104,4 +104,9 @@ $RECYCLE.BIN/
 
 # clasp
 .clasp.json
-.claspignore activiconta-9166254b6d22.json
+.claspignore
+
+# Google credentials (service account keys)
+credentials.json
+activiconta-*.json
+backend/credentials.json
