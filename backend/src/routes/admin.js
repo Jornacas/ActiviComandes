@@ -968,6 +968,9 @@ router.post('/delivery/create', async (req, res) => {
   try {
     const { deliveryData } = req.body;
 
+    console.log('🚚 CREATE DELIVERY request received');
+    console.log('🚚 deliveryData:', deliveryData);
+
     if (!deliveryData) {
       return res.json({
         success: false,
@@ -975,18 +978,131 @@ router.post('/delivery/create', async (req, res) => {
       });
     }
 
-    // TODO: Implementar lógica completa de createDelivery
-    // Por ahora estructura básica
+    const { orderIds, modalitat, monitorIntermediaria, escolaDestino, dataEntrega } = deliveryData;
 
-    res.json({
-      success: true,
-      message: 'Endpoint en desarrollo'
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.json({
+        success: false,
+        error: "No s'han proporcionat IDs de comandes"
+      });
+    }
+
+    if (!modalitat) {
+      return res.json({
+        success: false,
+        error: "No s'ha proporcionat la modalitat de lliurament"
+      });
+    }
+
+    // Obtener datos de la hoja Respostes
+    const data = await sheets.getSheetData('Respostes');
+
+    if (!data || data.length <= 1) {
+      return res.json({
+        success: false,
+        error: "No hi ha dades per actualitzar"
+      });
+    }
+
+    const headers = data[0];
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+    const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
+    const estatIndex = headers.findIndex(h => h === "Estat");
+    const modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
+    const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
+    const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
+
+    if (idItemIndex === -1 && idPedidoIndex === -1) {
+      return res.json({
+        success: false,
+        error: "No s'han trobat les columnes d'identificador"
+      });
+    }
+
+    let updatedRows = 0;
+    const currentTimestamp = new Date();
+
+    // Actualizar las filas correspondientes
+    const updatedData = data.map((row, index) => {
+      if (index === 0) return row; // Skip header
+
+      const rowIdItem = row[idItemIndex];
+      const rowIdPedido = row[idPedidoIndex];
+
+      // Verificar si este row es uno de los seleccionados
+      const matchesId = orderIds.some(orderId =>
+        orderId === rowIdItem || orderId === rowIdPedido
+      );
+
+      if (matchesId) {
+        // Actualizar estado a "Assignat"
+        if (estatIndex !== -1) {
+          row[estatIndex] = 'Assignat';
+        }
+
+        // Actualizar modalidad de entrega
+        if (modalitatEntregaIndex !== -1) {
+          row[modalitatEntregaIndex] = modalitat === 'Directa' ? 'DIRECTA' : 'INTERMEDIARI';
+        }
+
+        // Si es entrega con intermediario, guardar datos del intermediario
+        if (modalitat === 'Intermediari') {
+          if (monitorIntermediariIndex !== -1) {
+            row[monitorIntermediariIndex] = monitorIntermediaria || '';
+          }
+          if (escolaDestinoIndex !== -1) {
+            row[escolaDestinoIndex] = escolaDestino || '';
+          }
+        } else {
+          // Si es directa, limpiar campos de intermediario
+          if (monitorIntermediariIndex !== -1) {
+            row[monitorIntermediariIndex] = '';
+          }
+          if (escolaDestinoIndex !== -1) {
+            row[escolaDestinoIndex] = '';
+          }
+        }
+
+        // Actualizar fecha de lliurament prevista
+        if (dataLliuramentIndex !== -1 && dataEntrega) {
+          // Convertir la fecha string YYYY-MM-DD a objeto Date
+          const dateObj = new Date(dataEntrega);
+          row[dataLliuramentIndex] = dateObj;
+        }
+
+        updatedRows++;
+        console.log(`✅ Updated row ${index}: ${rowIdItem || rowIdPedido}`);
+      }
+
+      return row;
     });
+
+    if (updatedRows > 0) {
+      // Actualizar en Sheets
+      await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+
+      // Invalidar caché
+      cache.del('cache_respostes_data');
+
+      console.log(`✅ Successfully updated ${updatedRows} rows`);
+
+      return res.json({
+        success: true,
+        updatedRows: updatedRows,
+        message: `Lliurament assignat correctament. ${updatedRows} comand${updatedRows > 1 ? 'es' : 'a'} actualitzad${updatedRows > 1 ? 'es' : 'a'}.`
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: "No s'han trobat comandes per actualitzar amb els IDs proporcionats"
+      });
+    }
   } catch (error) {
     console.error('Error creating delivery:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Error creant el lliurament: ' + error.message
     });
   }
 });
