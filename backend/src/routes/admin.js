@@ -9,6 +9,7 @@ const { authenticateRequest } = require('../middleware/auth');
 const sheets = require('../services/sheets');
 const cache = require('../services/cache');
 const maps = require('../services/maps');
+const chat = require('../services/chat');
 
 // Aplicar autenticación a todas las rutas
 router.use(authenticateRequest);
@@ -1115,24 +1116,112 @@ router.post('/delivery/remove-intermediary', async (req, res) => {
   try {
     const { orderIds } = req.body;
 
-    if (!orderIds || !Array.isArray(orderIds)) {
+    console.log('🔄 REMOVE INTERMEDIARY request received');
+    console.log('🔄 orderIds:', orderIds);
+
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
       return res.json({
         success: false,
         error: "No s'han proporcionat IDs de comandes"
       });
     }
 
-    // TODO: Implementar lógica de removeIntermediaryAssignment
+    // Obtener datos de la hoja Respostes
+    const data = await sheets.getSheetData('Respostes');
 
-    res.json({
-      success: true,
-      message: 'Endpoint en desarrollo'
+    if (!data || data.length <= 1) {
+      return res.json({
+        success: false,
+        error: "No hi ha dades per actualitzar"
+      });
+    }
+
+    const headers = data[0];
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+    const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
+    const estatIndex = headers.findIndex(h => h === "Estat");
+    const modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
+    const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
+    const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
+
+    if (idItemIndex === -1 && idPedidoIndex === -1) {
+      return res.json({
+        success: false,
+        error: "No s'han trobat les columnes d'identificador"
+      });
+    }
+
+    let updatedRows = 0;
+
+    // Actualizar las filas correspondientes
+    const updatedData = data.map((row, index) => {
+      if (index === 0) return row; // Skip header
+
+      const rowIdItem = row[idItemIndex];
+      const rowIdPedido = row[idPedidoIndex];
+
+      // Verificar si este row es uno de los seleccionados
+      const matchesId = orderIds.some(orderId =>
+        orderId === rowIdItem || orderId === rowIdPedido
+      );
+
+      if (matchesId) {
+        // Volver el estado a "Preparat"
+        if (estatIndex !== -1) {
+          row[estatIndex] = 'Preparat';
+        }
+
+        // Limpiar modalidad de entrega
+        if (modalitatEntregaIndex !== -1) {
+          row[modalitatEntregaIndex] = '';
+        }
+
+        // Limpiar datos del intermediario
+        if (monitorIntermediariIndex !== -1) {
+          row[monitorIntermediariIndex] = '';
+        }
+        if (escolaDestinoIndex !== -1) {
+          row[escolaDestinoIndex] = '';
+        }
+
+        // Limpiar fecha de lliurament
+        if (dataLliuramentIndex !== -1) {
+          row[dataLliuramentIndex] = '';
+        }
+
+        updatedRows++;
+        console.log(`✅ Removed intermediary from row ${index}: ${rowIdItem || rowIdPedido}`);
+      }
+
+      return row;
     });
+
+    if (updatedRows > 0) {
+      // Actualizar en Sheets
+      await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+
+      // Invalidar caché
+      cache.del('cache_respostes_data');
+
+      console.log(`✅ Successfully removed intermediary from ${updatedRows} rows`);
+
+      return res.json({
+        success: true,
+        updatedRows: updatedRows,
+        message: `Assignació d'intermediari eliminada. ${updatedRows} comand${updatedRows > 1 ? 'es' : 'a'} actualitzad${updatedRows > 1 ? 'es' : 'a'}.`
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: "No s'han trobat comandes per actualitzar amb els IDs proporcionats"
+      });
+    }
   } catch (error) {
     console.error('Error removing intermediary:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Error eliminant intermediari: ' + error.message
     });
   }
 });
@@ -1149,25 +1238,75 @@ router.post('/notifications/send', async (req, res) => {
   try {
     const { spaceName, message, orderId, notificationType } = req.body;
 
+    console.log('📨 SEND NOTIFICATION request received');
+    console.log('📨 spaceName:', spaceName);
+    console.log('📨 notificationType:', notificationType);
+    console.log('📨 orderId:', orderId);
+
     if (!spaceName || !message) {
       return res.json({
         success: false,
-        error: "Falten dades obligatòries"
+        error: "Falten dades obligatòries (spaceName, message)"
       });
     }
 
-    // TODO: Implementar integración con Google Chat
-    console.log('[NOTIFICATION] Send notification:', { spaceName, message, orderId, notificationType });
+    // Enviar notificación usando el servicio de chat
+    const result = await chat.sendChatNotification(spaceName, message);
 
-    res.json({
-      success: true,
-      message: 'Notificació enviada (simulat - integració Google Chat pendent)'
-    });
+    if (result.success) {
+      // Si hay orderId, actualizar el estado de notificación en Sheets
+      if (orderId && notificationType) {
+        try {
+          const data = await sheets.getSheetData('Respostes');
+
+          if (data && data.length > 1) {
+            const headers = data[0];
+            const idItemIndex = headers.findIndex(h => h === 'ID_Item');
+            const notifColumn = notificationType === 'intermediario'
+              ? headers.findIndex(h => h === 'Notificacion_Intermediari')
+              : headers.findIndex(h => h === 'Notificacion_Destinatari');
+
+            if (idItemIndex !== -1 && notifColumn !== -1) {
+              const updatedData = data.map((row, index) => {
+                if (index === 0) return row;
+                if (row[idItemIndex] === orderId) {
+                  row[notifColumn] = 'Enviada';
+                }
+                return row;
+              });
+
+              await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+              cache.del('cache_respostes_data');
+              console.log(`✅ Estado de notificación actualizado para ${orderId}`);
+            }
+          }
+        } catch (updateError) {
+          console.error('Error actualizando estado de notificación:', updateError);
+          // No fallar si hay error actualizando el estado
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: result.message || 'Notificació enviada correctament',
+        data: {
+          spaceName: result.spaceName,
+          spaceId: result.spaceId,
+          messageId: result.messageId,
+          simulated: result.simulated || false
+        }
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: result.error || 'Error enviant notificació'
+      });
+    }
   } catch (error) {
     console.error('Error sending notification:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Error enviant notificació: ' + error.message
     });
   }
 });
@@ -1180,21 +1319,65 @@ router.get('/notifications/status/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    // TODO: Implementar lógica de getNotificationStatus
+    console.log('📊 GET NOTIFICATION STATUS request received');
+    console.log('📊 orderId:', orderId);
 
-    res.json({
-      success: true,
-      message: 'Endpoint en desarrollo',
-      data: {
-        orderId: orderId,
-        notificacions: []
-      }
-    });
+    if (!orderId) {
+      return res.json({
+        success: false,
+        error: "No s'ha proporcionat l'ID de la comanda"
+      });
+    }
+
+    // Obtener datos del sheet Respostes
+    const data = await sheets.getSheetData('Respostes');
+
+    if (!data || data.length < 2) {
+      return res.json({
+        success: true,
+        data: {
+          orderId: orderId,
+          intermediario: 'Pendent',
+          destinatario: 'Pendent'
+        }
+      });
+    }
+
+    const headers = data[0];
+    const idItemIndex = headers.findIndex(h => h === 'ID_Item');
+    const notifIntermediarioIndex = headers.findIndex(h => h === 'Notificacion_Intermediari');
+    const notifDestinatarioIndex = headers.findIndex(h => h === 'Notificacion_Destinatari');
+
+    if (idItemIndex === -1) {
+      return res.json({
+        success: false,
+        error: "Columna ID_Item no trobada"
+      });
+    }
+
+    // Buscar la fila correspondiente
+    const row = data.slice(1).find(r => r[idItemIndex] === orderId);
+
+    if (row) {
+      return res.json({
+        success: true,
+        data: {
+          orderId: orderId,
+          intermediario: notifIntermediarioIndex !== -1 ? (row[notifIntermediarioIndex] || 'Pendent') : 'Pendent',
+          destinatario: notifDestinatarioIndex !== -1 ? (row[notifDestinatarioIndex] || 'Pendent') : 'Pendent'
+        }
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: "No s'ha trobat la comanda amb l'ID proporcionat"
+      });
+    }
   } catch (error) {
     console.error('Error getting notification status:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Error obtenint estat de notificacions: ' + error.message
     });
   }
 });
@@ -1290,25 +1473,35 @@ router.post('/calculate-distances', async (req, res) => {
   try {
     const { addresses } = req.body;
 
-    if (!addresses || !Array.isArray(addresses)) {
+    console.log('🗺️ CALCULATE DISTANCES request received');
+    console.log('🗺️ addresses:', addresses);
+
+    if (!addresses || !Array.isArray(addresses) || addresses.length === 0) {
       return res.json({
         success: false,
-        error: "No s'han proporcionat adreces"
+        error: "No s'han proporcionat adreces vàlides"
       });
     }
 
-    // TODO: Implementar integración con Google Maps API
+    // Usar el servicio de maps para calcular distancias
+    const result = await maps.calculateDistances(addresses);
 
-    res.json({
-      success: true,
-      message: 'Endpoint en desarrollo - Google Maps API pendent',
-      data: []
-    });
+    if (result.success) {
+      return res.json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: result.error || 'Error calculant distàncies'
+      });
+    }
   } catch (error) {
     console.error('Error calculating distances:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Error calculant distàncies: ' + error.message
     });
   }
 });
