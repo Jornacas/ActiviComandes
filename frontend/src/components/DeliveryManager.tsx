@@ -289,6 +289,9 @@ export default function DeliveryManager() {
       console.log('📥 DEBUG - Backend response:', result);
 
       if (result.success) {
+        // Después de crear el delivery exitosamente, enviar notificaciones
+        await sendNotificationsForDelivery(option, isDirect, selectedMonitor, dataEntrega, orderIds);
+
         setSuccess(result.message || 'Lliurament assignat correctament');
 
         setDeliveryDialogOpen(false);
@@ -306,6 +309,146 @@ export default function DeliveryManager() {
       setError('Error de connexió amb el servidor');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Función para enviar notificaciones después de crear un delivery
+  const sendNotificationsForDelivery = async (
+    option: DeliveryOption,
+    isDirect: boolean,
+    selectedMonitor: string | undefined,
+    dataEntrega: string,
+    orderIds: string[]
+  ) => {
+    try {
+      const destinatarioNom = option.nomCognoms || option.comandes[0]?.nomCognoms;
+      const escolaReceptora = option.escola;
+      const activitat = option.destinatari?.activitat || 'N/A';
+
+      // Construir spaceName basado en la escuela y actividad del destinatario
+      let spaceName = escolaReceptora.replace(/\s+/g, '');
+      if (!spaceName.startsWith('/')) {
+        spaceName = '/' + spaceName;
+      }
+      if (activitat && activitat !== 'N/A' && activitat.trim() !== '') {
+        spaceName += activitat;
+      }
+
+      // Construir lista de materiales agrupados por escola solicitante
+      const materialsBySchool = new Map<string, Array<{material: string, unitats: number}>>();
+      option.comandes.forEach(comanda => {
+        const escola = comanda.escola;
+        if (!materialsBySchool.has(escola)) {
+          materialsBySchool.set(escola, []);
+        }
+        materialsBySchool.get(escola)!.push({
+          material: comanda.material,
+          unitats: comanda.unitats
+        });
+      });
+
+      // 1. NOTIFICACIÓN AL DESTINATARIO
+      let recipientMessage = `📦 *Material preparat per a tu*\n\n`;
+
+      if (isDirect) {
+        // Entrega directa
+        recipientMessage += `🏫 *Recollir a:* Academia (Eixos Creativa)\n`;
+        recipientMessage += `📅 *Data prevista:* ${formatDate(dataEntrega)}\n`;
+      } else {
+        // Entrega con intermediario
+        recipientMessage += `👤 *T'ho entregarà:* ${selectedMonitor}\n`;
+        recipientMessage += `🏫 *A l'escola:* ${escolaReceptora}\n`;
+        recipientMessage += `📅 *Data prevista:* ${formatDate(dataEntrega)}\n`;
+      }
+
+      // Listado de materiales
+      recipientMessage += `\n📋 *Materials:*\n`;
+      for (const [escola, materials] of materialsBySchool) {
+        recipientMessage += `   🏫 *Per ${escola}:*\n`;
+        materials.forEach(item => {
+          recipientMessage += `   • ${item.material}`;
+          if (item.unitats && item.unitats > 1) {
+            recipientMessage += ` (${item.unitats} unitats)`;
+          }
+          recipientMessage += `\n`;
+        });
+        if (materialsBySchool.size > 1) {
+          recipientMessage += `\n`;
+        }
+      }
+
+      if (materialsBySchool.size > 1) {
+        recipientMessage += `⚠️ *Nota:* Hi ha material per diferents centres. Revisa el detall.`;
+      }
+
+      // Enviar notificación al destinatario
+      console.log('📤 Enviando notificación al destinatario:', spaceName);
+      const recipientResult = await apiClient.sendGroupedNotification(
+        spaceName,
+        recipientMessage,
+        orderIds,
+        'destinatario'
+      );
+
+      if (recipientResult.success) {
+        console.log('✅ Notificación al destinatario enviada:', recipientResult);
+      } else {
+        console.warn('⚠️ Error enviando notificación al destinatario:', recipientResult.error);
+      }
+
+      // 2. NOTIFICACIÓN AL INTERMEDIARIO (solo si NO es entrega directa)
+      if (!isDirect && selectedMonitor) {
+        // Buscar info del monitor intermediario
+        const monitorInfo = option.monitorsDisponibles.find(m => m.nom === selectedMonitor);
+
+        if (monitorInfo) {
+          const escolaOrigen = monitorInfo.escola; // Donde recoge el material
+          const escolaDestino = monitorInfo.destinoFinal?.escola || escolaReceptora; // Donde entrega
+
+          // Construir spaceName del intermediario
+          let intermediarySpaceName = escolaOrigen.replace(/\s+/g, '');
+          if (!intermediarySpaceName.startsWith('/')) {
+            intermediarySpaceName = '/' + intermediarySpaceName;
+          }
+          if (monitorInfo.activitat && monitorInfo.activitat !== 'N/A') {
+            intermediarySpaceName += monitorInfo.activitat;
+          }
+
+          // Construir mensaje para intermediario (SIN lista de materiales)
+          let intermediaryMessage = `📦 *Tens una entrega per un altre company*\n\n`;
+
+          // Primero: Dónde y cuándo recoge el material
+          if (escolaOrigen && monitorInfo.dies && monitorInfo.dies.length > 0) {
+            // Calcular próxima fecha de ese día de la semana en escolaOrigen
+            // Por simplicidad, usamos la misma fecha de entrega
+            intermediaryMessage += `📍 Recollir el material a l'escola *${escolaOrigen}*\n`;
+            intermediaryMessage += `📅 Dies disponibles: ${monitorInfo.dies.join(', ')}\n\n`;
+          }
+
+          // Después: Destinatario y dónde/cuándo entregar
+          intermediaryMessage += `👤 *Destinatari:* ${destinatarioNom}\n`;
+          intermediaryMessage += `🏫 *Escola de lliurament:* ${escolaDestino}\n`;
+          intermediaryMessage += `📅 *Data prevista:* ${formatDate(dataEntrega)}\n`;
+
+          // Enviar notificación al intermediario
+          console.log('📤 Enviando notificación al intermediario:', intermediarySpaceName);
+          const intermediaryResult = await apiClient.sendGroupedNotification(
+            intermediarySpaceName,
+            intermediaryMessage,
+            orderIds,
+            'intermediario'
+          );
+
+          if (intermediaryResult.success) {
+            console.log('✅ Notificación al intermediario enviada:', intermediaryResult);
+          } else {
+            console.warn('⚠️ Error enviando notificación al intermediario:', intermediaryResult.error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error enviando notificaciones:', error);
+      // No bloqueamos el proceso si fallan las notificaciones
     }
   };
 

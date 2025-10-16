@@ -296,6 +296,40 @@ class ApiClient {
   async removeIntermediaryAssignment(orderIds: string[]): Promise<ApiResponse<{ updatedRows: number; message: string }>> {
     return this.request('removeIntermediaryAssignment', { orderIds: JSON.stringify(orderIds) }, 'GET');
   }
+
+  async sendGroupedNotification(spaceName: string, message: string, orderIds: string[], notificationType: 'intermediario' | 'destinatario'): Promise<ApiResponse<any>> {
+    // Node.js backend: POST /api/admin/notifications/send-grouped
+    const url = `${API_BASE_URL}/api/admin/notifications/send-grouped`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          spaceName,
+          message,
+          orderIds,
+          notificationType
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
 }
 
 export const apiClient = new ApiClient();
