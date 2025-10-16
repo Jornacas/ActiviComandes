@@ -1101,9 +1101,9 @@ router.post('/delivery/create', async (req, res) => {
             row[escolaDestinoIndex] = escolaDestino || '';
           }
         } else {
-          // Si es directa, limpiar campos de intermediario
+          // Si es directa, escribir "DIRECTA" en Monitor_Intermediari
           if (monitorIntermediariIndex !== -1) {
-            row[monitorIntermediariIndex] = '';
+            row[monitorIntermediariIndex] = 'DIRECTA';
           }
           if (escolaDestinoIndex !== -1) {
             row[escolaDestinoIndex] = '';
@@ -1502,6 +1502,112 @@ router.post('/notifications/statuses', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/notifications/send-grouped
+ * Envía una notificación para un grupo de pedidos
+ * Todos los pedidos del grupo se marcan como notificados al enviar uno solo
+ */
+router.post('/notifications/send-grouped', async (req, res) => {
+  try {
+    const { spaceName, message, orderIds, notificationType } = req.body;
+
+    console.log('📨📦 SEND GROUPED NOTIFICATION request received');
+    console.log('📨 spaceName:', spaceName);
+    console.log('📨 notificationType:', notificationType);
+    console.log('📨 orderIds (group):', orderIds);
+
+    if (!spaceName || !message) {
+      return res.json({
+        success: false,
+        error: "Falten dades obligatòries (spaceName, message)"
+      });
+    }
+
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.json({
+        success: false,
+        error: "No s'han proporcionat IDs de comandes"
+      });
+    }
+
+    // Enviar UNA sola notificación para todo el grupo
+    const result = await chat.sendChatNotification(spaceName, message);
+
+    if (result.success) {
+      // Actualizar TODOS los pedidos del grupo como notificados
+      if (notificationType) {
+        try {
+          const data = await sheets.getSheetData('Respostes');
+
+          if (data && data.length > 1) {
+            const headers = data[0];
+            const idItemIndex = headers.findIndex(h => h === 'ID_Item');
+            const idPedidoIndex = headers.findIndex(h => h === 'ID_Pedido');
+            const notifColumn = notificationType === 'intermediario'
+              ? headers.findIndex(h => h === 'Notificacion_Intermediari')
+              : headers.findIndex(h => h === 'Notificacion_Destinatari');
+
+            if ((idItemIndex !== -1 || idPedidoIndex !== -1) && notifColumn !== -1) {
+              let updatedCount = 0;
+
+              const updatedData = data.map((row, index) => {
+                if (index === 0) return row;
+
+                const rowIdItem = row[idItemIndex];
+                const rowIdPedido = row[idPedidoIndex];
+
+                // Verificar si este pedido está en el grupo
+                const isInGroup = orderIds.some(orderId =>
+                  orderId === rowIdItem || orderId === rowIdPedido
+                );
+
+                if (isInGroup) {
+                  row[notifColumn] = 'Enviada';
+                  updatedCount++;
+                  console.log(`✅ Marked notification sent for ${rowIdItem || rowIdPedido}`);
+                }
+
+                return row;
+              });
+
+              await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+              cache.del('cache_respostes_data');
+              console.log(`✅ Estado de notificación actualizado para ${updatedCount} pedidos del grupo`);
+            }
+          }
+        } catch (updateError) {
+          console.error('Error actualizando estado de notificación:', updateError);
+          // No fallar si hay error actualizando el estado
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: result.message || 'Notificació enviada correctament',
+        data: {
+          spaceName: result.actualSpace || result.spaceName,
+          spaceId: result.spaceId,
+          messageId: result.messageId,
+          simulated: result.simulated || false,
+          usedFallback: result.usedFallback || false,
+          groupSize: orderIds.length
+        }
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: result.error || 'Error enviant notificació'
+      });
+    }
+  } catch (error) {
+    console.error('Error sending grouped notification:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error enviant notificació agrupada: ' + error.message
     });
   }
 });
