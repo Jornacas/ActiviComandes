@@ -748,119 +748,167 @@ router.post('/delivery/options', async (req, res) => {
       return res.json(schoolData);
     }
 
-    // PASO 1: Agrupar pedidos por persona + escuela + día
+    // PASO 1: Agrupar pedidos por persona + rango de fechas (independiente de escola)
     const groupedOrders = new Map();
 
-    orders.forEach(order => {
-      // Crear clave única para agrupar: persona + escuela + día
-      const groupKey = `${order.nomCognoms}|${order.escola}|${order.dataNecessitat}`;
+    // Función para comparar si dos fechas están dentro de un rango aceptable (3 días)
+    const datesAreClose = (date1, date2, maxDays = 3) => {
+      if (!date1 || !date2) return false;
+      const d1 = new Date(date1);
+      const d2 = new Date(date2);
+      const diffTime = Math.abs(d2 - d1);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= maxDays;
+    };
 
-      if (!groupedOrders.has(groupKey)) {
-        groupedOrders.set(groupKey, {
-          nomCognoms: order.nomCognoms,
-          escola: order.escola,
-          dataNecessitat: order.dataNecessitat,
-          orders: []
-        });
+    orders.forEach(order => {
+      // Buscar si ya existe un grupo para esta persona con fechas cercanas
+      let matchingGroup = null;
+
+      for (const [key, group] of groupedOrders) {
+        if (group.nomCognoms === order.nomCognoms) {
+          // Verificar si las fechas están cercanas
+          if (datesAreClose(group.dataNecessitat, order.dataNecessitat)) {
+            matchingGroup = key;
+            break;
+          }
+        }
       }
 
-      groupedOrders.get(groupKey).orders.push(order);
+      if (matchingGroup) {
+        // Añadir al grupo existente
+        const group = groupedOrders.get(matchingGroup);
+        group.orders.push(order);
+
+        // Añadir la escola al grupo si no está ya
+        if (!group.escoles.includes(order.escola)) {
+          group.escoles.push(order.escola);
+        }
+
+        // Usar la fecha más temprana como fecha de necesidad del grupo
+        const currentDate = new Date(group.dataNecessitat);
+        const newDate = new Date(order.dataNecessitat);
+        if (newDate < currentDate) {
+          group.dataNecessitat = order.dataNecessitat;
+        }
+      } else {
+        // Crear nuevo grupo
+        const groupKey = `${order.nomCognoms}|${order.dataNecessitat}|${Date.now()}`;
+        groupedOrders.set(groupKey, {
+          nomCognoms: order.nomCognoms,
+          escoles: [order.escola], // Ahora es un array de escoles
+          dataNecessitat: order.dataNecessitat,
+          orders: [order]
+        });
+      }
     });
 
-    console.log(`📦 Grouped ${orders.length} orders into ${groupedOrders.size} groups`);
+    console.log(`📦 Grouped ${orders.length} orders into ${groupedOrders.size} groups (por persona + rango de dates)`);
 
     const deliveryOptions = [];
 
     // PASO 2: Procesar cada grupo
     for (const [groupKey, group] of groupedOrders) {
-      console.log(`🎯 Processing group: ${group.nomCognoms} - ${group.escola} - ${group.dataNecessitat}`);
+      console.log(`🎯 Processing group: ${group.nomCognoms} - Escoles: [${group.escoles.join(', ')}] - ${group.dataNecessitat}`);
       console.log(`   📋 Orders in group: ${group.orders.length}`);
+      console.log(`   🏫 Schools in group: ${group.escoles.length}`);
 
-      // Buscar información de la escuela
-      const directSchool = schoolData.data.schoolsMap.get(group.escola);
+      // OPCIÓN 1: Entrega DIRECTA (el destinatario recoge todo en Academia)
+      // Esta opción SIEMPRE está disponible independientemente de las escuelas
+      const directOption = {
+        tipus: "Lliurament Directe",
+        escola: "Academia", // Siempre recoge en Academia
+        escoles: group.escoles, // Pero los materiales son para múltiples escoles
+        adreça: "Carrer de la Llacuna, 162, 08018 Barcelona", // Dirección de Academia
+        eficiencia: "Màxima", // Entrega directa es siempre máxima eficiencia
+        prioritat: 1, // Máxima prioridad para entrega directa
+        nomCognoms: group.nomCognoms,
+        dataNecessitat: group.dataNecessitat,
+        monitorsDisponibles: [{
+          nom: "Recollida directa",
+          dies: ["dilluns", "dimarts", "dimecres", "dijous", "divendres"],
+          tipus: "directa",
+          activitat: 'N/A'
+        }],
+        descripció: `Recollida directa a Academia (Eixos Creativa) per ${group.nomCognoms}`,
+        distanciaAcademia: "0 km",
+        tempsAcademia: "0 min",
+        comandes: group.orders,
+        destinatari: {
+          nom: group.nomCognoms,
+          activitat: group.orders[0]?.activitat || 'N/A'
+        }
+      };
 
-      if (directSchool) {
-        // OPCIÓN 1: Entrega directa (con todos los pedidos del grupo)
-        const directOption = {
-          tipus: "Lliurament Directe",
-          escola: group.escola,
-          adreça: directSchool.adreça,
-          eficiencia: "Calculant...",
-          prioritat: 99999,
-          nomCognoms: group.nomCognoms, // Añadir nombre para mostrar en UI
-          dataNecessitat: group.dataNecessitat, // Añadir fecha de necesidad
-          monitorsDisponibles: directSchool.monitors.map(monitor => {
-            // Buscar actividad del monitor en esta escuela
-            const monitorInfo = schoolData.data.monitorsMap.get(monitor);
-            const schoolInfo = monitorInfo?.escoles.find(e => e.escola === group.escola);
+      deliveryOptions.push(directOption);
 
-            return {
-              nom: monitor,
-              dies: directSchool.dies,
-              tipus: "directa",
-              activitat: schoolInfo?.activitat || 'N/A' // Info de actividad
-            };
-          }),
-          descripció: `Entrega directa a ${group.escola} per ${group.nomCognoms}`,
-          distanciaAcademia: "Calculant...",
-          tempsAcademia: "Calculant...",
-          comandes: group.orders, // TODOS los pedidos del grupo
-          destinatari: {
-            nom: group.nomCognoms,
-            activitat: group.orders[0]?.activitat || 'N/A' // Actividad del destinatario
-          }
-        };
-
-        deliveryOptions.push(directOption);
-
-        // OPCIÓN 2: Entrega con intermediario (con todos los pedidos del grupo)
-        if (schoolData.data.monitors) {
-          schoolData.data.monitors.forEach(monitor => {
-            if (monitor.escoles?.length > 1) {
-              const targetSchoolInfo = monitor.escoles.find(s => s.escola === group.escola);
+      // OPCIÓN 2: Entrega con INTERMEDIARIO
+      // Buscar monitores que coincidan con el destinatario en AL MENOS UNA de las escoles
+      if (schoolData.data.monitors) {
+        schoolData.data.monitors.forEach(monitor => {
+          if (monitor.escoles?.length > 1) {
+            // Verificar si este monitor coincide con el destinatario en alguna escola del grupo
+            for (const escolaDestino of group.escoles) {
+              const targetSchoolInfo = monitor.escoles.find(s => s.escola === escolaDestino);
 
               if (targetSchoolInfo) {
+                // Este monitor va a la escola del destinatario
+                // Buscar otras escoles donde el monitor trabaja (para recoger el material)
                 monitor.escoles.forEach(intermediarySchoolInfo => {
-                  if (intermediarySchoolInfo.escola !== group.escola) {
+                  if (intermediarySchoolInfo.escola !== escolaDestino) {
                     const intermediaryOption = {
                       tipus: "Lliurament amb Intermediari",
-                      escola: intermediarySchoolInfo.escola,
-                      escolaDestino: group.escola,
+                      escola: intermediarySchoolInfo.escola, // Escola donde recoge
+                      escolaDestino: escolaDestino, // Escola donde entrega
+                      escoles: group.escoles, // Todas las escoles del grupo (para mostrar en materiales)
                       adreça: intermediarySchoolInfo.adreça,
                       eficiencia: "Calculant...",
                       prioritat: 99999,
-                      nomCognoms: group.nomCognoms, // Añadir nombre para mostrar en UI
-                      dataNecessitat: group.dataNecessitat, // Añadir fecha de necesidad
+                      nomCognoms: group.nomCognoms,
+                      dataNecessitat: group.dataNecessitat,
                       monitorsDisponibles: [{
                         nom: monitor.nom,
                         dies: intermediarySchoolInfo.dies,
                         tipus: "intermediari",
                         escolaOrigen: intermediarySchoolInfo.escola,
-                        activitat: intermediarySchoolInfo.activitat || 'N/A',  // Actividad en escola origen
+                        activitat: intermediarySchoolInfo.activitat || 'N/A',
                         destinoFinal: {
-                          escola: group.escola,
+                          escola: escolaDestino,
                           dies: targetSchoolInfo.dies,
                           activitat: targetSchoolInfo.activitat || 'N/A'
                         }
                       }],
-                      descripció: `Entrega a ${intermediarySchoolInfo.escola} → ${monitor.nom} transporta a ${group.escola} per ${group.nomCognoms}`,
+                      descripció: `Entrega a ${intermediarySchoolInfo.escola} → ${monitor.nom} transporta a ${escolaDestino} per ${group.nomCognoms}`,
                       distanciaAcademia: "Calculant...",
                       tempsAcademia: "Calculant...",
                       notes: "Monitor multicentre",
-                      comandes: group.orders, // TODOS los pedidos del grupo
+                      comandes: group.orders,
                       destinatari: {
                         nom: group.nomCognoms,
                         activitat: group.orders[0]?.activitat || 'N/A'
                       }
                     };
 
-                    deliveryOptions.push(intermediaryOption);
+                    // Evitar duplicados: solo añadir si no existe ya esta combinación
+                    const isDuplicate = deliveryOptions.some(opt =>
+                      opt.nomCognoms === intermediaryOption.nomCognoms &&
+                      opt.escola === intermediaryOption.escola &&
+                      opt.escolaDestino === intermediaryOption.escolaDestino &&
+                      opt.monitorsDisponibles[0]?.nom === intermediaryOption.monitorsDisponibles[0]?.nom
+                    );
+
+                    if (!isDuplicate) {
+                      deliveryOptions.push(intermediaryOption);
+                    }
                   }
                 });
+
+                // Solo procesar una escola destino (para evitar múltiples opciones redundantes)
+                break;
               }
             }
-          });
-        }
+          }
+        });
       }
     }
 
