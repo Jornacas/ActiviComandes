@@ -748,77 +748,109 @@ router.post('/delivery/options', async (req, res) => {
       return res.json(schoolData);
     }
 
+    // PASO 1: Agrupar pedidos por persona + escuela + día
+    const groupedOrders = new Map();
+
+    orders.forEach(order => {
+      // Crear clave única para agrupar: persona + escuela + día
+      const groupKey = `${order.nomCognoms}|${order.escola}|${order.dataNecessitat}`;
+
+      if (!groupedOrders.has(groupKey)) {
+        groupedOrders.set(groupKey, {
+          nomCognoms: order.nomCognoms,
+          escola: order.escola,
+          dataNecessitat: order.dataNecessitat,
+          orders: []
+        });
+      }
+
+      groupedOrders.get(groupKey).orders.push(order);
+    });
+
+    console.log(`📦 Grouped ${orders.length} orders into ${groupedOrders.size} groups`);
+
     const deliveryOptions = [];
 
-    for (const order of orders) {
-      console.log('🎯 Processing order for school:', order.escola);
+    // PASO 2: Procesar cada grupo
+    for (const [groupKey, group] of groupedOrders) {
+      console.log(`🎯 Processing group: ${group.nomCognoms} - ${group.escola} - ${group.dataNecessitat}`);
+      console.log(`   📋 Orders in group: ${group.orders.length}`);
 
       // Buscar información de la escuela
-      const directSchool = schoolData.data.schoolsMap.get(order.escola);
+      const directSchool = schoolData.data.schoolsMap.get(group.escola);
 
       if (directSchool) {
-        // OPCIÓN 1: Entrega directa
+        // OPCIÓN 1: Entrega directa (con todos los pedidos del grupo)
         const directOption = {
           tipus: "Lliurament Directe",
-          escola: order.escola,
+          escola: group.escola,
           adreça: directSchool.adreça,
           eficiencia: "Calculant...",
           prioritat: 99999,
-          monitorsDisponibles: directSchool.monitors.map(monitor => ({
-            nom: monitor,
-            dies: directSchool.dies,
-            tipus: "directa"
-          })),
-          descripció: `Entrega directa a ${order.escola}`,
+          nomCognoms: group.nomCognoms, // Añadir nombre para mostrar en UI
+          dataNecessitat: group.dataNecessitat, // Añadir fecha de necesidad
+          monitorsDisponibles: directSchool.monitors.map(monitor => {
+            // Buscar actividad del monitor en esta escuela
+            const monitorInfo = schoolData.data.monitorsMap.get(monitor);
+            const schoolInfo = monitorInfo?.escoles.find(e => e.escola === group.escola);
+
+            return {
+              nom: monitor,
+              dies: directSchool.dies,
+              tipus: "directa",
+              activitat: schoolInfo?.activitat || 'N/A' // Info de actividad
+            };
+          }),
+          descripció: `Entrega directa a ${group.escola} per ${group.nomCognoms}`,
           distanciaAcademia: "Calculant...",
           tempsAcademia: "Calculant...",
-          comandes: [order],
-          orderDetails: {
-            idItem: order.idItem,
-            solicitant: order.nomCognoms,
-            material: order.material,
-            quantitat: order.unitats
+          comandes: group.orders, // TODOS los pedidos del grupo
+          destinatari: {
+            nom: group.nomCognoms,
+            activitat: group.orders[0]?.activitat || 'N/A' // Actividad del destinatario
           }
         };
 
         deliveryOptions.push(directOption);
 
-        // OPCIÓN 2: Entrega con intermediario (buscar monitores multicentre)
+        // OPCIÓN 2: Entrega con intermediario (con todos los pedidos del grupo)
         if (schoolData.data.monitors) {
           schoolData.data.monitors.forEach(monitor => {
             if (monitor.escoles?.length > 1) {
-              const targetSchoolInfo = monitor.escoles.find(s => s.escola === order.escola);
+              const targetSchoolInfo = monitor.escoles.find(s => s.escola === group.escola);
 
               if (targetSchoolInfo) {
                 monitor.escoles.forEach(intermediarySchoolInfo => {
-                  if (intermediarySchoolInfo.escola !== order.escola) {
+                  if (intermediarySchoolInfo.escola !== group.escola) {
                     const intermediaryOption = {
                       tipus: "Lliurament amb Intermediari",
                       escola: intermediarySchoolInfo.escola,
-                      escolaDestino: order.escola,
+                      escolaDestino: group.escola,
                       adreça: intermediarySchoolInfo.adreça,
                       eficiencia: "Calculant...",
                       prioritat: 99999,
+                      nomCognoms: group.nomCognoms, // Añadir nombre para mostrar en UI
+                      dataNecessitat: group.dataNecessitat, // Añadir fecha de necesidad
                       monitorsDisponibles: [{
                         nom: monitor.nom,
                         dies: intermediarySchoolInfo.dies,
                         tipus: "intermediari",
                         escolaOrigen: intermediarySchoolInfo.escola,
+                        activitat: intermediarySchoolInfo.activitat || 'N/A',  // Actividad en escola origen
                         destinoFinal: {
-                          escola: order.escola,
-                          dies: targetSchoolInfo.dies
+                          escola: group.escola,
+                          dies: targetSchoolInfo.dies,
+                          activitat: targetSchoolInfo.activitat || 'N/A'
                         }
                       }],
-                      descripció: `Entrega a ${intermediarySchoolInfo.escola} → Monitor transporta a ${order.escola}`,
+                      descripció: `Entrega a ${intermediarySchoolInfo.escola} → ${monitor.nom} transporta a ${group.escola} per ${group.nomCognoms}`,
                       distanciaAcademia: "Calculant...",
                       tempsAcademia: "Calculant...",
                       notes: "Monitor multicentre",
-                      comandes: [order],
-                      orderDetails: {
-                        idItem: order.idItem,
-                        solicitant: order.nomCognoms,
-                        material: order.material,
-                        quantitat: order.unitats
+                      comandes: group.orders, // TODOS los pedidos del grupo
+                      destinatari: {
+                        nom: group.nomCognoms,
+                        activitat: group.orders[0]?.activitat || 'N/A'
                       }
                     };
 
@@ -903,6 +935,7 @@ async function getSchoolMonitorData() {
     const monitoraIdx = headers.findIndex(h => h === 'MONITORA');
     const diaIdx = headers.findIndex(h => h === 'DIA');
     const adreçaIdx = headers.findIndex(h => h === 'ADREÇA');
+    const activitatIdx = headers.findIndex(h => h === 'ACTIVITAT'); // Nueva columna
 
     if (escolaIdx === -1 || monitoraIdx === -1) {
       return { success: false, error: "No s'han trobat les columnes necessàries (ESCOLA, MONITORA)" };
@@ -917,6 +950,7 @@ async function getSchoolMonitorData() {
       const monitora = row[monitoraIdx]?.toString().trim();
       const dia = row[diaIdx]?.toString().trim() || '';
       const adreça = row[adreçaIdx]?.toString().trim() || '';
+      const activitat = activitatIdx !== -1 ? (row[activitatIdx]?.toString().trim() || '') : '';
 
       if (!escola || !monitora) continue;
 
@@ -940,9 +974,20 @@ async function getSchoolMonitorData() {
       const existingSchool = monitorData.escoles.find(s => s.escola === escola);
 
       if (!existingSchool) {
-        monitorData.escoles.push({ escola: escola, adreça: adreça, dies: dia ? [dia] : [] });
-      } else if (dia && !existingSchool.dies.includes(dia)) {
-        existingSchool.dies.push(dia);
+        monitorData.escoles.push({
+          escola: escola,
+          adreça: adreça,
+          dies: dia ? [dia] : [],
+          activitat: activitat // Guardar actividad
+        });
+      } else {
+        if (dia && !existingSchool.dies.includes(dia)) {
+          existingSchool.dies.push(dia);
+        }
+        // Actualizar actividad si existe
+        if (activitat && !existingSchool.activitat) {
+          existingSchool.activitat = activitat;
+        }
       }
     }
 

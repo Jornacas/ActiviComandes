@@ -82,6 +82,7 @@ interface DeliveryOption {
       dies: string[];
     };
     distanciaAcademia?: string;
+    activitat?: string;
   }>;
   descripció: string;
   eficiencia: string;
@@ -92,6 +93,12 @@ interface DeliveryOption {
     directa: boolean;
     intermediari: boolean;
   };
+  destinatari?: {
+    nom: string;
+    activitat: string;
+  };
+  nomCognoms?: string;
+  dataNecessitat?: string;
 }
 
 export default function DeliveryManager() {
@@ -104,17 +111,21 @@ export default function DeliveryManager() {
 
   // Dialog states
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
-  const [selectedModalitat, setSelectedModalitat] = useState<'Directa' | 'Intermediari'>('Directa');
-  const [selectedMonitor, setSelectedMonitor] = useState('');
-  const [dataEntrega, setDataEntrega] = useState('');
-  const [dateError, setDateError] = useState('');
-  const [dateWarning, setDateWarning] = useState('');
+  const [selectedOption, setSelectedOption] = useState<DeliveryOption | null>(null);
+  const [selectedMonitors, setSelectedMonitors] = useState<{[key: number]: string}>({});
+  const [selectedDates, setSelectedDates] = useState<{[key: number]: string}>({});
+  const [dateErrors, setDateErrors] = useState<{[key: number]: string}>({});
+  const [dateWarnings, setDateWarnings] = useState<{[key: number]: string}>({});
 
   // Función para validar que no sea domingo y que esté dentro del plazo de necesidad
-  const validateDate = (dateString: string) => {
+  const validateDate = (dateString: string, optionIndex: number, option: DeliveryOption) => {
     if (!dateString) {
-      setDateError('');
-      setDateWarning('');
+      const newErrors = {...dateErrors};
+      const newWarnings = {...dateWarnings};
+      delete newErrors[optionIndex];
+      delete newWarnings[optionIndex];
+      setDateErrors(newErrors);
+      setDateWarnings(newWarnings);
       return true;
     }
 
@@ -123,33 +134,31 @@ export default function DeliveryManager() {
 
     // Validar que no sea domingo
     if (dayOfWeek === 0) {
-      setDateError('No es poden programar lliuraments els diumenges (no hi ha activitats)');
-      setDateWarning('');
+      setDateErrors({...dateErrors, [optionIndex]: 'No es poden programar lliuraments els diumenges (no hi ha activitats)'});
+      const newWarnings = {...dateWarnings};
+      delete newWarnings[optionIndex];
+      setDateWarnings(newWarnings);
       return false;
     }
 
     // Validar que esté dentro del plazo de necesidad
-    const selectedOrdersData = preparatedOrders.filter(order =>
-      selectedOrders.includes(order.idItem)
-    );
-
     let warningMessages: string[] = [];
     let hasOutOfRange = false;
 
-    selectedOrdersData.forEach(order => {
+    option.comandes.forEach(order => {
       if (order.dataNecessitat) {
         const needDate = new Date(order.dataNecessitat);
-        
+
         // Comparar fechas (solo día, sin hora)
         const deliveryDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         const needDateOnly = new Date(needDate.getFullYear(), needDate.getMonth(), needDate.getDate());
-        
+
         if (deliveryDate > needDateOnly) {
           hasOutOfRange = true;
-          const formatDate = (d: Date) => d.toLocaleDateString('ca-ES', { 
-            weekday: 'long', 
-            day: 'numeric', 
-            month: 'long' 
+          const formatDate = (d: Date) => d.toLocaleDateString('ca-ES', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long'
           });
           warningMessages.push(`${order.material} (necessari: ${formatDate(needDate)})`);
         }
@@ -157,12 +166,16 @@ export default function DeliveryManager() {
     });
 
     if (hasOutOfRange) {
-      setDateWarning(`⚠️ Aviso: La data de lliurament és posterior a la data de necessitat per algunes comandes: ${warningMessages.join(', ')}`);
+      setDateWarnings({...dateWarnings, [optionIndex]: `⚠️ Aviso: La data de lliurament és posterior a la data de necessitat per algunes comandes: ${warningMessages.join(', ')}`});
     } else {
-      setDateWarning('');
+      const newWarnings = {...dateWarnings};
+      delete newWarnings[optionIndex];
+      setDateWarnings(newWarnings);
     }
 
-    setDateError('');
+    const newErrors = {...dateErrors};
+    delete newErrors[optionIndex];
+    setDateErrors(newErrors);
     return true;
   };
 
@@ -234,19 +247,17 @@ export default function DeliveryManager() {
     }
   };
 
-  const createDelivery = async () => {
-    if (!selectedModalitat) {
-              setError('Selecciona la modalitat de lliurament');
-      return;
-    }
+  const createDeliveryForOption = async (option: DeliveryOption, optionIndex: number, isDirect: boolean) => {
+    const selectedMonitor = selectedMonitors[optionIndex];
+    const dataEntrega = selectedDates[optionIndex];
 
-    if (selectedModalitat === 'Intermediari' && !selectedMonitor) {
+    if (!isDirect && !selectedMonitor) {
       setError('Selecciona un monitor intermediari');
       return;
     }
 
     // Validar que no sea domingo (los avisos no bloquean el proceso)
-    if (dataEntrega && !validateDate(dataEntrega)) {
+    if (dataEntrega && dateErrors[optionIndex]) {
       setError('No es poden programar lliuraments els diumenges');
       return;
     }
@@ -255,57 +266,37 @@ export default function DeliveryManager() {
     setError(null);
 
     try {
-      // Buscar la escolaDestino segons la modalitat i monitor seleccionats
+      // Get order IDs from this option
+      const orderIds = option.comandes.map(c => c.id);
+
+      // Buscar la escolaDestino
       let escolaDestino = '';
-      if (selectedModalitat === 'Intermediari' && selectedMonitor) {
-        console.log('🔍 DEBUG - deliveryOptions:', deliveryOptions);
-        console.log('🔍 DEBUG - selectedMonitor:', selectedMonitor);
-
-        const intermediaryOption = deliveryOptions.find(option =>
-          option.tipus.includes('Intermediari') &&
-          option.monitorsDisponibles.some(monitor => monitor.nom === selectedMonitor)
-        );
-
-        console.log('🔍 DEBUG - intermediaryOption found:', intermediaryOption);
-        escolaDestino = intermediaryOption?.escola || '';
-        console.log('🔍 DEBUG - escolaDestino calculated:', escolaDestino);
+      if (!isDirect && selectedMonitor) {
+        escolaDestino = option.escola || '';
       }
 
       const deliveryData = {
-        orderIds: selectedOrders as string[], // Convert GridRowSelectionModel to string[]
-        modalitat: selectedModalitat,
-        monitorIntermediaria: selectedModalitat === 'Intermediari' ? selectedMonitor : '',
+        orderIds: orderIds,
+        modalitat: isDirect ? 'Directa' : 'Intermediari',
+        monitorIntermediaria: isDirect ? '' : selectedMonitor,
         escolaDestino: escolaDestino,
-        dataEntrega: dataEntrega
+        dataEntrega: dataEntrega || ''
       };
 
-      // DEBUG: Log datos que se van a enviar
-      console.log('📅 DEBUG - Estado dataEntrega antes de enviar:', dataEntrega);
-      console.log('📦 DEBUG - deliveryData object:', deliveryData);
-      console.log('🚀 FRONTEND DEBUG - Datos a enviar:', {
-        deliveryData,
-        selectedModalitat,
-        selectedMonitor,
-        dataEntrega,
-        escolaDestino,
-        deliveryOptions: deliveryOptions.length
-      });
+      console.log('🚀 FRONTEND DEBUG - Datos a enviar:', deliveryData);
 
       const result = await apiClient.createDelivery(deliveryData);
       console.log('📥 DEBUG - Backend response:', result);
 
       if (result.success) {
         setSuccess(result.message || 'Lliurament assignat correctament');
-        
-        // Las notificaciones se envían automáticamente desde el backend
-        
+
         setDeliveryDialogOpen(false);
         setSelectedOrders([]);
-        setSelectedModalitat('Directa');
-        setSelectedMonitor('');
-        setDataEntrega('');
-        setDateError('');
-        setDateWarning('');
+        setSelectedMonitors({});
+        setSelectedDates({});
+        setDateErrors({});
+        setDateWarnings({});
         fetchPreparatedOrders(); // Refresh the list
       } else {
         setError(result.error || 'Error creant l\'assignació de lliurament');
@@ -341,17 +332,6 @@ export default function DeliveryManager() {
     return `${days[date.getDay()]} ${date.getDate()} de ${months[date.getMonth()]}`;
   };
 
-  const getAvailableMonitors = () => {
-    const monitors: Array<{nom: string; escola: string; dies: string[]}> = [];
-    deliveryOptions.forEach(option => {
-      option.monitorsDisponibles.forEach(monitor => {
-        if (!monitors.find(m => m.nom === monitor.nom)) {
-          monitors.push(monitor);
-        }
-      });
-    });
-    return monitors;
-  };
 
   // DataGrid columns definition
   const columns: GridColDef[] = [
@@ -545,126 +525,103 @@ export default function DeliveryManager() {
         <DialogContent>
           {deliveryOptions.length > 0 && (
             <Box>
-              <Typography variant="subtitle1" gutterBottom>
-                Resum de comandes seleccionades:
+              <Typography variant="subtitle1" gutterBottom sx={{ mb: 3 }}>
+                Opcions de lliurament disponibles - Selecciona l'opció desitjada:
               </Typography>
 
               {deliveryOptions.map((option, index) => {
-                // Definir icones per tipus d'opció
-                const getOptionIcon = (tipus: string) => {
-                  switch (tipus) {
-                    case 'Lliurament Optimitzat': return <TrendingUp color="success" />;
-                    case 'Ruta Multicentre': return <Route color="warning" />;
-                    case 'Lliurament Directe': return <DirectionsCar color="action" />;
-                    default: return <School />;
-                  }
-                };
-
                 const getEfficiencyDisplay = (eficiencia: string) => {
                   switch (eficiencia) {
                     case 'Màxima':
-                      return { 
-                        icon: <Star sx={{ fontSize: 16 }} />, 
-                        color: 'success' as const, 
-                        label: '★★★ Màxima',
-                        stars: '★★★'
-                      };
+                      return { icon: <Star sx={{ fontSize: 16 }} />, color: 'success' as const, label: '★★★ Màxima' };
                     case 'Alta':
-                      return { 
-                        icon: <Star sx={{ fontSize: 16 }} />, 
-                        color: 'info' as const, 
-                        label: '★★☆ Alta',
-                        stars: '★★☆'
-                      };
+                      return { icon: <Star sx={{ fontSize: 16 }} />, color: 'info' as const, label: '★★☆ Alta' };
                     case 'Mitjana':
-                      return { 
-                        icon: <StarHalf sx={{ fontSize: 16 }} />, 
-                        color: 'warning' as const, 
-                        label: '★☆☆ Mitjana',
-                        stars: '★☆☆'
-                      };
+                      return { icon: <StarHalf sx={{ fontSize: 16 }} />, color: 'warning' as const, label: '★☆☆ Mitjana' };
                     case 'Baixa':
-                      return { 
-                        icon: <StarOutline sx={{ fontSize: 16 }} />, 
-                        color: 'error' as const, 
-                        label: '☆☆☆ Baixa',
-                        stars: '☆☆☆'
-                      };
+                      return { icon: <StarOutline sx={{ fontSize: 16 }} />, color: 'error' as const, label: '☆☆☆ Baixa' };
                     default:
-                      return { 
-                        icon: <StarOutline sx={{ fontSize: 16 }} />, 
-                        color: 'default' as const, 
-                        label: '? Desconeguda',
-                        stars: '?'
-                      };
+                      return { icon: <StarOutline sx={{ fontSize: 16 }} />, color: 'default' as const, label: '? Desconeguda' };
                   }
                 };
+
+                const canDeliverDirect = option.monitorsDisponibles.some(m => m.tipus === 'directa');
+                const canDeliverViaIntermediary = option.monitorsDisponibles.some(m => m.tipus !== 'directa');
 
                 return (
                   <Card
                     key={index}
                     sx={{
-                      mb: 2,
-                      border: option.prioritat === 1 ? '2px solid #4caf50' : 'none',
-                      backgroundColor: option.prioritat === 1 ? '#f8fff8' : 'inherit'
+                      mb: 3,
+                      border: option.prioritat === 1 ? '2px solid #4caf50' : '1px solid #e0e0e0',
+                      backgroundColor: option.prioritat === 1 ? '#f8fff8' : 'white'
                     }}
                   >
                     <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {getOptionIcon(option.tipus)}
-                          {option.tipus}
-                          {option.prioritat === 1 && (
-                            <Chip
-                              label="RECOMANAT"
-                              size="small"
-                              color="success"
-                              sx={{ ml: 1 }}
-                            />
+                      {/* Header */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Person color="primary" />
+                            <Typography variant="h6">
+                              {option.nomCognoms || option.comandes[0]?.nomCognoms}
+                            </Typography>
+                            {option.prioritat === 1 && (
+                              <Chip label="RECOMANAT" size="small" color="success" sx={{ ml: 1 }} />
+                            )}
+                          </Box>
+                          {option.dataNecessitat && (
+                            <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
+                              📅 <strong>Necessari per:</strong> {formatDate(option.dataNecessitat)}
+                            </Typography>
                           )}
-                        </Typography>
+                        </Box>
                         <Chip
                           icon={getEfficiencyDisplay(option.eficiencia).icon}
                           label={getEfficiencyDisplay(option.eficiencia).label}
                           size="small"
                           color={getEfficiencyDisplay(option.eficiencia).color}
-                          sx={{ fontWeight: 'bold' }}
                         />
                       </Box>
 
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        {option.descripció}
-                      </Typography>
-
-                      {option.notes && (
-                        <Typography variant="caption" sx={{
-                          color: option.prioritat === 1 ? 'success.main' : 'text.secondary',
-                          fontWeight: option.prioritat === 1 ? 'bold' : 'normal'
-                        }}>
-                          💡 {option.notes}
-                        </Typography>
+                      {/* Recipient Activity */}
+                      {option.destinatari && (
+                        <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#f3e5f5', borderRadius: 1, borderLeft: '4px solid #9c27b0' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#7b1fa2' }}>
+                            🎭 Activitat: {option.destinatari.activitat}
+                          </Typography>
+                        </Box>
                       )}
 
-                      <Box sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+                      {/* Location and Summary */}
+                      <Box sx={{ mb: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
                         <Stack spacing={1}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Place color="primary" fontSize="small" />
+                            <School color="primary" fontSize="small" />
                             <Typography variant="subtitle2">
                               <strong>{option.escola}</strong>
                               {option.escolaDestino && (
-                                <span style={{ color: '#666' }}> → <strong>{option.escolaDestino}</strong></span>
+                                <span style={{ color: '#666', fontWeight: 'normal' }}> (intermediària) → <strong>{option.escolaDestino}</strong> (destí final)</span>
                               )}
                             </Typography>
                           </Box>
-                          
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                          {/* Mostrar días de actividad en la escuela intermediaria */}
+                          {option.monitorsDisponibles && option.monitorsDisponibles.length > 0 && option.monitorsDisponibles[0].dies && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Schedule color="action" fontSize="small" />
+                              <Typography variant="body2" color="text.secondary">
+                                Dies disponibles: {option.monitorsDisponibles[0].dies.join(', ')}
+                              </Typography>
+                            </Box>
+                          )}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mt: 1 }}>
                             <Chip
                               icon={<LocalShipping />}
-                              label={`${option.comandes.length} comand${option.comandes.length > 1 ? 'es' : 'a'}`}
+                              label={`${option.comandes.length} comanda${option.comandes.length > 1 ? 'es agrupades' : ''}`}
                               size="small"
+                              color="primary"
                               variant="outlined"
                             />
-                            
                             {option.distanciaAcademia && (
                               <Chip
                                 icon={<Route />}
@@ -674,131 +631,203 @@ export default function DeliveryManager() {
                                 color="info"
                               />
                             )}
-                            
-
                           </Box>
                         </Stack>
                       </Box>
 
-                      <List dense sx={{ mt: 1 }}>
-                        {option.comandes.map((comanda) => (
-                          <ListItem key={comanda.idItem} sx={{ py: 0.5 }}>
-                            <ListItemText
-                              primary={`${comanda.material} (${comanda.unitats})`}
-                              secondary={`${comanda.nomCognoms} • ${formatDate(comanda.dataNecessitat)}`}
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-
-                      {option.monitorsDisponibles && option.monitorsDisponibles.length > 0 && (
-                        <Box sx={{ mt: 2 }}>
-                          <Typography variant="subtitle2" gutterBottom>
-                            Monitors disponibles:
-                          </Typography>
-                          <Stack direction="row" spacing={1} flexWrap="wrap">
-                            {option.monitorsDisponibles.map((monitor, idx) => (
-                              <Chip
-                                key={idx}
-                                icon={<Person />}
-                                label={`${monitor.nom} (${monitor.dies?.join(', ') || 'N/A'})`}
-                                size="small"
-                                variant={monitor.tipus === 'directa' ? 'filled' : 'outlined'}
-                                color={monitor.tipus === 'intermèdia' ? 'success' : 'default'}
+                      {/* Orders List */}
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                          Materials:
+                        </Typography>
+                        <List dense sx={{ pt: 0.5 }}>
+                          {option.comandes.map((comanda) => (
+                            <ListItem key={comanda.idItem} sx={{ py: 0.25, px: 0 }}>
+                              <ListItemText
+                                primary={`• ${comanda.material} (${comanda.unitats})`}
+                                primaryTypographyProps={{ variant: 'body2' }}
                               />
-                            ))}
-                          </Stack>
-                        </Box>
-                      )}
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Box>
+
+                      <Divider sx={{ my: 2 }} />
+
+                      {/* Delivery Actions */}
+                      <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
+                        Selecciona modalitat de lliurament:
+                      </Typography>
+
+                      <Stack spacing={2}>
+                        {/* Direct Delivery Option */}
+                        {canDeliverDirect && (
+                          <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1, backgroundColor: '#fafafa' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                              <DirectionsCar sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
+                              Lliurament Directe
+                            </Typography>
+
+                            <TextField
+                              fullWidth
+                              type="date"
+                              label="Data de lliurament"
+                              size="small"
+                              value={selectedDates[index] || ''}
+                              onChange={(e) => {
+                                const newDate = e.target.value;
+                                setSelectedDates({...selectedDates, [index]: newDate});
+                                validateDate(newDate, index, option);
+                              }}
+                              error={!!dateErrors[index]}
+                              helperText={dateErrors[index]}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ mb: 1.5 }}
+                            />
+
+                            {dateWarnings[index] && (
+                              <Alert severity="warning" sx={{ mb: 1.5, py: 0.5 }}>
+                                <Typography variant="caption">{dateWarnings[index]}</Typography>
+                              </Alert>
+                            )}
+
+                            <Button
+                              variant="contained"
+                              color="primary"
+                              fullWidth
+                              disabled={loading || !!dateErrors[index]}
+                              onClick={() => createDeliveryForOption(option, index, true)}
+                              startIcon={loading ? <CircularProgress size={16} /> : <CheckCircle />}
+                            >
+                              Entregar Directament
+                            </Button>
+                          </Box>
+                        )}
+
+                        {/* Intermediary Delivery Option */}
+                        {canDeliverViaIntermediary && (
+                          <Box sx={{ p: 2, border: '1px solid #4caf50', borderRadius: 1, backgroundColor: '#f1f8f4' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                              <Person sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
+                              Lliurament amb Intermediari
+                            </Typography>
+
+                            {/* Mostrar lista de monitores disponibles */}
+                            <Box sx={{ mb: 2 }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+                                Monitors intermediaris disponibles:
+                              </Typography>
+                              <Stack spacing={1}>
+                                {option.monitorsDisponibles
+                                  .filter(m => m.tipus !== 'directa')
+                                  .map((monitor, idx) => (
+                                    <Card
+                                      key={idx}
+                                      sx={{
+                                        p: 1.5,
+                                        border: selectedMonitors[index] === monitor.nom ? '2px solid #4caf50' : '1px solid #e0e0e0',
+                                        backgroundColor: selectedMonitors[index] === monitor.nom ? '#e8f5e9' : 'white',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        '&:hover': {
+                                          borderColor: '#4caf50',
+                                          backgroundColor: '#f1f8f4'
+                                        }
+                                      }}
+                                      onClick={() => setSelectedMonitors({...selectedMonitors, [index]: monitor.nom})}
+                                    >
+                                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                                        <Box sx={{ flex: 1 }}>
+                                          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                                            {monitor.nom}
+                                            {monitor.activitat && monitor.activitat !== 'N/A' && (
+                                              <span style={{ fontWeight: 'normal', color: '#666' }}> - {monitor.activitat}</span>
+                                            )}
+                                            {selectedMonitors[index] === monitor.nom && (
+                                              <Chip label="SELECCIONAT" size="small" color="success" sx={{ ml: 1, height: 18 }} />
+                                            )}
+                                          </Typography>
+                                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                            {monitor.dies && monitor.dies.length > 0 && (
+                                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                📅 <strong>Dies:</strong> {monitor.dies.join(', ')}
+                                              </Typography>
+                                            )}
+                                            {monitor.escola && (
+                                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                🏫 <strong>Escola intermediària:</strong> {monitor.escola}
+                                              </Typography>
+                                            )}
+                                            {monitor.destinoFinal && (
+                                              <Typography variant="caption" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                                🎯 <strong>Destí final:</strong> {monitor.destinoFinal.escola} ({monitor.destinoFinal.dies?.join(', ')})
+                                              </Typography>
+                                            )}
+                                          </Box>
+                                        </Box>
+                                        {selectedMonitors[index] === monitor.nom && (
+                                          <CheckCircle color="success" sx={{ ml: 1 }} />
+                                        )}
+                                      </Box>
+                                    </Card>
+                                  ))}
+                              </Stack>
+                            </Box>
+
+                            <Divider sx={{ my: 2 }} />
+
+                            <TextField
+                              fullWidth
+                              type="date"
+                              label="Data de lliurament"
+                              size="small"
+                              value={selectedDates[index] || ''}
+                              onChange={(e) => {
+                                const newDate = e.target.value;
+                                setSelectedDates({...selectedDates, [index]: newDate});
+                                validateDate(newDate, index, option);
+                              }}
+                              error={!!dateErrors[index]}
+                              helperText={dateErrors[index]}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ mb: 1.5 }}
+                            />
+
+                            {dateWarnings[index] && (
+                              <Alert severity="warning" sx={{ mb: 1.5, py: 0.5 }}>
+                                <Typography variant="caption">{dateWarnings[index]}</Typography>
+                              </Alert>
+                            )}
+
+                            <Button
+                              variant="contained"
+                              color="success"
+                              fullWidth
+                              disabled={loading || !selectedMonitors[index] || !!dateErrors[index]}
+                              onClick={() => createDeliveryForOption(option, index, false)}
+                              startIcon={loading ? <CircularProgress size={16} /> : <CheckCircle />}
+                            >
+                              Assignar Intermediari
+                            </Button>
+                          </Box>
+                        )}
+                      </Stack>
                     </CardContent>
                   </Card>
                 );
               })}
-
-              <Divider sx={{ my: 3 }} />
-
-              <Typography variant="h6" gutterBottom>
-                Configuració del lliurament:
-              </Typography>
-
-              <Stack spacing={3}>
-                <FormControl fullWidth>
-                  <InputLabel>Modalitat de lliurament</InputLabel>
-                  <Select
-                    value={selectedModalitat}
-                    label="Modalitat de lliurament"
-                    onChange={(e) => setSelectedModalitat(e.target.value as 'Directa' | 'Intermediari')}
-                  >
-                    <MenuItem value="Directa">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <DirectionsCar />
-                        Lliurament Directe
-                      </Box>
-                    </MenuItem>
-                    <MenuItem value="Intermediari" disabled={getAvailableMonitors().length === 0}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Person />
-                        Lliurament amb Intermediari
-                      </Box>
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-
-                {selectedModalitat === 'Intermediari' && (
-                  <FormControl fullWidth>
-                    <InputLabel>Monitor Intermediari</InputLabel>
-                    <Select
-                      value={selectedMonitor}
-                      label="Monitor Intermediari"
-                      onChange={(e) => setSelectedMonitor(e.target.value)}
-                    >
-                      {getAvailableMonitors().map((monitor, index) => (
-                        <MenuItem key={index} value={monitor.nom}>
-                          {monitor.nom} - {monitor.escola} ({monitor.dies.join(', ')})
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
-
-                {dateWarning && (
-                  <Alert severity="warning" sx={{ mb: 1 }}>
-                    {dateWarning}
-                  </Alert>
-                )}
-
-                <TextField
-                  fullWidth
-                  type="date"
-                  label="Data de lliurament prevista"
-                  value={dataEntrega}
-                  onChange={(e) => {
-                    const newDate = e.target.value;
-                    console.log('📅 DEBUG - Nueva fecha seleccionada:', newDate);
-                    setDataEntrega(newDate);
-                    validateDate(newDate);
-                  }}
-                  error={!!dateError}
-                  helperText={dateError}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </Stack>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeliveryDialogOpen(false)}>
+          <Button onClick={() => {
+            setDeliveryDialogOpen(false);
+            setSelectedMonitors({});
+            setSelectedDates({});
+            setDateErrors({});
+            setDateWarnings({});
+          }}>
             Cancel·lar
-          </Button>
-          <Button
-            onClick={createDelivery}
-            variant="contained"
-            disabled={loading || !!dateError}
-            startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
-          >
-            {dateWarning ? 'Confirmar Lliurament (amb avís)' : 'Confirmar Lliurament'}
           </Button>
         </DialogActions>
       </Dialog>

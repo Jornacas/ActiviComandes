@@ -51,6 +51,19 @@ async function calculateDistances(addresses) {
       try {
         console.log(`🗺️ Calculating distance to: ${address}`);
 
+        // Si la dirección es "Academia", es Eixos Creativa mismo (distancia 0)
+        if (address && (address.toLowerCase().includes('academia') || address.toLowerCase() === 'eixos creativa')) {
+          console.log('✅ Address is Academia/Eixos Creativa - returning 0 distance');
+          results.push({
+            address: address,
+            distance: '0 km',
+            duration: '0 min',
+            distanceValue: 0,
+            durationValue: 0
+          });
+          continue;
+        }
+
         // Llamar a la nueva Routes API (v2)
         // Documentación: https://developers.google.com/maps/documentation/routes
         const response = await axios.post(
