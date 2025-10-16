@@ -9,53 +9,85 @@ const { auth } = require('./sheets');
 const chat = google.chat({ version: 'v1', auth });
 
 /**
- * Obtiene el Space ID desde la hoja ChatWebhooks
- * @param {string} spaceName - Nombre del espacio (ej: "/LestonnacDX1")
- * @returns {Promise<string|null>}
+ * Obtiene el Space ID desde la hoja ChatWebhooks con lógica de fallback secuencial
+ * @param {string} spaceName - Nombre del espacio (ej: "/LestonnacDX1A")
+ * @returns {Promise<{spaceId: string|null, realSpaceName: string|null}>}
  */
 async function getSpaceIdByName(spaceName) {
   try {
     const sheets = require('./sheets');
-    const data = await sheets.getSheetData('ChatWebhooks');
+    const cache = require('./cache');
 
-    if (!data || data.length < 2) {
-      console.error('❌ Hoja ChatWebhooks vacía o no existe');
-      return null;
+    // Intentar obtener desde caché
+    const cacheKey = 'chat_webhooks_data';
+    let data = cache.get(cacheKey);
+
+    if (!data) {
+      console.log('📥 Cargando espacios de chat desde Sheets...');
+      data = await sheets.getSheetData('ChatWebhooks');
+
+      if (!data || data.length < 2) {
+        console.error('❌ Hoja ChatWebhooks vacía o no existe');
+        return { spaceId: null, realSpaceName: null };
+      }
+
+      // Guardar en caché por 5 minutos
+      cache.set(cacheKey, data, 300);
     }
 
-    // Buscar el space ID en la hoja
+    // Crear mapa de espacios disponibles para búsqueda rápida
     // Formato: [Nombre, SpaceID, Descripción]
+    const spacesMap = new Map();
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      if (row[0] === spaceName) {
-        const spaceId = row[1];
-        console.log(`✅ Space ID encontrado para ${spaceName}: ${spaceId}`);
-        return spaceId;
+      if (row[0] && row[1]) {
+        spacesMap.set(String(row[0]).trim(), String(row[1]).trim());
       }
     }
 
-    // Si no se encuentra, intentar buscar con fallback
-    console.log(`🔍 Búsqueda con fallback para: ${spaceName}`);
+    console.log(`📋 Espacios disponibles: ${Array.from(spacesMap.keys()).join(', ')}`);
 
-    // Buscar por coincidencia parcial
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const rowName = String(row[0]).toLowerCase();
-      const searchName = String(spaceName).toLowerCase();
-
-      if (rowName.includes(searchName) || searchName.includes(rowName)) {
-        const spaceId = row[1];
-        console.log(`✅ Space ID encontrado con fallback: ${spaceId}`);
-        return spaceId;
-      }
+    // PASO 1: Buscar coincidencia exacta
+    if (spacesMap.has(spaceName)) {
+      const spaceId = spacesMap.get(spaceName);
+      console.log(`✅ Space ID encontrado (exacto) para ${spaceName}: ${spaceId}`);
+      return { spaceId, realSpaceName: spaceName };
     }
 
-    console.error(`❌ No se encontró Space ID para: ${spaceName}`);
-    return null;
+    // PASO 2: Fallback secuencial - ir quitando caracteres del final
+    console.log(`🔍 Búsqueda con fallback secuencial para: ${spaceName}`);
+
+    let currentName = spaceName;
+    while (currentName.length > 1) {
+      // Quitar el último carácter
+      currentName = currentName.slice(0, -1);
+
+      if (spacesMap.has(currentName)) {
+        const spaceId = spacesMap.get(currentName);
+        console.log(`✅ Space ID encontrado (fallback) para ${spaceName} → ${currentName}: ${spaceId}`);
+        return { spaceId, realSpaceName: currentName };
+      }
+
+      console.log(`   🔍 Probando: ${currentName} - No encontrado`);
+    }
+
+    console.error(`❌ No se encontró Space ID para: ${spaceName} (ni con fallback secuencial)`);
+    console.error(`   Espacios disponibles: ${Array.from(spacesMap.keys()).join(', ')}`);
+    return { spaceId: null, realSpaceName: null };
   } catch (error) {
     console.error('Error obteniendo Space ID:', error);
-    return null;
+    return { spaceId: null, realSpaceName: null };
   }
+}
+
+/**
+ * Refresca la caché de espacios de chat
+ * Útil cuando se han añadido o modificado espacios en la hoja
+ */
+async function refreshChatSpaces() {
+  const cache = require('./cache');
+  cache.del('chat_webhooks_data');
+  console.log('🔄 Caché de espacios de chat refrescada');
 }
 
 /**
@@ -68,17 +100,25 @@ async function sendChatNotification(spaceName, message) {
   try {
     console.log(`📤 Intentando enviar notificación a: ${spaceName}`);
 
-    // Buscar Space ID
-    const spaceId = await getSpaceIdByName(spaceName);
+    // Buscar Space ID con fallback secuencial
+    const result = await getSpaceIdByName(spaceName);
 
-    if (!spaceId) {
+    if (!result.spaceId || !result.realSpaceName) {
       const errorMsg = `No se encontró Space ID para: ${spaceName}. Verifica la hoja ChatWebhooks.`;
       console.error(`❌ ${errorMsg}`);
       return {
         success: false,
         error: errorMsg,
-        spaceName: spaceName
+        requestedSpace: spaceName,
+        actualSpace: null
       };
+    }
+
+    const { spaceId, realSpaceName } = result;
+
+    // Mostrar info si se usó fallback
+    if (realSpaceName !== spaceName) {
+      console.log(`ℹ️ Usando fallback: ${spaceName} → ${realSpaceName}`);
     }
 
     // Enviar mensaje usando Chat API
@@ -90,13 +130,15 @@ async function sendChatNotification(spaceName, message) {
         }
       });
 
-      console.log(`✅ Mensaje enviado correctamente a ${spaceName} (${spaceId})`);
+      console.log(`✅ Mensaje enviado correctamente a ${realSpaceName} (${spaceId})`);
       return {
         success: true,
-        spaceName: spaceName,
+        requestedSpace: spaceName,
+        actualSpace: realSpaceName,
         spaceId: spaceId,
-        message: 'Notificación enviada correctamente',
-        messageId: response.data.name
+        message: `Notificación enviada a ${realSpaceName}`,
+        messageId: response.data.name,
+        usedFallback: realSpaceName !== spaceName
       };
     } catch (apiError) {
       console.error(`❌ Error enviando mensaje con Chat API:`, apiError.message);
@@ -105,21 +147,23 @@ async function sendChatNotification(spaceName, message) {
       console.log('⚠️ Continuando con notificación simulada');
       return {
         success: true,
-        spaceName: spaceName,
+        requestedSpace: spaceName,
+        actualSpace: realSpaceName,
         spaceId: spaceId,
-        message: 'Notificación registrada (modo simulado)',
-        simulated: true
+        message: `Notificación registrada (modo simulado) para ${realSpaceName}`,
+        simulated: true,
+        usedFallback: realSpaceName !== spaceName
       };
     }
   } catch (error) {
     console.error('❌ Error general en sendChatNotification:', error);
 
-    // Devolver éxito simulado para no bloquear
+    // Devolver error en lugar de simular éxito cuando hay un fallo crítico
     return {
-      success: true,
-      spaceName: spaceName,
-      message: 'Notificación registrada (modo simulado)',
-      simulated: true
+      success: false,
+      error: error.message,
+      requestedSpace: spaceName,
+      actualSpace: null
     };
   }
 }
@@ -146,5 +190,6 @@ async function sendMultipleNotifications(notifications) {
 module.exports = {
   sendChatNotification,
   sendMultipleNotifications,
-  getSpaceIdByName
+  getSpaceIdByName,
+  refreshChatSpaces
 };

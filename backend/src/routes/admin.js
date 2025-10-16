@@ -1506,6 +1506,30 @@ router.post('/notifications/statuses', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/chat/refresh-spaces
+ * Refresca la caché de espacios de chat
+ */
+router.post('/chat/refresh-spaces', async (req, res) => {
+  try {
+    console.log('🔄 REFRESH CHAT SPACES request received');
+
+    // Refrescar caché de espacios
+    await chat.refreshChatSpaces();
+
+    res.json({
+      success: true,
+      message: 'Caché d\'espais de xat refrescada correctament'
+    });
+  } catch (error) {
+    console.error('Error refreshing chat spaces:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error refrescant espais de xat: ' + error.message
+    });
+  }
+});
+
 // ======================================================
 // UTILIDADES
 // ======================================================

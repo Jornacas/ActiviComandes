@@ -399,6 +399,28 @@ Obtiene estados de múltiples notificaciones.
 
 ---
 
+#### POST `/api/admin/chat/refresh-spaces`
+Refresca la caché de espacios de chat (5 min TTL).
+
+**Body**:
+```json
+{
+  "token": "comanda_materials_2024"
+}
+```
+
+**Respuesta**:
+```json
+{
+  "success": true,
+  "message": "Caché d'espais de xat refrescada correctament"
+}
+```
+
+**Uso**: Llamar después de añadir o modificar espacios en la hoja ChatWebhooks.
+
+---
+
 ### Utilidades
 
 #### POST `/api/admin/calculate-distances`
