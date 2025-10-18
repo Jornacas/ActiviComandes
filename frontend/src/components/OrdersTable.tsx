@@ -141,39 +141,127 @@ export default function OrdersTable() {
     }
   };
 
-  // Función para generar el mensaje de notificación
+  // Función para generar el mensaje de notificación AGRUPADO por pedido
   const generateNotificationMessage = (order: any, type: 'intermediario' | 'destinatario'): string => {
+    let orderMaterials: any[] = [];
+
     if (type === 'intermediario') {
+      // Para intermediario: agrupar por Monitor + Escola Destino + Fecha Lliurament
+      // Esto permite agrupar múltiples pedidos asignados al mismo intermediario
+      orderMaterials = orders.filter(o =>
+        o.monitorIntermediari === order.monitorIntermediari &&
+        o.escolaDestinoIntermediari === order.escolaDestinoIntermediari &&
+        o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
+        o.monitorIntermediari && o.monitorIntermediari.trim() !== '' // Que tenga intermediario asignado
+      ).sort((a, b) => {
+        // Ordenar por idItem para asegurar consistencia con la tabla
+        return (a.idItem || '').localeCompare(b.idItem || '');
+      });
+    } else {
+      // Para destinatario: agrupar por Nom_Cognoms + Escola + Data_Lliurament_Prevista
+      // Esto permite agrupar todos los materiales de la misma persona, misma escola y misma fecha
+      orderMaterials = orders.filter(o =>
+        o.nomCognoms === order.nomCognoms &&
+        o.escola === order.escola &&
+        o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
+        o.monitorIntermediari && o.monitorIntermediari.trim() !== '' // Solo pedidos con intermediario
+      ).sort((a, b) => {
+        // Ordenar por idItem para asegurar consistencia
+        return (a.idItem || '').localeCompare(b.idItem || '');
+      });
+    }
+
+    if (type === 'intermediario') {
+      // Obtener los destinatarios únicos (puede haber varios pedidos pero un solo destinatario común)
+      const destinatarios = [...new Set(orderMaterials.map(o => o.nomCognoms))];
+      const destinatarioText = destinatarios.join(', ');
+
+      // IMPORTANTE: El intermediario SIEMPRE entrega en la PRIMERA escola del grupo
+      // Buscar la primera escola en TODOS los materiales del grupo del intermediario (ya ordenados)
+      const escolaEntregaIntermediari = orderMaterials.length > 0 ? orderMaterials[0].escola : (order.escola || 'N/A');
+
       return `🔔 NOVA ASSIGNACIÓ DE MATERIAL COM INTERMEDIARI PER ${order.monitorIntermediari || 'N/A'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
 
 📥 REBRÀS MATERIAL:
 🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
-📅 Data: ${formatDate(order.Data_Lliurament_Prevista)}
-📦 Material: ${order.material || 'N/A'}
+📅 Data: ${formatDate(order.dataLliuramentPrevista)}
+📦 Total: ${orderMaterials.length} materials
 📍 Ubicació: Consergeria o caixa de material
 
 📤 LLIURARÀS MATERIAL:
-🏫 Escola: ${order.escola || 'N/A'}
-📅 Data que necessita: ${formatDate(order.dataNecessitat || order.Data_Necessitat)}
-👤 Per: ${order.nomCognoms || 'N/A'}
+🏫 Escola: ${escolaEntregaIntermediari}
+📅 Data: ${formatDate(order.dataNecessitat)}
+👤 Per: ${destinatarioText}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [✅ Confirmar recepció] [❌ Hi ha un problema]`;
     } else {
-      return `📦 MATERIAL ASSIGNAT PER LLIURAMENT PER ${order.nomCognoms || 'N/A'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 Sol·licitant: ${order.nomCognoms || 'N/A'}
+      let materialsText = '';
+      if (orderMaterials.length > 1) {
+        // Múltiples materiales - listarlos
+        materialsText = orderMaterials.map((item, index) =>
+          `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+        ).join('\n');
+      } else {
+        // Un solo material
+        materialsText = `   ${order.material || 'N/A'} (${order.unitats || 1} unitats)`;
+      }
 
-📦 MATERIAL:
-${order.material || 'N/A'}
+      // LÓGICA DE DETECCIÓN DE ENTREGA DEL INTERMEDIARIO:
+      // El intermediario SIEMPRE entrega en la PRIMERA escola donde coincide con algún material del grupo
+      // Necesitamos buscar en TODOS los materiales del intermediario (no solo del pedido actual)
 
-🚚 LLIURAMENT:
+      // 1. Obtener TODOS los materiales del mismo grupo del intermediario (ordenados)
+      const grupoIntermediari = orders.filter(o =>
+        o.monitorIntermediari === order.monitorIntermediari &&
+        o.escolaDestinoIntermediari === order.escolaDestinoIntermediari &&
+        o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
+        o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+      ).sort((a, b) => {
+        // Ordenar por idItem para asegurar consistencia
+        return (a.idItem || '').localeCompare(b.idItem || '');
+      });
+
+      // 2. Encontrar la PRIMERA escola donde el intermediario entrega (primera del grupo ordenado)
+      const escolaEntregaIntermediari = grupoIntermediari.length > 0 ? grupoIntermediari[0].escola : null;
+
+      // 3. Verificar si la escola del pedido actual coincide con la escola de entrega del intermediario
+      const intermediarioCoincideEnEscola = order.escola === escolaEntregaIntermediari;
+
+      let lliuramentInfo = '';
+      if (intermediarioCoincideEnEscola) {
+        // El intermediario entrega en la misma escola donde trabaja el destinatario
+        lliuramentInfo = `🚚 LLIURAMENT:
 👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
 🏫 Escola: ${order.escola || 'N/A'}
-📅 Data que necessites: ${formatDate(order.dataNecessitat || order.Data_Necessitat)}
-⏰ Hora: Abans de l'activitat
+📅 Data que necessites: ${formatDate(order.dataNecessitat)}
+⏰ Hora: Abans de l'activitat`;
+      } else {
+        // El intermediario NO entrega en esta escola (destinatario se lo lleva él/ella mismo/a)
+        // La escola de entrega es la primera del grupo del intermediario
+        const escolaEntrega = escolaEntregaIntermediari || 'N/A';
+
+        lliuramentInfo = `🚚 LLIURAMENT:
+👤 Intermediari: ${order.monitorIntermediari || 'N/A'} (t'ho entregarà a ${escolaEntrega})
+🏫 Escola destí: ${order.escola || 'N/A'}
+📅 Data que necessites: ${formatDate(order.dataNecessitat)}
+
+ℹ️ NOTA: ${order.monitorIntermediari} t'entregarà aquest material a ${escolaEntrega}.
+Tu mateixa te'l portaràs a ${order.escola} el ${formatDate(order.dataNecessitat)}.`;
+      }
+
+      return `📦 MATERIAL PREPARAT PER ${order.nomCognoms || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Destinatari: ${order.nomCognoms || 'N/A'}
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data necessitat: ${formatDate(order.dataNecessitat)}
+
+📦 MATERIALS (${orderMaterials.length} ${orderMaterials.length === 1 ? 'unitat' : 'unitats'}):
+${materialsText}
+
+${lliuramentInfo}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [✅ Confirmar recepció] [❌ Hi ha un problema]`;
@@ -307,15 +395,45 @@ ${order.material || 'N/A'}
     }
   };
 
-  // Función para enviar la notificación
+  // Función para enviar la notificación AGRUPADA por pedido
   const sendNotification = async () => {
     if (!selectedOrderForNotification) return;
 
     setIsSendingNotification(true);
     try {
-      console.log(`📱 Enviando notificación ${notificationType}:`, {
-        destinatario: notificationType === 'intermediario' 
-          ? selectedOrderForNotification.monitorIntermediari 
+      // Buscar todos los materiales agrupados según el tipo de notificación
+      let orderMaterials: any[] = [];
+
+      if (notificationType === 'intermediario') {
+        // Para intermediario: agrupar por Monitor + Escola Destino + Fecha
+        orderMaterials = orders.filter(o =>
+          o.monitorIntermediari === selectedOrderForNotification.monitorIntermediari &&
+          o.escolaDestinoIntermediari === selectedOrderForNotification.escolaDestinoIntermediari &&
+          o.dataLliuramentPrevista === selectedOrderForNotification.dataLliuramentPrevista &&
+          o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+        ).sort((a, b) => {
+          // Ordenar por idItem para asegurar consistencia
+          return (a.idItem || '').localeCompare(b.idItem || '');
+        });
+      } else {
+        // Para destinatario: agrupar por Nom_Cognoms + Escola + Data_Lliurament_Prevista
+        orderMaterials = orders.filter(o =>
+          o.nomCognoms === selectedOrderForNotification.nomCognoms &&
+          o.escola === selectedOrderForNotification.escola &&
+          o.dataLliuramentPrevista === selectedOrderForNotification.dataLliuramentPrevista &&
+          o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+        ).sort((a, b) => {
+          return (a.idItem || '').localeCompare(b.idItem || '');
+        });
+      }
+
+      const orderIds = orderMaterials.map(o => o.idItem).filter(Boolean);
+
+      console.log(`📱 Enviando notificación ${notificationType} AGRUPADA para ${orderIds.length} materiales:`, {
+        idPedido: selectedOrderForNotification.idPedido,
+        orderIds,
+        destinatario: notificationType === 'intermediario'
+          ? selectedOrderForNotification.monitorIntermediari
           : selectedOrderForNotification.solicitant,
         mensaje: customMessage
       });
@@ -323,9 +441,9 @@ ${order.material || 'N/A'}
       // Determinar el espacio de Google Chat según el tipo
       let spaceName = '';
       if (notificationType === 'intermediario') {
-        // Para intermediario: espacio de la escuela destino + actividad
+        // Para intermediario: espacio de la escuela destino + actividad del intermediario
         const escolaDestino = selectedOrderForNotification.escolaDestinoIntermediari || '';
-        const activitat = selectedOrderForNotification.activitat || '';
+        const activitat = selectedOrderForNotification.activitatIntermediari || '';
         spaceName = `/${escolaDestino}${activitat}`;
       } else {
         // Para destinatario: espacio de la escuela origen + actividad
@@ -334,7 +452,7 @@ ${order.material || 'N/A'}
         spaceName = `/${escolaOrigen}${activitat}`;
       }
 
-      // Llamar al backend para enviar la notificación
+      // Llamar al backend para enviar la notificación AGRUPADA
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
       const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '';
 
@@ -342,18 +460,19 @@ ${order.material || 'N/A'}
         throw new Error('API_BASE_URL no está configurada');
       }
 
-      // Usar GET para evitar problemas de CORS con POST
+      // Usar GET con el endpoint de notificaciones agrupadas
       const url = new URL(API_BASE_URL);
-      url.searchParams.append('action', 'sendManualNotification');
+      url.searchParams.append('action', 'sendManualNotificationGrouped');
       url.searchParams.append('token', API_TOKEN);
       url.searchParams.append('spaceName', spaceName);
       url.searchParams.append('message', customMessage);
-      url.searchParams.append('orderId', selectedOrderForNotification.idItem);
+      url.searchParams.append('orderIds', JSON.stringify(orderIds)); // Array de IDs
       url.searchParams.append('notificationType', notificationType);
 
-      console.log('🌐 Enviando notificación manual al backend (GET):', {
-        action: 'sendManualNotification',
+      console.log('🌐 Enviando notificación manual AGRUPADA al backend (GET):', {
+        action: 'sendManualNotificationGrouped',
         spaceName,
+        orderIdsCount: orderIds.length,
         messageLength: customMessage.length
       });
 
@@ -363,24 +482,27 @@ ${order.material || 'N/A'}
       console.log('📥 Respuesta del backend:', result);
 
       if (result.success) {
-        console.log(`✅ Notificación ${notificationType} enviada correctamente`);
-        
-        // Marcar como enviado en el estado local
-        setNotificationStatuses(prev => ({
-          ...prev,
-          [selectedOrderForNotification.idItem]: {
-            ...prev[selectedOrderForNotification.idItem],
-            [notificationType]: true
+        console.log(`✅ Notificación ${notificationType} enviada correctamente para ${orderIds.length} materiales`);
+
+        // Marcar TODOS los materiales del pedido como enviados en el estado local
+        setNotificationStatuses(prev => {
+          const newStatuses = { ...prev };
+          for (const orderId of orderIds) {
+            newStatuses[orderId] = {
+              ...newStatuses[orderId],
+              [notificationType]: true
+            };
           }
-        }));
-        
+          return newStatuses;
+        });
+
         // Mostrar mensaje de éxito con el espacio donde se envió
         setNotificationStatus({
           open: true,
-          message: `✅ Notificación enviada correctamente a ${notificationType === 'intermediario' ? 'intermediario' : 'destinatario'} en el espacio: ${spaceName}`,
+          message: `✅ Notificación enviada correctamente a ${notificationType === 'intermediario' ? 'intermediario' : 'destinatario'} en el espacio: ${spaceName} (${orderIds.length} materiales marcados)`,
           severity: 'success'
         });
-        
+
         // Cerrar modal
         setNotificationModalOpen(false);
         setSelectedOrderForNotification(null);
@@ -390,7 +512,7 @@ ${order.material || 'N/A'}
       }
     } catch (error) {
       console.error(`⚠️ Error enviando notificación ${notificationType}:`, error);
-      
+
       // Mostrar mensaje de error
       setNotificationStatus({
         open: true,
@@ -679,7 +801,7 @@ ${order.material || 'N/A'}
       },
     },
     {
-      field: 'Data_Lliurament_Prevista',
+      field: 'dataLliuramentPrevista',
       headerName: 'Data Lliurament',
       width: 120,
       flex: 0.9,
@@ -768,12 +890,12 @@ ${order.material || 'N/A'}
         renderCell: (params: any) => {
           const order = params.row;
           const estado = order.estat;
-          
+
           // Si no tiene intermediario asignado, no mostrar nada
           if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
             return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
           }
-          
+
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
             // Mostrar indicador de carga si aún se están cargando los estados
@@ -782,48 +904,69 @@ ${order.material || 'N/A'}
                 <CircularProgress size={16} sx={{ color: '#999' }} />
               );
             }
-            
-            const isSent = notificationStatuses[order.idItem]?.intermediario || false;
-            console.log(`🔍 Renderizando orden ${order.idItem}:`, {
-              estado,
-              isSent,
-              notificationStatuses: notificationStatuses[order.idItem],
-              monitorIntermediari: order.monitorIntermediari,
-              loadingNotificationStatuses
+
+            // IMPORTANTE: Detectar si este material es el PRIMERO del grupo
+            // Solo mostramos el botón en la primera fila del grupo para evitar duplicados
+            const groupMaterials = orders.filter(o =>
+              o.monitorIntermediari === order.monitorIntermediari &&
+              o.escolaDestinoIntermediari === order.escolaDestinoIntermediari &&
+              o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
+              o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+            ).sort((a, b) => {
+              // Ordenar por idItem para asegurar consistencia
+              return (a.idItem || '').localeCompare(b.idItem || '');
             });
+
+            const isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem;
+            const groupSize = groupMaterials.length;
+
+            const isSent = notificationStatuses[order.idItem]?.intermediario || false;
             const message = generateNotificationMessage(order, 'intermediario');
-            
-            if (isSent) {
+
+            // Si es el primero del grupo, mostrar el botón/chip
+            if (isFirstInGroup) {
+              if (isSent) {
+                return (
+                  <Chip
+                    label={`Enviat ✅ (${groupSize})`}
+                    size="small"
+                    color="primary"
+                    sx={{ fontSize: '0.7rem' }}
+                    onClick={() => openNotificationModal(order, 'intermediario')}
+                  />
+                );
+              }
+
+              return (
+                <Tooltip title={message} placement="top" arrow>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<span>📤</span>}
+                    onClick={() => openNotificationModal(order, 'intermediario')}
+                    sx={{
+                      fontSize: '0.7rem',
+                      minWidth: 'auto',
+                      px: 1,
+                      py: 0.5
+                    }}
+                  >
+                    Enviar ({groupSize})
+                  </Button>
+                </Tooltip>
+              );
+            } else {
+              // Si NO es el primero, mostrar indicador de agrupación
               return (
                 <Chip
-                  label="Enviat ✅"
+                  label="Agrupat"
                   size="small"
-                  color="primary"
-                  sx={{ fontSize: '0.7rem' }}
-                  onClick={() => openNotificationModal(order, 'intermediario')}
+                  variant="outlined"
+                  sx={{ fontSize: '0.7rem', color: '#999' }}
                 />
               );
             }
-            
-            return (
-              <Tooltip title={message} placement="top" arrow>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<span>📤</span>}
-                  onClick={() => openNotificationModal(order, 'intermediario')}
-                  sx={{ 
-                    fontSize: '0.7rem',
-                    minWidth: 'auto',
-                    px: 1,
-                    py: 0.5
-                  }}
-                >
-                  Enviar
-                </Button>
-              </Tooltip>
-            );
           } else if (estado === 'Entregant') {
             return (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -867,12 +1010,12 @@ ${order.material || 'N/A'}
         renderCell: (params: any) => {
           const order = params.row;
           const estado = order.estat;
-          
+
           // Si no tiene intermediario asignado, no mostrar nada
           if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
             return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
           }
-          
+
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
             // Mostrar indicador de carga si aún se están cargando los estados
@@ -881,41 +1024,69 @@ ${order.material || 'N/A'}
                 <CircularProgress size={16} sx={{ color: '#999' }} />
               );
             }
-            
+
+            // IMPORTANTE: Detectar si este material es el PRIMERO del grupo de destinatario
+            // Agrupar por Nom_Cognoms + Escola + Data_Lliurament_Prevista
+            const groupMaterials = orders.filter(o =>
+              o.nomCognoms === order.nomCognoms &&
+              o.escola === order.escola &&
+              o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
+              o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+            ).sort((a, b) => {
+              // Ordenar por idItem para asegurar consistencia
+              return (a.idItem || '').localeCompare(b.idItem || '');
+            });
+
+            const isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem;
+            const groupSize = groupMaterials.length;
+
             const isSent = notificationStatuses[order.idItem]?.destinatario || false;
             const message = generateNotificationMessage(order, 'destinatario');
-            
-            if (isSent) {
+
+            // Si es el primero del grupo, mostrar el botón/chip
+            if (isFirstInGroup) {
+              if (isSent) {
+                return (
+                  <Chip
+                    label={`Enviat ✅ (${groupSize})`}
+                    size="small"
+                    color="primary"
+                    sx={{ fontSize: '0.7rem' }}
+                    onClick={() => openNotificationModal(order, 'destinatario')}
+                  />
+                );
+              }
+
+              return (
+                <Tooltip title={message} placement="top" arrow>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<span>📤</span>}
+                    onClick={() => openNotificationModal(order, 'destinatario')}
+                    sx={{
+                      fontSize: '0.7rem',
+                      minWidth: 'auto',
+                      px: 1,
+                      py: 0.5
+                    }}
+                  >
+                    Enviar ({groupSize})
+                  </Button>
+                </Tooltip>
+              );
+            } else {
+              // Si NO es el primero, mostrar indicador de agrupación
               return (
                 <Chip
-                  label="Enviat ✅"
+                  label="Agrupat"
                   size="small"
-                  color="primary"
-                  sx={{ fontSize: '0.7rem' }}
-                  onClick={() => openNotificationModal(order, 'destinatario')}
+                  variant="outlined"
+                  sx={{ fontSize: '0.7rem', color: '#999' }}
                 />
               );
             }
-            
-            return (
-              <Tooltip title={message} placement="top" arrow>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<span>📤</span>}
-                  onClick={() => openNotificationModal(order, 'destinatario')}
-                  sx={{ 
-                    fontSize: '0.7rem',
-                    minWidth: 'auto',
-                    px: 1,
-                    py: 0.5
-                  }}
-                >
-                  Enviar
-                </Button>
-              </Tooltip>
-            );
           } else if (estado === 'Lliurat') {
             return (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

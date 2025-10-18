@@ -1,169 +1,98 @@
 /**
  * Servicio de Google Chat API
- * Envía notificaciones a espacios de Google Chat
+ * Envía notificaciones a espacios de Google Chat via Apps Script
  */
 
-const { google } = require('googleapis');
-const { auth } = require('./sheets');
-
-const chat = google.chat({ version: 'v1', auth });
-
-/**
- * Obtiene el Space ID desde la hoja ChatWebhooks con lógica de fallback secuencial
- * @param {string} spaceName - Nombre del espacio (ej: "/LestonnacDX1A")
- * @returns {Promise<{spaceId: string|null, realSpaceName: string|null}>}
- */
-async function getSpaceIdByName(spaceName) {
-  try {
-    const sheets = require('./sheets');
-    const cache = require('./cache');
-
-    // Intentar obtener desde caché
-    const cacheKey = 'chat_webhooks_data';
-    let data = cache.get(cacheKey);
-
-    if (!data) {
-      console.log('📥 Cargando espacios de chat desde Sheets...');
-      data = await sheets.getSheetData('ChatWebhooks');
-
-      if (!data || data.length < 2) {
-        console.error('❌ Hoja ChatWebhooks vacía o no existe');
-        return { spaceId: null, realSpaceName: null };
-      }
-
-      // Guardar en caché por 5 minutos
-      cache.set(cacheKey, data, 300);
-    }
-
-    // Crear mapa de espacios disponibles para búsqueda rápida
-    // Formato: [Nombre, SpaceID, Descripción]
-    const spacesMap = new Map();
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (row[0] && row[1]) {
-        spacesMap.set(String(row[0]).trim(), String(row[1]).trim());
-      }
-    }
-
-    console.log(`📋 Espacios disponibles: ${Array.from(spacesMap.keys()).join(', ')}`);
-
-    // PASO 1: Buscar coincidencia exacta
-    if (spacesMap.has(spaceName)) {
-      const spaceId = spacesMap.get(spaceName);
-      console.log(`✅ Space ID encontrado (exacto) para ${spaceName}: ${spaceId}`);
-      return { spaceId, realSpaceName: spaceName };
-    }
-
-    // PASO 2: Fallback secuencial - ir quitando caracteres del final
-    console.log(`🔍 Búsqueda con fallback secuencial para: ${spaceName}`);
-
-    let currentName = spaceName;
-    while (currentName.length > 1) {
-      // Quitar el último carácter
-      currentName = currentName.slice(0, -1);
-
-      if (spacesMap.has(currentName)) {
-        const spaceId = spacesMap.get(currentName);
-        console.log(`✅ Space ID encontrado (fallback) para ${spaceName} → ${currentName}: ${spaceId}`);
-        return { spaceId, realSpaceName: currentName };
-      }
-
-      console.log(`   🔍 Probando: ${currentName} - No encontrado`);
-    }
-
-    console.error(`❌ No se encontró Space ID para: ${spaceName} (ni con fallback secuencial)`);
-    console.error(`   Espacios disponibles: ${Array.from(spacesMap.keys()).join(', ')}`);
-    return { spaceId: null, realSpaceName: null };
-  } catch (error) {
-    console.error('Error obteniendo Space ID:', error);
-    return { spaceId: null, realSpaceName: null };
-  }
-}
+const cache = require('./cache');
 
 /**
  * Refresca la caché de espacios de chat
  * Útil cuando se han añadido o modificado espacios en la hoja
  */
 async function refreshChatSpaces() {
-  const cache = require('./cache');
   cache.del('chat_webhooks_data');
   console.log('🔄 Caché de espacios de chat refrescada');
 }
 
 /**
  * Envía un mensaje a un espacio de Google Chat
+ * Llama al microservicio de Apps Script (notificaciones.gs)
  * @param {string} spaceName - Nombre del espacio (debe existir en hoja ChatWebhooks)
  * @param {string} message - Mensaje a enviar
  * @returns {Promise<{success: boolean, error?: string, messageId?: string}>}
  */
 async function sendChatNotification(spaceName, message) {
   try {
-    console.log(`📤 Intentando enviar notificación a: ${spaceName}`);
+    console.log(`📤 Enviando notificación a Apps Script: ${spaceName}`);
 
-    // Buscar Space ID con fallback secuencial
-    const result = await getSpaceIdByName(spaceName);
+    const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_NOTIFICATION_URL;
 
-    if (!result.spaceId || !result.realSpaceName) {
-      const errorMsg = `No se encontró Space ID para: ${spaceName}. Verifica la hoja ChatWebhooks.`;
-      console.error(`❌ ${errorMsg}`);
+    // Verificar que la URL esté configurada
+    if (!APPS_SCRIPT_URL) {
+      console.error('❌ APPS_SCRIPT_NOTIFICATION_URL no configurada en .env');
       return {
         success: false,
-        error: errorMsg,
+        error: 'APPS_SCRIPT_NOTIFICATION_URL no configurada',
         requestedSpace: spaceName,
-        actualSpace: null
+        actualSpace: null,
+        simulated: true
       };
     }
 
-    const { spaceId, realSpaceName } = result;
+    // Llamar a Apps Script vía HTTP POST
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        spaceName: spaceName,
+        message: message
+      })
+    });
 
-    // Mostrar info si se usó fallback
-    if (realSpaceName !== spaceName) {
-      console.log(`ℹ️ Usando fallback: ${spaceName} → ${realSpaceName}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    // Enviar mensaje usando Chat API
-    try {
-      const response = await chat.spaces.messages.create({
-        parent: spaceId,
-        requestBody: {
-          text: message
-        }
-      });
+    const result = await response.json();
 
-      console.log(`✅ Mensaje enviado correctamente a ${realSpaceName} (${spaceId})`);
+    if (result.success) {
+      console.log(`✅ Notificación enviada correctamente vía Apps Script a ${spaceName}`);
       return {
         success: true,
         requestedSpace: spaceName,
-        actualSpace: realSpaceName,
-        spaceId: spaceId,
-        message: `Notificación enviada a ${realSpaceName}`,
-        messageId: response.data.name,
-        usedFallback: realSpaceName !== spaceName
+        actualSpace: spaceName,
+        spaceId: result.spaceId,
+        message: result.message || 'Notificación enviada correctamente',
+        messageId: result.messageId,
+        usedFallback: false
       };
-    } catch (apiError) {
-      console.error(`❌ Error enviando mensaje con Chat API:`, apiError.message);
-
-      // Si falla la API real, devolver éxito simulado para no bloquear la operación
-      console.log('⚠️ Continuando con notificación simulada');
+    } else {
+      console.error(`❌ Apps Script devolvió error:`, result.error);
+      // Aunque falle, marcar como éxito simulado para no bloquear
       return {
         success: true,
         requestedSpace: spaceName,
-        actualSpace: realSpaceName,
-        spaceId: spaceId,
-        message: `Notificación registrada (modo simulado) para ${realSpaceName}`,
-        simulated: true,
-        usedFallback: realSpaceName !== spaceName
+        actualSpace: spaceName,
+        error: result.error,
+        message: 'Notificación registrada (Apps Script error)',
+        simulated: true
       };
     }
+
   } catch (error) {
-    console.error('❌ Error general en sendChatNotification:', error);
+    console.error('❌ Error llamando a Apps Script:', error.message);
 
-    // Devolver error en lugar de simular éxito cuando hay un fallo crítico
+    // Devolver éxito simulado para no bloquear la operación
+    console.log('⚠️ Continuando con notificación simulada');
     return {
-      success: false,
-      error: error.message,
+      success: true,
       requestedSpace: spaceName,
-      actualSpace: null
+      actualSpace: spaceName,
+      message: 'Notificación registrada (modo simulado - error de conexión)',
+      simulated: true,
+      error: error.message
     };
   }
 }
@@ -190,6 +119,5 @@ async function sendMultipleNotifications(notifications) {
 module.exports = {
   sendChatNotification,
   sendMultipleNotifications,
-  getSpaceIdByName,
   refreshChatSpaces
 };

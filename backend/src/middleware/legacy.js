@@ -42,6 +42,7 @@ function legacyCompatibility(req, res, next) {
     'removeIntermediaryAssignment': { method: 'POST', path: '/api/admin/delivery/remove-intermediary' },
     'calculateDistances': { method: 'POST', path: '/api/admin/calculate-distances' },
     'sendManualNotification': { method: 'POST', path: '/api/admin/notifications/send' },
+    'sendManualNotificationGrouped': { method: 'POST', path: '/api/admin/notifications/send-grouped' },
     'getNotificationStatus': { method: 'GET', path: '/api/admin/notifications/status' },
     'getMultipleNotificationStatuses': { method: 'POST', path: '/api/admin/notifications/statuses' },
     'updateInternalNotes': { method: 'POST', path: '/api/admin/orders/update-notes' }

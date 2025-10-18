@@ -289,8 +289,8 @@ export default function DeliveryManager() {
       console.log('📥 DEBUG - Backend response:', result);
 
       if (result.success) {
-        // Después de crear el delivery exitosamente, enviar notificaciones
-        await sendNotificationsForDelivery(option, isDirect, selectedMonitor, dataEntrega, orderIds);
+        // NO enviar notificaciones automáticamente - deben enviarse manualmente
+        // await sendNotificationsForDelivery(option, isDirect, selectedMonitor, dataEntrega, orderIds);
 
         setSuccess(result.message || 'Lliurament assignat correctament');
 
@@ -778,20 +778,54 @@ export default function DeliveryManager() {
                         </Stack>
                       </Box>
 
-                      {/* Orders List */}
+                      {/* Orders List - Grouped by Escola */}
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
                           Materials:
                         </Typography>
                         <List dense sx={{ pt: 0.5 }}>
-                          {option.comandes.map((comanda) => (
-                            <ListItem key={comanda.idItem} sx={{ py: 0.25, px: 0 }}>
-                              <ListItemText
-                                primary={`• ${comanda.material} (${comanda.unitats})`}
-                                primaryTypographyProps={{ variant: 'body2' }}
-                              />
-                            </ListItem>
-                          ))}
+                          {(() => {
+                            // Group materials by escola
+                            const materialsBySchool = new Map<string, Array<{material: string, unitats: number, idItem: string}>>();
+                            option.comandes.forEach(comanda => {
+                              const escola = comanda.escola;
+                              if (!materialsBySchool.has(escola)) {
+                                materialsBySchool.set(escola, []);
+                              }
+                              materialsBySchool.get(escola)!.push({
+                                material: comanda.material,
+                                unitats: comanda.unitats,
+                                idItem: comanda.idItem
+                              });
+                            });
+
+                            // Render grouped materials
+                            return Array.from(materialsBySchool.entries()).map(([escola, materials], schoolIndex) => (
+                              <Box key={escola}>
+                                {materialsBySchool.size > 1 && (
+                                  <ListItem sx={{ py: 0.25, px: 0 }}>
+                                    <ListItemText
+                                      primary={`🏫 Per ${escola}:`}
+                                      primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold', color: 'primary.main' }}
+                                    />
+                                  </ListItem>
+                                )}
+                                {materials.map((item) => (
+                                  <ListItem key={item.idItem} sx={{ py: 0.25, px: materialsBySchool.size > 1 ? 2 : 0 }}>
+                                    <ListItemText
+                                      primary={materialsBySchool.size > 1
+                                        ? `• ${item.material} (${item.unitats})`
+                                        : `• ${item.material} (${item.unitats}) - ${escola}`}
+                                      primaryTypographyProps={{ variant: 'body2' }}
+                                    />
+                                  </ListItem>
+                                ))}
+                                {materialsBySchool.size > 1 && schoolIndex < materialsBySchool.size - 1 && (
+                                  <Box sx={{ height: 8 }} />
+                                )}
+                              </Box>
+                            ));
+                          })()}
                         </List>
                       </Box>
 
@@ -838,7 +872,7 @@ export default function DeliveryManager() {
                               variant="contained"
                               color="primary"
                               fullWidth
-                              disabled={loading || !!dateErrors[index]}
+                              disabled={loading || !selectedDates[index] || !!dateErrors[index]}
                               onClick={() => createDeliveryForOption(option, index, true)}
                               startIcon={loading ? <CircularProgress size={16} /> : <CheckCircle />}
                             >
@@ -946,7 +980,7 @@ export default function DeliveryManager() {
                               variant="contained"
                               color="success"
                               fullWidth
-                              disabled={loading || !selectedMonitors[index] || !!dateErrors[index]}
+                              disabled={loading || !selectedMonitors[index] || !selectedDates[index] || !!dateErrors[index]}
                               onClick={() => createDeliveryForOption(option, index, false)}
                               startIcon={loading ? <CircularProgress size={16} /> : <CheckCircle />}
                             >

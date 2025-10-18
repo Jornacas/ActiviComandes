@@ -8,8 +8,19 @@ const cache = require('./cache');
 
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 
-// Inicializar cliente de Google Sheets
+// Inicializar cliente de Google Sheets y autenticación compartida
 let sheetsClient = null;
+
+// Crear objeto de autenticación compartido (para chat.js y otros servicios)
+const auth = new google.auth.GoogleAuth({
+  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  scopes: [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/chat.bot',
+    'https://www.googleapis.com/auth/chat.spaces',
+    'https://www.googleapis.com/auth/chat.messages'
+  ],
+});
 
 /**
  * Obtiene el cliente autenticado de Google Sheets
@@ -20,12 +31,6 @@ async function getSheetsClient() {
   }
 
   try {
-    // Autenticación usando service account
-    const auth = new google.auth.GoogleAuth({
-      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-
     const authClient = await auth.getClient();
     sheetsClient = google.sheets({ version: 'v4', auth: authClient });
 
@@ -221,6 +226,7 @@ async function batchGet(ranges) {
 }
 
 module.exports = {
+  auth,
   getSheetsClient,
   getCachedData,
   getSheetData,

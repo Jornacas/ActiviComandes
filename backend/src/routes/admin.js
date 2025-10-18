@@ -121,8 +121,10 @@ router.get('/orders', async (req, res) => {
         'Responsable_Preparacio': 'responsablePreparacio',
         'Notes_Internes': 'notesInternes',
         'Modalitat_Entrega': 'modalitatEntrega',
+        'Modalitat_Lliurament': 'modalitatEntrega', // Support both column names
         'Monitor_Intermediari': 'monitorIntermediari',
         'Escola_Destino_Intermediari': 'escolaDestinoIntermediari',
+        'Activitat_Intermediari': 'activitatIntermediari',
         'Data_Entrega_Prevista': 'dataEntregaPrevista',
         'Data_Lliurament_Prevista': 'dataLliuramentPrevista',
         'Distancia_Academia': 'distanciaAcademia',
@@ -145,6 +147,9 @@ router.get('/orders', async (req, res) => {
         const rawDate = processedRow[dataNecessitatColIndex];
         if (rawDate instanceof Date) {
           processedRow[dataNecessitatColIndex] = formatDate(rawDate);
+        } else if (typeof rawDate === 'string' && rawDate.match(/^\d{4}-\d{2}-\d{2}/)) {
+          // Si es un string en formato ISO (YYYY-MM-DD o YYYY-MM-DDTHH:MM:SS), mantenerlo
+          processedRow[dataNecessitatColIndex] = rawDate.split('T')[0];
         }
       }
 
@@ -153,6 +158,9 @@ router.get('/orders', async (req, res) => {
         const rawDate = processedRow[dataLliuramentColIndex];
         if (rawDate instanceof Date) {
           processedRow[dataLliuramentColIndex] = formatDate(rawDate);
+        } else if (typeof rawDate === 'string' && rawDate.match(/^\d{4}-\d{2}-\d{2}/)) {
+          // Si es un string en formato ISO (YYYY-MM-DD o YYYY-MM-DDTHH:MM:SS), extraer solo la fecha
+          processedRow[dataLliuramentColIndex] = rawDate.split('T')[0];
         }
       }
 
@@ -298,6 +306,18 @@ router.post('/orders/update-status', async (req, res) => {
     const estatIndex = headers.findIndex(h => h === "Estat");
     const dataEstatIndex = headers.findIndex(h => h === "Data_Estat");
 
+    // Intentar encontrar la columna de modalidad con ambos nombres posibles
+    let modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    if (modalitatEntregaIndex === -1) {
+      modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Lliurament");
+    }
+
+    const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
+    const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
+    const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
+    const notifIntermediariIndex = headers.findIndex(h => h === "Notificacion_Intermediari");
+    const notifDestinatariIndex = headers.findIndex(h => h === "Notificacion_Destinatari");
+
     if (idPedidoIndex === -1 && idItemIndex === -1) {
       return res.json({
         success: false,
@@ -332,6 +352,30 @@ router.post('/orders/update-status', async (req, res) => {
           if (dataEstatIndex !== -1) {
             row[dataEstatIndex] = currentTimestamp;
           }
+
+          // Si el nuevo estado es "Preparat", limpiar TODOS los campos de asignación
+          if (newStatus === 'Preparat') {
+            if (modalitatEntregaIndex !== -1) {
+              row[modalitatEntregaIndex] = '';
+            }
+            if (monitorIntermediariIndex !== -1) {
+              row[monitorIntermediariIndex] = '';
+            }
+            if (escolaDestinoIndex !== -1) {
+              row[escolaDestinoIndex] = '';
+            }
+            if (dataLliuramentIndex !== -1) {
+              row[dataLliuramentIndex] = '';
+            }
+            if (notifIntermediariIndex !== -1) {
+              row[notifIntermediariIndex] = '';
+            }
+            if (notifDestinatariIndex !== -1) {
+              row[notifDestinatariIndex] = '';
+            }
+            console.log(`🧹 Limpiando campos de asignación para ${rowIdItem || rowIdPedido}`);
+          }
+
           changesMade++;
         }
       }
@@ -700,12 +744,37 @@ router.get('/orders/preparated', async (req, res) => {
       return estat === 'Preparat' || estat === 'Assignat';
     });
 
-    // Mapear a formato de objeto
+    // Mapear a formato de objeto con procesamiento de fechas
+    const dataLliuramentColIndex = headers.findIndex(h => h === 'Data_Lliurament_Prevista');
+    const dataNecessitatColIndex = headers.findIndex(h => h === 'Data_Necessitat');
+
     const orders = preparatedRows.map(row => {
       const order = {};
       headers.forEach((header, index) => {
         const key = mapHeaderToKey(header);
-        order[key] = row[index];
+        let value = row[index];
+
+        // Procesar Data_Lliurament_Prevista
+        if (index === dataLliuramentColIndex && value) {
+          if (value instanceof Date) {
+            value = formatDate(value);
+          } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+            // Si es un string en formato ISO, extraer solo la fecha
+            value = value.split('T')[0];
+          }
+        }
+
+        // Procesar Data_Necessitat
+        if (index === dataNecessitatColIndex && value) {
+          if (value instanceof Date) {
+            value = formatDate(value);
+          } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+            // Si es un string en formato ISO, extraer solo la fecha
+            value = value.split('T')[0];
+          }
+        }
+
+        order[key] = value;
       });
       return order;
     });
@@ -970,6 +1039,52 @@ router.post('/delivery/options', async (req, res) => {
   }
 });
 
+/**
+ * Busca la actividad de un monitor en una escola específica desde la hoja Dades
+ * @param {string} monitorName - Nombre del monitor
+ * @param {string} escolaName - Nombre de la escola
+ * @returns {Promise<string|null>} - Actividad del monitor o null si no se encuentra
+ */
+async function getMonitorActivityInSchool(monitorName, escolaName) {
+  try {
+    const data = await sheets.getSheetData('Dades');
+
+    if (!data || data.length === 0) {
+      console.error('❌ Hoja Dades vacía');
+      return null;
+    }
+
+    const headers = data[0];
+    const escolaIdx = headers.findIndex(h => h === 'ESCOLA');
+    const monitoraIdx = headers.findIndex(h => h === 'MONITORA');
+    const activitatIdx = headers.findIndex(h => h === 'ACTIVITAT');
+
+    if (escolaIdx === -1 || monitoraIdx === -1 || activitatIdx === -1) {
+      console.error('❌ No se encontraron columnas necesarias en Dades');
+      return null;
+    }
+
+    // Buscar fila que coincida con monitor y escola
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rowMonitor = row[monitoraIdx]?.toString().trim();
+      const rowEscola = row[escolaIdx]?.toString().trim();
+      const rowActivitat = row[activitatIdx]?.toString().trim();
+
+      if (rowMonitor === monitorName && rowEscola === escolaName && rowActivitat) {
+        console.log(`✅ Actividad encontrada para ${monitorName} en ${escolaName}: ${rowActivitat}`);
+        return rowActivitat;
+      }
+    }
+
+    console.warn(`⚠️ No se encontró actividad para ${monitorName} en ${escolaName}`);
+    return null;
+  } catch (error) {
+    console.error('Error buscando actividad del monitor:', error);
+    return null;
+  }
+}
+
 async function getSchoolMonitorData() {
   try {
     const data = await sheets.getSheetData('Dades');
@@ -1099,13 +1214,26 @@ router.post('/delivery/create', async (req, res) => {
     }
 
     const headers = data[0];
+    console.log('📋 Headers found in sheet (delivery/create):', headers);
+
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
     const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
     const estatIndex = headers.findIndex(h => h === "Estat");
-    const modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+
+    // Intentar encontrar la columna de modalidad con ambos nombres posibles
+    let modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    if (modalitatEntregaIndex === -1) {
+      modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Lliurament");
+      console.log('⚠️ Using Modalitat_Lliurament column instead of Modalitat_Entrega');
+    }
+    console.log('🔍 modalitatEntregaIndex:', modalitatEntregaIndex);
+
     const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
     const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
+
+    // Buscar columna de Activitat_Intermediari (puede que no exista todavía)
+    let activitatIntermediariIndex = headers.findIndex(h => h === "Activitat_Intermediari");
 
     if (idItemIndex === -1 && idPedidoIndex === -1) {
       return res.json({
@@ -1116,6 +1244,15 @@ router.post('/delivery/create', async (req, res) => {
 
     let updatedRows = 0;
     const currentTimestamp = new Date();
+
+    // Si hay intermediario, buscar su actividad en la hoja Dades
+    let activitatIntermediariValue = null;
+    if (modalitat === 'Intermediari' && monitorIntermediaria && escolaDestino) {
+      // La escolaDestino es donde ENTREGA el intermediario (escola destino final)
+      // Necesitamos buscar la actividad del intermediario en ESA escola
+      activitatIntermediariValue = await getMonitorActivityInSchool(monitorIntermediaria, escolaDestino);
+      console.log(`🔍 Actividad del intermediario ${monitorIntermediaria} en ${escolaDestino}: ${activitatIntermediariValue}`);
+    }
 
     // Actualizar las filas correspondientes
     const updatedData = data.map((row, index) => {
@@ -1147,6 +1284,10 @@ router.post('/delivery/create', async (req, res) => {
           }
           if (escolaDestinoIndex !== -1) {
             row[escolaDestinoIndex] = escolaDestino || '';
+          }
+          // Guardar actividad del intermediario si existe
+          if (activitatIntermediariIndex !== -1 && activitatIntermediariValue) {
+            row[activitatIntermediariIndex] = activitatIntermediariValue;
           }
         } else {
           // Si es directa, escribir "DIRECTA" en Monitor_Intermediari
@@ -1233,10 +1374,18 @@ router.post('/delivery/remove-intermediary', async (req, res) => {
     const idItemIndex = headers.findIndex(h => h === "ID_Item");
     const idPedidoIndex = headers.findIndex(h => h === "ID_Pedido");
     const estatIndex = headers.findIndex(h => h === "Estat");
-    const modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+
+    // Intentar encontrar la columna de modalidad con ambos nombres posibles
+    let modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Entrega");
+    if (modalitatEntregaIndex === -1) {
+      modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Lliurament");
+    }
+
     const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
     const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
+    const notifIntermediariIndex = headers.findIndex(h => h === "Notificacion_Intermediari");
+    const notifDestinatariIndex = headers.findIndex(h => h === "Notificacion_Destinatari");
 
     if (idItemIndex === -1 && idPedidoIndex === -1) {
       return res.json({
@@ -1281,6 +1430,14 @@ router.post('/delivery/remove-intermediary', async (req, res) => {
         // Limpiar fecha de lliurament
         if (dataLliuramentIndex !== -1) {
           row[dataLliuramentIndex] = '';
+        }
+
+        // Limpiar estados de notificaciones
+        if (notifIntermediariIndex !== -1) {
+          row[notifIntermediariIndex] = '';
+        }
+        if (notifDestinatariIndex !== -1) {
+          row[notifDestinatariIndex] = '';
         }
 
         updatedRows++;
@@ -1774,8 +1931,10 @@ function mapHeaderToKey(header) {
     'Responsable_Preparacio': 'responsablePreparacio',
     'Notes_Internes': 'notesInternes',
     'Modalitat_Entrega': 'modalitatEntrega',
+    'Modalitat_Lliurament': 'modalitatEntrega', // Support both column names
     'Monitor_Intermediari': 'monitorIntermediari',
     'Escola_Destino_Intermediari': 'escolaDestinoIntermediari',
+    'Activitat_Intermediari': 'activitatIntermediari',
     'Data_Entrega_Prevista': 'dataEntregaPrevista',
     'Data_Lliurament_Prevista': 'dataLliuramentPrevista',
     'Distancia_Academia': 'distanciaAcademia',
