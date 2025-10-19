@@ -54,7 +54,9 @@ export interface Stats {
   pendents?: number;
   enProces?: number;
   preparats?: number;
+  assignats?: number;
   entregats?: number;
+  lliurats?: number;
   // Spanish names (legacy)
   pendientes?: number;
   enProceso?: number;
