@@ -21,8 +21,18 @@ let authConfig = {
   ],
 };
 
+// Si existe GOOGLE_SERVICE_ACCOUNT_BASE64 (Vercel con base64), decodificar y usar
+if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
+  try {
+    const decoded = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8');
+    authConfig.credentials = JSON.parse(decoded);
+    console.log('[SHEETS] Usando credenciales de variable de entorno (base64)');
+  } catch (error) {
+    console.error('[SHEETS] Error al decodificar GOOGLE_SERVICE_ACCOUNT_BASE64:', error.message);
+  }
+}
 // Si existe GOOGLE_SERVICE_ACCOUNT_JSON (Vercel), usar esas credenciales
-if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+else if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
   try {
     authConfig.credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
     console.log('[SHEETS] Usando credenciales de variable de entorno');
