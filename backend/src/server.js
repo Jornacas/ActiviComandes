@@ -32,6 +32,18 @@ app.get('/', (req, res) => {
   });
 });
 
+// Debug endpoint
+app.get('/debug/env', (req, res) => {
+  res.json({
+    hasSpreadsheetId: !!process.env.SPREADSHEET_ID,
+    hasAuthToken: !!process.env.AUTH_TOKEN,
+    hasGoogleBase64: !!process.env.GOOGLE_SERVICE_ACCOUNT_BASE64,
+    hasGoogleJson: !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
+    hasGoogleFile: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    spreadsheetIdLength: process.env.SPREADSHEET_ID?.length || 0
+  });
+});
+
 // Routes
 app.use('/api', mobileRoutes);
 app.use('/api/admin', adminRoutes);
