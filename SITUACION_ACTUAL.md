@@ -1,236 +1,263 @@
-# Situación Actual - Migración Backend Node.js
+# Situación Actual - Sistema ID_Lliurament
 
-**Fecha**: 14 de Octubre de 2025
-**Rama**: `backend-migration`
-**Estado**: ⚠️ **PENDIENTE DE RESOLVER ERROR 500**
-
----
-
-## 🎯 Objetivo Cumplido (Parcialmente)
-
-Se completó la migración del frontend para que use el backend Node.js con rutas REST en lugar del formato Google Apps Script.
+**Fecha:** 18 de Octubre 2025
+**Branch:** frontend-redesign
+**Objetivo:** Implementar sistema de ID_Lliurament para agrupar correctamente las notificaciones de pedidos
 
 ---
 
-## ✅ Trabajo Completado
+## 📋 Problema Original
 
-### 1. **Backend Node.js**
-- ✅ Servidor corriendo correctamente en `http://localhost:3000`
-- ✅ Endpoints REST implementados y funcionando:
-  - `GET /api/admin/orders/preparated` - Funciona correctamente (probado con curl)
-  - `POST /api/admin/delivery/options` - Implementado
-  - `POST /api/admin/delivery/create` - Implementado
-- ✅ Autenticación funcionando con token `comanda_materials_2024`
-- ✅ Google Sheets API funcionando
-- ✅ Google Maps Routes API v2 configurada
+Las notificaciones se agrupaban incorrectamente mostrando nombres de otras personas:
+- Judit Pesquero hacía un pedido para Auro con ella misma como intermediaria
+- La notificación mostraba el nombre de Miriam Miranda (otra compañera)
+- **Causa:** La agrupación se hacía por monitor + escuela + fecha, lo cual agrupaba pedidos que NO fueron asignados juntos
 
-### 2. **Frontend Next.js - Archivos Modificados**
+---
 
-#### `frontend/src/lib/api.ts`
-**Cambios realizados:**
-- Métodos `getPreparatedOrders()`, `getDeliveryOptions()`, y `createDelivery()` actualizados
-- Migrados del formato Google Apps Script (`?action=`) a rutas REST (`/api/admin/...`)
-- Añadida autenticación con header `Authorization: Bearer`
+## ✅ Solución Implementada
 
-```typescript
-// ANTES (Google Apps Script):
-const url = new URL(API_BASE_URL);
-url.searchParams.append('action', 'getPreparatedOrders');
+### 1. Sistema ID_Lliurament en Backend
 
-// DESPUÉS (Node.js REST):
-const url = `${API_BASE_URL}/api/admin/orders/preparated`;
-fetch(url, {
-  headers: { 'Authorization': `Bearer ${API_TOKEN}` }
-})
+**Cambios en Google Sheets:**
+- Columna V (antes "Distancia_Academia") renombrada a "ID_Lliurament"
+- Almacena un identificador único para cada lote de entrega
+
+**Cambios en `backend/src/routes/admin.js`:**
+
+#### Generación de ID único al crear entrega:
+```javascript
+// Línea ~1248
+const idLliurament = `LLI-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// Líneas ~1322-1326
+if (idLliuramentIndex !== -1) {
+  row[idLliuramentIndex] = idLliurament;
+  console.log(`🆔 Assigned ID_Lliurament: ${idLliurament} to row ${rowIdItem}`);
+}
 ```
 
-#### `frontend/src/components/DeliveryManager.tsx`
-**Cambios realizados:**
-- Añadido import: `import { apiClient } from '../lib/api';`
-- Eliminadas constantes `API_BASE_URL` y `API_TOKEN` (ya no se usan directamente)
-- Función `fetchPreparatedOrders()` ahora usa `apiClient.getPreparatedOrders()`
-- Función `getDeliveryOptionsForSelected()` ahora usa `apiClient.getDeliveryOptions()`
-- Función `createDelivery()` ahora usa `apiClient.createDelivery()`
-
----
-
-## ⚠️ Problema Actual
-
-### Error HTTP 500
-
-**Síntoma:**
-- Frontend carga en `http://localhost:3002` pero muestra "HTTP error! status: 500"
-- El backend está corriendo correctamente
-- Los endpoints funcionan cuando se prueban con curl
-
-**Posibles Causas:**
-1. **Error en el backend al procesar la petición del frontend**
-2. **CORS o problema de autenticación**
-3. **Formato de datos incorrecto entre frontend-backend**
-4. **Problema con Next.js cache** (hay conflictos con Dropbox sincronizando `.next/cache`)
-
-**Para Diagnosticar:**
-1. Revisar logs del backend: `BashOutput` del proceso `f18417`
-2. Revisar logs del frontend en consola del navegador
-3. Verificar que el endpoint `/api/admin/orders` funcione correctamente
-4. Probar la petición con las DevTools del navegador
-
----
-
-## 📁 Archivos Modificados (Sin Commitear)
-
+#### Limpieza de ID al cambiar estado:
+```javascript
+// Líneas ~358-384
+if (newStatus !== 'Assignat' && newStatus !== 'Lliurat') {
+  if (idLliuramentIndex !== -1) {
+    row[idLliuramentIndex] = '';
+    console.log(`🆔 Eliminado ID_Lliurament (cambio de estado a ${newStatus})`);
+  }
+}
 ```
-M backend/package-lock.json
-M backend/package.json
-M backend/src/middleware/legacy.js
-M backend/src/routes/admin.js
-M frontend/src/components/DeliveryManager.tsx
-M frontend/src/components/OrdersTable.tsx
-M frontend/src/lib/api.ts
 
-?? backend/src/services/maps.js
-?? ESTADO_MIGRACION.md
-?? .claspignore
-?? activiconta-9166254b6d22.json
-?? SITUACION_ACTUAL.md (este archivo)
+#### Limpieza de ID al eliminar intermediario:
+```javascript
+// Líneas ~1460-1464
+if (idLliuramentIndex !== -1) {
+  row[idLliuramentIndex] = '';
+  console.log(`🆔 Cleared ID_Lliurament from row ${rowIdItem}`);
+}
+```
+
+#### Fix crítico: Rellenar filas cortas
+```javascript
+// Líneas ~79-88
+let rows = data.slice(1)
+  .map(row => {
+    // Asegurar que todas las filas tengan la misma longitud que el header
+    const filledRow = [...row];
+    while (filledRow.length < headersRow.length) {
+      filledRow.push('');
+    }
+    return filledRow.slice(0, headersRow.length);
+  })
+```
+
+**Problema resuelto:** Google Sheets API solo devuelve valores hasta la última celda no vacía. Las filas antiguas sin ID_Lliurament eran más cortas que el header, causando que `row[21]` fuera `undefined`.
+
+#### Mapeo de columnas:
+```javascript
+// Líneas ~143-169
+const map = {
+  'Timestamp': 'timestamp',
+  'ID_Pedido': 'idPedido',
+  'ID_Item': 'idItem',
+  // ...
+  'ID_Lliurament': 'idLliurament',
+  'Distancia_Academia': 'idLliurament', // Compatibilidad
+  // ...
+};
 ```
 
 ---
 
-## 🔧 Configuración Actual
+### 2. Agrupación en Frontend
 
-### Backend (`backend/.env`)
-```env
-PORT=3000
-NODE_ENV=development
-API_TOKEN=comanda_materials_2024
-GOOGLE_MAPS_API_KEY=AIzaSyByO41A21_Ze-M-0wjbsooHVf0mElEnatI
+**Cambios en `frontend/src/components/OrdersTable.tsx`:**
+
+#### Agrupación en columnas de notificaciones:
+```javascript
+// Líneas ~1020-1043 (Intermediario)
+if (order.idLliurament) {
+  groupMaterials = orders.filter(o =>
+    o.idLliurament &&
+    o.idLliurament === order.idLliurament &&
+    o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+  ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
+
+  isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem;
+}
 ```
 
-### Frontend (`frontend/.env.local`)
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3000
-NEXT_PUBLIC_API_TOKEN=comanda_materials_2024
-NEXT_PUBLIC_ENABLE_NOTIFICATIONS=true
+#### Agrupación en panel lateral (NUEVO):
+```javascript
+// Líneas ~2189-2223 (Intermediario en drawer)
+if (selectedOrderForDrawer.idLliurament && selectedOrderForDrawer.monitorIntermediari) {
+  groupMaterials = orders.filter(o =>
+    o.idLliurament &&
+    o.idLliurament === selectedOrderForDrawer.idLliurament &&
+    o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+  ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
+
+  isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === selectedOrderForDrawer.idItem;
+}
+
+// Renderizado condicional
+if (isSent) {
+  return <Chip label="✅ Enviada" size="small" color="success" />;
+} else if (!isFirstInGroup) {
+  return <Chip label="Agrupat" size="small" color="default" />;
+} else {
+  return <Button>Enviar</Button>;
+}
 ```
+
+**Lógica de visualización:**
+- **Primera fila del grupo:** Muestra botón "Enviar"
+- **Resto de filas:** Muestra chip gris "Agrupat"
+- **Notificación enviada:** Muestra chip verde "✅ Enviada"
 
 ---
 
-## 🚀 Próximos Pasos para Resolver
+## 🔍 Verificación de Funcionamiento
 
-### 1. **Diagnosticar el Error 500**
+### Datos de prueba en Google Sheets:
+```
+Row 72: bc8def4c-0a5b-41c1-bc4c-f4f5a8b6e6e2-001, ID: LLI-1760810127615-v70xukdp3
+Row 73: bc8def4c-0a5b-41c1-bc4c-f4f5a8b6e6e2-002, ID: LLI-1760810127615-v70xukdp3
+Row 74: bc8def4c-0a5b-41c1-bc4c-f4f5a8b6e6e2-003, ID: LLI-1760810127615-v70xukdp3
+```
 
+**Monitor:** Judit Pesquero
+**Escuela destino:** VilaOlimpica
+**Fecha:** 15/10/2025
+**Materiales:** Lápices HB (x2), Lápiz carboncillo (x1)
+
+### Backend verificado ✅
 ```bash
-# Ver logs del backend
-cd backend
-npm run dev
-# (observar qué error aparece cuando el frontend hace la petición)
-
-# En el navegador:
-# - Abrir DevTools (F12)
-# - Ir a Network tab
-# - Recargar la página
-# - Ver qué petición falla y qué error devuelve
+curl -s -H "Authorization: Bearer comanda_materials_2024" "http://localhost:3001/api/admin/orders"
 ```
 
-### 2. **Verificar Endpoint Específico**
+**Resultado:**
+- Headers[21] = "idLliurament" ✅
+- Rows[4][21] = "LLI-1760810127615-v70xukdp3" ✅
+- Rows[5][21] = "LLI-1760810127615-v70xukdp3" ✅
+- Rows[6][21] = "LLI-1760810127615-v70xukdp3" ✅
 
-```bash
-# Probar el endpoint que el frontend intenta llamar primero
-curl -H "Authorization: Bearer comanda_materials_2024" http://localhost:3000/api/admin/orders
+### Frontend verificado ✅
 ```
-
-### 3. **Revisar Logs del Frontend**
-
-Abrir `http://localhost:3002` en el navegador y revisar:
-- Console tab: errores JavaScript
-- Network tab: peticiones fallidas y sus respuestas
-
-### 4. **Solución Temporal de Next.js Cache**
-
-Si persisten problemas con cache de Next.js debido a Dropbox:
-
-```bash
-# Detener frontend
-# Cerrar Dropbox temporalmente
-# Borrar cache
-cd frontend
-rm -rf .next
-# Reiniciar Dropbox
-# Iniciar frontend
-npm run dev
+🔍 DEBUG headers: (25) ['timestamp', 'idPedido', 'idItem', ..., 'idLliurament', ...]
+🔍 DEBUG índice de idLliurament: 21
+🔍 DEBUG primera fila length: 25
 ```
 
 ---
 
-## 📋 Comandos Útiles
+## 📝 Pendiente de Verificación
 
-### Iniciar Servidores
+### Pruebas por realizar:
 
-```bash
-# Backend
-cd backend
-npm run dev
-# Corre en http://localhost:3000
+1. **Verificar panel lateral en filas agrupadas:**
+   - [ ] Abrir primera fila del grupo de Judit (bc8def4c...001) → Debe mostrar botones "Enviar"
+   - [ ] Abrir segunda fila del grupo (bc8def4c...002) → Debe mostrar chips "Agrupat"
+   - [ ] Abrir tercera fila del grupo (bc8def4c...003) → Debe mostrar chips "Agrupat"
 
-# Frontend
-cd frontend
-npm run dev
-# Corre en http://localhost:3001 o 3002
-```
+2. **Crear nuevo lote de entrega:**
+   - [ ] Seleccionar varios pedidos
+   - [ ] Asignar intermediario
+   - [ ] Verificar que se genera ID_Lliurament único
+   - [ ] Confirmar que todas las filas del grupo tienen el mismo ID
 
-### Probar Endpoints
+3. **Eliminar asignación:**
+   - [ ] Quitar intermediario de un lote
+   - [ ] Verificar que se limpia el ID_Lliurament
+   - [ ] Confirmar que las notificaciones se desagrupan
 
-```bash
-# Comandes preparades
-curl -H "Authorization: Bearer comanda_materials_2024" \
-  http://localhost:3000/api/admin/orders/preparated
-
-# Opciones de entrega (POST)
-curl -X POST \
-  -H "Authorization: Bearer comanda_materials_2024" \
-  -H "Content-Type: application/json" \
-  -d '{"orders":[...]}' \
-  http://localhost:3000/api/admin/delivery/options
-```
+4. **Cambio de estado:**
+   - [ ] Cambiar pedido de "Assignat" a "Preparat"
+   - [ ] Verificar que se limpia el ID_Lliurament
+   - [ ] Confirmar comportamiento correcto
 
 ---
 
-## 🔍 Información de Debug
+## 🛠️ Archivos Modificados
 
-### Procesos en Background
+### Backend:
+- `backend/src/routes/admin.js`
+  - Líneas 55-77: DEBUG logs
+  - Líneas 79-88: Relleno de filas cortas
+  - Líneas 131-171: Mapeo de headers con ID_Lliurament
+  - Líneas 358-384: Limpieza de ID al cambiar estado
+  - Líneas 1248: Generación de ID único
+  - Líneas 1322-1326: Asignación de ID a lote
+  - Líneas 1460-1464: Limpieza de ID al quitar intermediario
+  - Líneas 2200-2246: Endpoint de debug temporal
 
-- **Backend**: Shell ID `f18417` - `cd backend && npm run dev`
-- **Frontend**: Shell ID `b92316` - `cd frontend && rm -rf .next && npm run dev` (último intento)
-
-### Verificación Rápida del Backend
-
-El backend está funcionando - prueba exitosa:
-```bash
-$ curl -H "Authorization: Bearer comanda_materials_2024" \
-  http://localhost:3000/api/admin/orders/preparated
-
-# Devuelve 22 comandas preparadas correctamente
-```
-
----
-
-## 📝 Notas Importantes
-
-1. **No hacer commit todavía** - Esperar a resolver el error 500
-2. **Dropbox puede causar problemas** con archivos `.next/cache` - considerar pausarlo temporalmente
-3. **Los endpoints del backend funcionan** - el problema está en la integración frontend-backend
-4. **La migración de Google Apps Script a Node.js está completa** en términos de código
+### Frontend:
+- `frontend/src/components/OrdersTable.tsx`
+  - Líneas 1020-1059: Lógica de agrupación en columnas
+  - Líneas 1065-1110: Renderizado condicional (columna intermediario)
+  - Líneas 1172-1230: Renderizado condicional (columna destinatario)
+  - Líneas 1345-1362: DEBUG logs de transformación
+  - Líneas 2189-2223: Agrupación en panel lateral (intermediario)
+  - Líneas 2235-2268: Agrupación en panel lateral (destinatario)
 
 ---
 
-## 🔗 Referencias
+## 🎯 Próximos Pasos
 
-- **Documentación anterior**: `ESTADO_MIGRACION.md`
-- **Backend routes**: `backend/src/routes/admin.js`
-- **Frontend API client**: `frontend/src/lib/api.ts`
-- **Componente afectado**: `frontend/src/components/DeliveryManager.tsx`
+1. **Verificar funcionamiento completo** con las pruebas listadas arriba
+2. **Eliminar logs DEBUG** una vez confirmado el funcionamiento
+3. **Probar casos edge:**
+   - Pedidos antiguos sin ID_Lliurament (fallback a lógica antigua)
+   - Mezcla de pedidos con y sin ID en la misma vista
+   - Notificaciones ya enviadas
+4. **Documentar para el equipo** cómo funciona el nuevo sistema
+5. **Merge a main** cuando esté completamente verificado
 
 ---
 
-**Última actualización**: 14/10/2025 18:00
+## 📌 Notas Importantes
+
+- **Compatibilidad hacia atrás:** Pedidos antiguos sin ID_Lliurament usan la lógica antigua de agrupación (monitor + escuela + fecha)
+- **No rompe datos existentes:** Las filas sin ID simplemente no se agrupan por ID
+- **Limpieza automática:** El ID se elimina al cambiar estado o quitar intermediario
+- **Unicidad garantizada:** Combinación de timestamp + random genera IDs únicos
+
+---
+
+## 🐛 Problemas Resueltos Durante la Implementación
+
+### 1. Columna con espacio trailing
+**Problema:** Header "Distancia_Academia " tenía espacio al final
+**Solución:** Añadido `.trim()` en mapeo de headers (línea 133)
+
+### 2. Filas más cortas que headers
+**Problema:** Google Sheets API no devuelve celdas vacías al final, `row[21]` era `undefined`
+**Solución:** Relleno automático de filas hasta longitud del header (líneas 83-86)
+
+### 3. Panel lateral no aplicaba agrupación
+**Problema:** Lógica de agrupación solo existía en columnas de tabla
+**Solución:** Replicada lógica en sección de notificaciones del drawer (líneas 2189-2268)
+
+---
+
+**Estado:** ✅ Implementado, pendiente de verificación final por usuario

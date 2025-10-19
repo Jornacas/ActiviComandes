@@ -51,8 +51,41 @@ router.get('/orders', async (req, res) => {
     }
 
     const headersRow = data[0];
+
+    // DEBUG: Log headers para verificar
+    console.log('🔍 DEBUG Headers count:', headersRow.length);
+    console.log('🔍 DEBUG Header at index 21:', headersRow[21]);
+    const idLliuramentIdx = headersRow.findIndex(h => String(h || '').trim() === 'ID_Lliurament');
+    const distanciaIdx = headersRow.findIndex(h => String(h || '').trim() === 'Distancia_Academia');
+    console.log('🔍 DEBUG Índice ID_Lliurament:', idLliuramentIdx);
+    console.log('🔍 DEBUG Índice Distancia_Academia:', distanciaIdx);
+
+    if (data[1]) {
+      console.log('🔍 DEBUG First row length:', data[1].length);
+      console.log('🔍 DEBUG First row value at index 21:', data[1][21]);
+      console.log('🔍 DEBUG First row value type:', typeof data[1][21]);
+    }
+
+    // Buscar una fila que tenga ID_Lliurament
+    if (idLliuramentIdx !== -1) {
+      for (let i = 1; i < Math.min(data.length, 10); i++) {
+        if (data[i] && data[i][idLliuramentIdx]) {
+          console.log(`🔍 DEBUG Fila ${i} tiene ID_Lliurament:`, data[i][idLliuramentIdx]);
+          break;
+        }
+      }
+    }
+
     let rows = data.slice(1)
-      .map(row => row.slice(0, headersRow.length))
+      .map(row => {
+        // Asegurar que todas las filas tengan la misma longitud que el header
+        // Rellenar con valores vacíos si la fila es más corta
+        const filledRow = [...row];
+        while (filledRow.length < headersRow.length) {
+          filledRow.push('');
+        }
+        return filledRow.slice(0, headersRow.length);
+      })
       .filter(row => {
         // Filtrar filas vacías: verificar que al menos tenga timestamp o ID
         const hasTimestamp = row[0] && String(row[0]).trim() !== '';
@@ -104,6 +137,9 @@ router.get('/orders', async (req, res) => {
 
     // Mapear headers a formato camelCase
     const headers = headersRow.map(h => {
+      // IMPORTANTE: Hacer trim() para eliminar espacios al principio/final
+      const headerTrimmed = String(h || '').trim();
+
       const map = {
         'Timestamp': 'timestamp',
         'ID_Pedido': 'idPedido',
@@ -127,10 +163,11 @@ router.get('/orders', async (req, res) => {
         'Activitat_Intermediari': 'activitatIntermediari',
         'Data_Entrega_Prevista': 'dataEntregaPrevista',
         'Data_Lliurament_Prevista': 'dataLliuramentPrevista',
-        'Distancia_Academia': 'distanciaAcademia',
+        'ID_Lliurament': 'idLliurament',
+        'Distancia_Academia': 'idLliurament', // Columna V reutilizada como ID_Lliurament
         'Notes_Entrega': 'notesEntrega'
       };
-      return map[h] || String(h).toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
+      return map[headerTrimmed] || String(headerTrimmed).toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
     });
 
     const allRows = data.slice(1);
@@ -317,6 +354,7 @@ router.post('/orders/update-status', async (req, res) => {
     const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
     const notifIntermediariIndex = headers.findIndex(h => h === "Notificacion_Intermediari");
     const notifDestinatariIndex = headers.findIndex(h => h === "Notificacion_Destinatari");
+    const idLliuramentIndex = headers.findIndex(h => h === "ID_Lliurament");
 
     if (idPedidoIndex === -1 && idItemIndex === -1) {
       return res.json({
@@ -353,8 +391,8 @@ router.post('/orders/update-status', async (req, res) => {
             row[dataEstatIndex] = currentTimestamp;
           }
 
-          // Si el nuevo estado es "Preparat", limpiar TODOS los campos de asignación
-          if (newStatus === 'Preparat') {
+          // Si el nuevo estado NO es "Assignat" ni "Lliurat", limpiar campos de lliurament
+          if (newStatus !== 'Assignat' && newStatus !== 'Lliurat') {
             if (modalitatEntregaIndex !== -1) {
               row[modalitatEntregaIndex] = '';
             }
@@ -372,6 +410,11 @@ router.post('/orders/update-status', async (req, res) => {
             }
             if (notifDestinatariIndex !== -1) {
               row[notifDestinatariIndex] = '';
+            }
+            // Limpiar ID_Lliurament cuando se cancela el lliurament
+            if (idLliuramentIndex !== -1) {
+              row[idLliuramentIndex] = '';
+              console.log(`🆔 Eliminado ID_Lliurament de ${rowIdItem || rowIdPedido} (cambio de estado a ${newStatus})`);
             }
             console.log(`🧹 Limpiando campos de asignación para ${rowIdItem || rowIdPedido}`);
           }
@@ -1235,6 +1278,18 @@ router.post('/delivery/create', async (req, res) => {
     // Buscar columna de Activitat_Intermediari (puede que no exista todavía)
     let activitatIntermediariIndex = headers.findIndex(h => h === "Activitat_Intermediari");
 
+    // Buscar columna ID_Lliurament (Columna V / Distancia_Academia reutilizada)
+    let idLliuramentIndex = headers.findIndex(h => h === "ID_Lliurament");
+    if (idLliuramentIndex === -1) {
+      idLliuramentIndex = headers.findIndex(h => h === "Distancia_Academia");
+      console.log('⚠️ Using Distancia_Academia column as ID_Lliurament');
+    }
+    console.log('🔍 idLliuramentIndex:', idLliuramentIndex);
+
+    // Generar ID único para este lliurament (UUID simplificado con timestamp)
+    const idLliurament = `LLI-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log('🆔 ID Lliurament generado:', idLliurament);
+
     if (idItemIndex === -1 && idPedidoIndex === -1) {
       return res.json({
         success: false,
@@ -1304,6 +1359,12 @@ router.post('/delivery/create', async (req, res) => {
           // Convertir la fecha string YYYY-MM-DD a objeto Date
           const dateObj = new Date(dataEntrega);
           row[dataLliuramentIndex] = dateObj;
+        }
+
+        // Asignar ID_Lliurament único a todos los pedidos de este lote
+        if (idLliuramentIndex !== -1) {
+          row[idLliuramentIndex] = idLliurament;
+          console.log(`🆔 Assigned ID_Lliurament: ${idLliurament} to row ${rowIdItem || rowIdPedido}`);
         }
 
         updatedRows++;
@@ -1387,6 +1448,12 @@ router.post('/delivery/remove-intermediary', async (req, res) => {
     const notifIntermediariIndex = headers.findIndex(h => h === "Notificacion_Intermediari");
     const notifDestinatariIndex = headers.findIndex(h => h === "Notificacion_Destinatari");
 
+    // Buscar columna ID_Lliurament (Columna V / Distancia_Academia reutilizada)
+    let idLliuramentIndex = headers.findIndex(h => h === "ID_Lliurament");
+    if (idLliuramentIndex === -1) {
+      idLliuramentIndex = headers.findIndex(h => h === "Distancia_Academia");
+    }
+
     if (idItemIndex === -1 && idPedidoIndex === -1) {
       return res.json({
         success: false,
@@ -1430,6 +1497,12 @@ router.post('/delivery/remove-intermediary', async (req, res) => {
         // Limpiar fecha de lliurament
         if (dataLliuramentIndex !== -1) {
           row[dataLliuramentIndex] = '';
+        }
+
+        // Limpiar ID_Lliurament
+        if (idLliuramentIndex !== -1) {
+          row[idLliuramentIndex] = '';
+          console.log(`🆔 Cleared ID_Lliurament from row ${rowIdItem || rowIdPedido}`);
         }
 
         // Limpiar estados de notificaciones
@@ -1937,10 +2010,262 @@ function mapHeaderToKey(header) {
     'Activitat_Intermediari': 'activitatIntermediari',
     'Data_Entrega_Prevista': 'dataEntregaPrevista',
     'Data_Lliurament_Prevista': 'dataLliuramentPrevista',
-    'Distancia_Academia': 'distanciaAcademia',
+    'ID_Lliurament': 'idLliurament',
+    'Distancia_Academia': 'idLliurament', // Columna V reutilizada como ID_Lliurament
     'Notes_Entrega': 'notesEntrega'
   };
   return map[header] || String(header).toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
 }
+
+// ======================================================
+// ENDPOINT TEMPORAL - CARGAR ID_LLIURAMENT
+// ======================================================
+
+/**
+ * GET /api/admin/list-current-orders
+ * TEMPORAL: Lista todos los pedidos actuales con sus IDs
+ */
+router.get('/list-current-orders', async (req, res) => {
+  try {
+    const data = await sheets.getSheetData('Respostes');
+
+    if (!data || data.length < 2) {
+      return res.json({
+        success: true,
+        orders: []
+      });
+    }
+
+    const headers = data[0];
+    const rows = data.slice(1);
+
+    const idItemIndex = headers.findIndex(h => h === 'ID_Item');
+    const nomCognomsIndex = headers.findIndex(h => h === 'Nom_i_Cognoms');
+    const escolaIndex = headers.findIndex(h => h === 'Escola_Destino' || h === 'Escola');
+    const monitorIndex = headers.findIndex(h => h === 'Monitor_Intermediari');
+    const estatIndex = headers.findIndex(h => h === 'Estat');
+
+    const orders = rows
+      .filter(row => row[idItemIndex]) // Solo filas con ID_Item
+      .map(row => ({
+        idItem: row[idItemIndex] || 'N/A',
+        nomCognoms: row[nomCognomsIndex] || 'N/A',
+        escola: row[escolaIndex] || 'N/A',
+        monitor: row[monitorIndex] || '',
+        estat: row[estatIndex] || ''
+      }));
+
+    res.json({
+      success: true,
+      total: orders.length,
+      orders
+    });
+  } catch (error) {
+    console.error('Error listando pedidos:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/load-ids-lliurament
+ * TEMPORAL: Carga IDs de lliurament a pedidos existentes
+ * Este endpoint puede eliminarse después de usarlo
+ *
+ * Body: { grupos: [{ id: 'LLI-001', descripcion: '...', idItems: ['uuid-001', 'uuid-002'] }] }
+ */
+router.post('/load-ids-lliurament', async (req, res) => {
+  try {
+    console.log('🔄 Iniciando carga de ID_Lliurament...');
+
+    // Obtener grupos del body o usar valores por defecto
+    const GRUPOS = req.body.grupos || [];
+
+    // Obtener datos actuales
+    const data = await sheets.getSheetData('Respostes');
+
+    if (!data || data.length < 2) {
+      return res.json({
+        success: false,
+        error: 'No se encontraron datos en la hoja'
+      });
+    }
+
+    const headers = data[0];
+    const rows = data.slice(1);
+
+    // Encontrar índices
+    const idItemIndex = headers.findIndex(h => h === 'ID_Item');
+    let idLliuramentIndex = headers.findIndex(h => h === 'ID_Lliurament' || h === 'Distancia_Academia');
+
+    console.log('📍 Headers actuales:', headers);
+    console.log('📍 Índice ID_Item:', idItemIndex);
+    console.log('📍 Índice ID_Lliurament:', idLliuramentIndex);
+
+    if (idItemIndex === -1) {
+      return res.json({
+        success: false,
+        error: 'No se encontró la columna ID_Item'
+      });
+    }
+
+    // Si no existe la columna, buscar la primera columna vacía o usar columna V (índice 21)
+    if (idLliuramentIndex === -1) {
+      // Buscar primera columna completamente vacía
+      idLliuramentIndex = headers.findIndex((h, i) => i > 0 && (!h || h.trim() === ''));
+
+      // Si no hay columnas vacías, usar columna V (índice 21) por defecto
+      if (idLliuramentIndex === -1) {
+        idLliuramentIndex = 21; // Columna V
+        console.log('⚠️  No se encontró columna vacía, usando columna V (índice 21)');
+      } else {
+        console.log(`✅ Columna vacía encontrada en índice ${idLliuramentIndex}`);
+      }
+
+      // Crear el header
+      console.log('📝 Creando columna ID_Lliurament...');
+      const colLetter = String.fromCharCode(65 + idLliuramentIndex);
+      await sheets.updateRange('Respostes', `${colLetter}1`, [['ID_Lliurament']]);
+      console.log(`✅ Columna ID_Lliurament creada en columna ${colLetter}`);
+    } else if (headers[idLliuramentIndex] === 'Distancia_Academia') {
+      // Cambiar encabezado si es necesario
+      console.log('📝 Cambiando encabezado de Distancia_Academia a ID_Lliurament...');
+      const colLetter = String.fromCharCode(65 + idLliuramentIndex);
+      await sheets.updateRange('Respostes', `${colLetter}1`, [['ID_Lliurament']]);
+      console.log('✅ Encabezado actualizado');
+    }
+
+    // Procesar cada grupo
+    const resultados = [];
+    let totalActualizados = 0;
+
+    for (const grupo of GRUPOS) {
+      console.log(`\n📦 Procesando ${grupo.id}: ${grupo.descripcion}`);
+
+      const actualizacionesGrupo = [];
+
+      for (const idItem of grupo.idItems) {
+        // Buscar la fila correspondiente
+        const rowIndex = rows.findIndex(row => row[idItemIndex] === idItem);
+
+        if (rowIndex === -1) {
+          console.log(`⚠️  No se encontró: ${idItem}`);
+          actualizacionesGrupo.push({
+            idItem,
+            status: 'no_encontrado'
+          });
+          continue;
+        }
+
+        // Fila en el Sheet (1-indexed + header)
+        const sheetRow = rowIndex + 2;
+        const colLetter = String.fromCharCode(65 + idLliuramentIndex);
+
+        // Actualizar la celda
+        await sheets.updateRange('Respostes', `${colLetter}${sheetRow}`, [[grupo.id]]);
+
+        console.log(`✅ ${idItem} → fila ${sheetRow} → ${grupo.id}`);
+        totalActualizados++;
+
+        actualizacionesGrupo.push({
+          idItem,
+          fila: sheetRow,
+          idLliurament: grupo.id,
+          status: 'actualizado'
+        });
+      }
+
+      resultados.push({
+        grupo: grupo.id,
+        descripcion: grupo.descripcion,
+        actualizaciones: actualizacionesGrupo
+      });
+    }
+
+    console.log(`\n🎉 Proceso completado: ${totalActualizados} pedidos actualizados`);
+
+    // Invalidar caché
+    cache.del('cache_respostes');
+
+    res.json({
+      success: true,
+      totalActualizados,
+      grupos: resultados,
+      message: `Se actualizaron ${totalActualizados} pedidos con sus ID_Lliurament correspondientes`
+    });
+
+  } catch (error) {
+    console.error('❌ Error al cargar IDs:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/debug-column-v
+ * Endpoint temporal para diagnosticar la columna V (ID_Lliurament)
+ */
+router.get('/debug-column-v', async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Leyendo columna V directamente...');
+
+    const data = await sheets.getSheetData('Respostes');
+
+    if (!data || data.length === 0) {
+      return res.json({ error: 'No hay datos' });
+    }
+
+    const headers = data[0];
+    console.log('🔍 DEBUG: Headers length:', headers.length);
+    console.log('🔍 DEBUG: Headers:', headers);
+
+    const idLliuramentIdx = headers.findIndex(h => String(h || '').trim() === 'ID_Lliurament');
+    console.log('🔍 DEBUG: Index de ID_Lliurament:', idLliuramentIdx);
+
+    // Buscar filas con ID_Lliurament
+    const filasConID = [];
+    const filasSinID = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const hasID = idLliuramentIdx !== -1 && row[idLliuramentIdx] && String(row[idLliuramentIdx]).trim() !== '';
+
+      const filaInfo = {
+        rowIndex: i,
+        rowLength: row.length,
+        idItem: row[2],
+        idLliurament: idLliuramentIdx !== -1 ? row[idLliuramentIdx] : 'N/A',
+        valueAtIndex21: row[21],
+        monitor: row[17]
+      };
+
+      if (hasID) {
+        filasConID.push(filaInfo);
+      } else if (filasSinID.length < 5) {
+        filasSinID.push(filaInfo);
+      }
+
+      if (filasConID.length >= 5) break;
+    }
+
+    res.json({
+      headersLength: headers.length,
+      idLliuramentIndex: idLliuramentIdx,
+      headerAt21: headers[21],
+      totalFilas: data.length - 1,
+      filasConID: filasConID.length,
+      ejemplosConID: filasConID,
+      ejemplosSinID: filasSinID
+    });
+
+  } catch (error) {
+    console.error('❌ Error en debug:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = router;

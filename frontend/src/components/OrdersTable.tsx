@@ -28,6 +28,12 @@ import {
   TextField,
   Tooltip,
   Snackbar,
+  Drawer,
+  IconButton,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import {
   Sync,
@@ -37,6 +43,8 @@ import {
   HourglassEmpty,
   Delete,
   Clear,
+  Close,
+  Info,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
 
@@ -118,6 +126,10 @@ export default function OrdersTable() {
   const [internalNotes, setInternalNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
+  // Estados para el Drawer lateral (panel de detalles)
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState<any>(null);
+
   // Guardar el estado en localStorage cuando cambie
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -131,11 +143,52 @@ export default function OrdersTable() {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver original
-      
+
       const day = date.getDate().toString().padStart(2, '0');
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const year = date.getFullYear();
       return `${day}/${month}/${year}`;
+    } catch (error) {
+      return dateString; // Si hay error, devolver original
+    }
+  };
+
+  // Función para formatear fecha en formato catalán "dijous 23 octubre"
+  const formatDateCatalan = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A';
+
+    try {
+      let date: Date;
+
+      // Si es una fecha ISO con Z (UTC), extraer solo la parte de fecha
+      if (dateString.includes('T') && dateString.includes('Z')) {
+        const dateOnly = dateString.split('T')[0]; // "2025-10-01"
+        const [year, month, day] = dateOnly.split('-');
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      }
+      // Si es formato DD/MM/YYYY (formato europeo del Google Sheet)
+      else if (dateString.includes('/')) {
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0]);
+          const month = parseInt(parts[1]) - 1; // Meses en JS son 0-indexed
+          const year = parseInt(parts[2]);
+          date = new Date(year, month, day);
+        } else {
+          date = new Date(dateString);
+        }
+      }
+      // Para fechas normales (ISO 8601 sin Z)
+      else {
+        date = new Date(dateString);
+      }
+
+      if (isNaN(date.getTime())) return dateString; // Si no es válida, devolver original
+
+      const days = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+      const months = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+
+      return `${days[date.getDay()]} ${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]}`;
     } catch (error) {
       return dateString; // Si hay error, devolver original
     }
@@ -146,12 +199,10 @@ export default function OrdersTable() {
     let orderMaterials: any[] = [];
 
     if (type === 'intermediario') {
-      // Para intermediario: agrupar por Monitor + Escola Destino + Fecha Lliurament
-      // Esto permite agrupar múltiples pedidos asignados al mismo intermediario
+      // Para intermediario: agrupar por ID_Lliurament
+      // IMPORTANTE: Solo agrupa materiales que fueron asignados JUNTOS (mismo ID_Lliurament)
       orderMaterials = orders.filter(o =>
-        o.monitorIntermediari === order.monitorIntermediari &&
-        o.escolaDestinoIntermediari === order.escolaDestinoIntermediari &&
-        o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
+        o.idLliurament && o.idLliurament === order.idLliurament && // CLAVE: mismo lote de lliurament
         o.monitorIntermediari && o.monitorIntermediari.trim() !== '' // Que tenga intermediario asignado
       ).sort((a, b) => {
         // Ordenar por idItem para asegurar consistencia con la tabla
@@ -214,10 +265,9 @@ export default function OrdersTable() {
       // Necesitamos buscar en TODOS los materiales del intermediario (no solo del pedido actual)
 
       // 1. Obtener TODOS los materiales del mismo grupo del intermediario (ordenados)
+      // IMPORTANTE: Solo materiales que fueron asignados JUNTOS (mismo ID_Lliurament)
       const grupoIntermediari = orders.filter(o =>
-        o.monitorIntermediari === order.monitorIntermediari &&
-        o.escolaDestinoIntermediari === order.escolaDestinoIntermediari &&
-        o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
+        o.idLliurament && o.idLliurament === order.idLliurament && // CLAVE: mismo lote de lliurament
         o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
       ).sort((a, b) => {
         // Ordenar por idItem para asegurar consistencia
@@ -405,11 +455,10 @@ ${lliuramentInfo}
       let orderMaterials: any[] = [];
 
       if (notificationType === 'intermediario') {
-        // Para intermediario: agrupar por Monitor + Escola Destino + Fecha
+        // Para intermediario: agrupar por ID_Lliurament
+        // IMPORTANTE: Solo agrupa materiales que fueron asignados JUNTOS (mismo ID_Lliurament)
         orderMaterials = orders.filter(o =>
-          o.monitorIntermediari === selectedOrderForNotification.monitorIntermediari &&
-          o.escolaDestinoIntermediari === selectedOrderForNotification.escolaDestinoIntermediari &&
-          o.dataLliuramentPrevista === selectedOrderForNotification.dataLliuramentPrevista &&
+          o.idLliurament && o.idLliurament === selectedOrderForNotification.idLliurament && // CLAVE: mismo lote de lliurament
           o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
         ).sort((a, b) => {
           // Ordenar por idItem para asegurar consistencia
@@ -544,6 +593,27 @@ ${lliuramentInfo}
   };
 
   const columns: GridColDef[] = [
+    {
+      field: 'actions',
+      headerName: '',
+      width: 60,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => (
+        <IconButton
+          size="small"
+          color="primary"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedOrderForDrawer(params.row);
+            setDrawerOpen(true);
+          }}
+          sx={{ '&:hover': { bgcolor: 'primary.light', color: 'white' } }}
+        >
+          <Info />
+        </IconButton>
+      ),
+    },
     {
       field: 'timestamp',
       headerName: 'Data',
@@ -765,18 +835,44 @@ ${lliuramentInfo}
       flex: 0.8,
       renderCell: (params) => {
         const monitor = params.value as string;
-        if (!monitor || monitor.trim() === '') {
+        const estat = formatSentenceCase(params.row.estat as string);
+        const modalitat = params.row.modalitatEntrega;
+
+        // Si el estado es Preparat, mostrar -- (aún no asignado)
+        if (estat === 'Preparat' || estat === 'Pendent' || estat === 'En proces') {
           return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
         }
-        return (
-          <span style={{ 
-            color: '#1976d2', 
-            fontSize: '0.85rem', 
-            fontWeight: '500' 
-          }}>
-            {monitor}
-          </span>
-        );
+
+        // Si el estado es Assignat o Lliurat
+        if (estat === 'Assignat' || estat === 'Lliurat') {
+          // Si hay nombre de monitor, mostrarlo
+          if (monitor && monitor.trim() !== '' && monitor.toUpperCase() !== 'DIRECTA') {
+            return (
+              <span style={{
+                color: '#1976d2',
+                fontSize: '0.85rem',
+                fontWeight: '500'
+              }}>
+                {monitor}
+              </span>
+            );
+          }
+
+          // Si no hay monitor O es DIRECTA, es Lliurament Directe
+          return (
+            <span style={{
+              color: '#2e7d32',
+              fontSize: '0.85rem',
+              fontStyle: 'italic',
+              fontWeight: '500'
+            }}>
+              Lliurament Directe
+            </span>
+          );
+        }
+
+        // Para cualquier otro estado, mostrar --
+        return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
       },
     },
     {
@@ -907,18 +1003,60 @@ ${lliuramentInfo}
 
             // IMPORTANTE: Detectar si este material es el PRIMERO del grupo
             // Solo mostramos el botón en la primera fila del grupo para evitar duplicados
-            const groupMaterials = orders.filter(o =>
-              o.monitorIntermediari === order.monitorIntermediari &&
-              o.escolaDestinoIntermediari === order.escolaDestinoIntermediari &&
-              o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
-              o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
-            ).sort((a, b) => {
-              // Ordenar por idItem para asegurar consistencia
-              return (a.idItem || '').localeCompare(b.idItem || '');
-            });
+            let groupMaterials = [];
+            let isFirstInGroup = true;
+            let groupSize = 1;
 
-            const isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem;
-            const groupSize = groupMaterials.length;
+            // DEBUG: Log del ID_Lliurament (solo primeras 5 filas para no saturar)
+            if (orders.indexOf(order) < 5 && order.monitorIntermediari) {
+              console.log('🔍 DEBUG Notif Intermediari:', {
+                idItem: order.idItem?.substring(0, 20),
+                idLliurament: order.idLliurament,
+                hasIdLliurament: !!order.idLliurament,
+                monitor: order.monitorIntermediari
+              });
+            }
+
+            // Si tiene ID_Lliurament, agrupar por ese ID (pedidos asignados JUNTOS en el mismo lote)
+            if (order.idLliurament) {
+              groupMaterials = orders.filter(o =>
+                o.idLliurament &&
+                o.idLliurament === order.idLliurament &&
+                o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+              ).sort((a, b) => {
+                // Ordenar por idItem para asegurar consistencia
+                return (a.idItem || '').localeCompare(b.idItem || '');
+              });
+
+              // DEBUG (solo primeras 5 filas)
+              if (orders.indexOf(order) < 5 && order.monitorIntermediari) {
+                console.log('🔍 DEBUG Group:', {
+                  groupSize: groupMaterials.length,
+                  groupIds: groupMaterials.map(g => g.idItem?.substring(0, 15)),
+                  firstIdInGroup: groupMaterials[0]?.idItem?.substring(0, 20),
+                  currentId: order.idItem?.substring(0, 20),
+                  isFirst: groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem
+                });
+              }
+
+              isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem;
+              groupSize = groupMaterials.length;
+            } else {
+              // FALLBACK para pedidos antiguos sin ID_Lliurament:
+              // Agrupar por monitor + escola destino + fecha (lógica antigua)
+              groupMaterials = orders.filter(o =>
+                o.monitorIntermediari === order.monitorIntermediari &&
+                o.escolaDestinoIntermediari === order.escolaDestinoIntermediari &&
+                o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
+                o.monitorIntermediari && o.monitorIntermediari.trim() !== '' &&
+                !o.idLliurament // Solo agrupar pedidos que tampoco tienen ID
+              ).sort((a, b) => {
+                return (a.idItem || '').localeCompare(b.idItem || '');
+              });
+
+              isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem;
+              groupSize = groupMaterials.length;
+            }
 
             const isSent = notificationStatuses[order.idItem]?.intermediario || false;
             const message = generateNotificationMessage(order, 'intermediario');
@@ -1204,6 +1342,13 @@ ${lliuramentInfo}
       if (response.success && response.data) {
         const { headers, rows, estadisticas } = response.data;
 
+        // DEBUG: Verificar headers e índice de idLliurament
+        const idLliuramentIdx = headers.indexOf('idLliurament');
+        console.log('🔍 DEBUG headers:', headers);
+        console.log('🔍 DEBUG índice de idLliurament:', idLliuramentIdx);
+        console.log('🔍 DEBUG primera fila length:', rows[0]?.length);
+        console.log('🔍 DEBUG primera fila[21]:', rows[0]?.[21]);
+
         // Transform raw data to Order objects
         const transformedOrders = rows.map((row, index) => {
           const order: any = {};
@@ -1216,9 +1361,16 @@ ${lliuramentInfo}
           return order;
         });
 
+        // DEBUG: Log de los primeros 3 pedidos para verificar idLliurament
+        console.log('🔍 DEBUG Orders cargados (primeros 3):', transformedOrders.slice(0, 3).map(o => ({
+          idItem: o.idItem?.substring(0, 20),
+          idLliurament: o.idLliurament,
+          monitor: o.monitorIntermediari
+        })));
+
         setOrders(transformedOrders);
         setStats(estadisticas);
-        
+
         // Detect stale orders
         detectStaleOrders(transformedOrders);
       } else {
@@ -1432,61 +1584,102 @@ ${lliuramentInfo}
   }
 
   return (
-    <Box sx={{ 
-      width: '100%', 
+    <Box sx={{
+      width: '100%',
       overflow: 'hidden',
+      bgcolor: 'grey.50',
+      minHeight: '100vh',
+      p: 3,
       '& .MuiDataGrid-root': {
         border: 'none',
       }
     }}>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      {notificationsEnabled && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          🔔 <strong>Sistema de notificacions manual activat</strong> - Pots enviar notificacions manualment des de la taula
-        </Alert>
-      )}
-
-      {staleOrders.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          <strong>⚠️ Avisos de Sol·licituds Estancades</strong>
-          <br />
-          Hi ha {staleOrders.length} sol·licitud{staleOrders.length > 1 ? 's' : ''} sense canvi d'estat durant més de 5 dies.
-          {staleOrders.length <= 3 && (
-            <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
-              {staleOrders.map(order => (
-                <div key={order.id}>
-                  • {order.nomCognoms} - {order.escola} - {order.material}
-                </div>
-              ))}
-            </div>
-          )}
-        </Alert>
-      )}
-
+      {/* Header Mejorado */}
       {stats && (
-        <Card sx={{ mb: 2 }}>
+        <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Estadístiques
-            </Typography>
-            <Stack direction="row" spacing={2}>
-              <Chip label={`Total: ${stats.total}`} />
-              <Chip label={`Pendents: ${stats.pendientes || stats.pendents || 0}`} color="default" />
-              <Chip label={`En Procés: ${stats.enProceso || stats.enProces || 0}`} color="warning" />
-              <Chip label={`Preparats: ${stats.preparados || stats.preparats || 0}`} color="info" />
-              <Chip label={`Lliurats: ${stats.entregados || stats.entregats || 0}`} color="success" />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+              <Box>
+                <Typography variant="h5" fontWeight="bold" gutterBottom>
+                  Panell d'Administració
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Comandas de Materials
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Stats - Diseño Mejorado */}
+            <Stack direction="row" spacing={1.5} flexWrap="wrap">
+              <Chip
+                label={`Total: ${stats.total}`}
+                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
+              />
+              <Chip
+                label={`Pendents: ${stats.pendientes || stats.pendents || 0}`}
+                color="error"
+                variant="outlined"
+                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
+              />
+              <Chip
+                label={`En Procés: ${stats.enProceso || stats.enProces || 0}`}
+                color="warning"
+                variant="outlined"
+                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
+              />
+              <Chip
+                label={`Preparats: ${stats.preparados || stats.preparats || 0}`}
+                color="info"
+                variant="outlined"
+                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
+              />
+              <Chip
+                label={`Lliurats: ${stats.entregados || stats.entregats || 0}`}
+                color="success"
+                variant="outlined"
+                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
+              />
             </Stack>
           </CardContent>
         </Card>
       )}
 
-      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+      {/* Alertas */}
+      <Stack spacing={2} sx={{ mb: 3 }}>
+        {error && (
+          <Alert severity="error">
+            {error}
+          </Alert>
+        )}
+
+        {notificationsEnabled && (
+          <Alert severity="info">
+            🔔 <strong>Sistema de notificacions manual activat</strong> - Pots enviar notificacions manualment des de la taula
+          </Alert>
+        )}
+
+        {staleOrders.length > 0 && (
+          <Alert severity="warning">
+            <strong>⚠️ Avisos de Sol·licituds Estancades</strong>
+            <br />
+            Hi ha {staleOrders.length} sol·licitud{staleOrders.length > 1 ? 's' : ''} sense canvi d'estat durant més de 5 dies.
+            {staleOrders.length <= 3 && (
+              <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
+                {staleOrders.map(order => (
+                  <div key={order.id}>
+                    • {order.nomCognoms} - {order.escola} - {order.material}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Alert>
+        )}
+      </Stack>
+
+      {/* Toolbar de Acciones */}
+      <Card sx={{ mb: 3 }}>
+      <Stack direction="row" spacing={2} sx={{ p: 2 }}>
         <Button
           variant="contained"
           startIcon={<Sync />}
@@ -1555,17 +1748,26 @@ ${lliuramentInfo}
         )}
       </Stack>
 
-      <Box sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={orders}
+        {/* DataGrid */}
+        <Box sx={{ height: 600, width: '100%', px: 2, pb: 2 }}>
+          <DataGrid
+            rows={orders}
           columns={columns}
           checkboxSelection
           disableRowSelectionOnClick
           onRowSelectionModelChange={setSelectedRows}
           rowSelectionModel={selectedRows}
           columnVisibilityModel={{
+            // Ocultar columnas - los detalles están en el drawer lateral
             esMaterialPersonalitzat: false,
             distanciaAcademia: false,
+            comentarisGenerals: false,
+            modalitatEntrega: false,
+            responsablePreparacio: false,
+            escolaDestinoIntermediari: false,
+            notesEntrega: false,
+            notifIntermediario: false,
+            notifDestinatario: false,
           }}
           slots={{
             toolbar: GridToolbar,
@@ -1595,8 +1797,9 @@ ${lliuramentInfo}
               overflowX: 'auto',
             },
           }}
-        />
-      </Box>
+          />
+        </Box>
+      </Card>
 
       {/* Modal de notificaciones */}
       <Dialog
@@ -1735,6 +1938,345 @@ ${lliuramentInfo}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Drawer lateral - Panel de detalles del pedido */}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        PaperProps={{
+          sx: { width: { xs: '100%', sm: 500, md: 600 } }
+        }}
+      >
+        {selectedOrderForDrawer && (
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* Header */}
+            <Box sx={{
+              p: 2,
+              bgcolor: 'primary.main',
+              color: 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Info />
+                Detalls del Pedido
+              </Typography>
+              <IconButton onClick={() => setDrawerOpen(false)} sx={{ color: 'white' }}>
+                <Close />
+              </IconButton>
+            </Box>
+
+            {/* Content */}
+            <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+              <Stack spacing={3}>
+                {/* Estado */}
+                <Box>
+                  <Chip
+                    icon={statusIcons[formatSentenceCase(selectedOrderForDrawer.estat as string) as keyof typeof statusIcons] || statusIcons['']}
+                    label={formatSentenceCase(selectedOrderForDrawer.estat as string) || 'Pendent'}
+                    color={statusColors[formatSentenceCase(selectedOrderForDrawer.estat as string) as keyof typeof statusColors] || 'default'}
+                    sx={{ fontSize: '1rem', py: 2.5, px: 1 }}
+                  />
+                </Box>
+
+                <Divider />
+
+                {/* Informació General */}
+                <Box>
+                  <Typography variant="overline" fontWeight="bold" color="primary" gutterBottom>
+                    📋 Informació General
+                  </Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemText
+                        primary="Data Sol·licitud"
+                        secondary={formatDateCatalan(selectedOrderForDrawer.timestamp)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText
+                        primary="Monitor"
+                        secondary={selectedOrderForDrawer.nomCognoms || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText
+                        primary="Escola"
+                        secondary={selectedOrderForDrawer.escola || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText
+                        primary="Activitat"
+                        secondary={selectedOrderForDrawer.activitat || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText
+                        primary="Data Necessitat"
+                        secondary={formatDateCatalan(selectedOrderForDrawer.dataNecessitat)}
+                      />
+                    </ListItem>
+                  </List>
+                </Box>
+
+                <Divider />
+
+                {/* Material */}
+                <Box>
+                  <Typography variant="overline" fontWeight="bold" color="primary" gutterBottom>
+                    📦 Material Sol·licitat
+                  </Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemText
+                        primary="Material"
+                        secondary={formatSentenceCase(selectedOrderForDrawer.material as string) || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText
+                        primary="Unitats"
+                        secondary={selectedOrderForDrawer.unitats || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText
+                        primary="Comentaris"
+                        secondary={selectedOrderForDrawer.comentarisGenerals || '-'}
+                      />
+                    </ListItem>
+                    {selectedOrderForDrawer.esMaterialPersonalitzat === 'TRUE' && (
+                      <ListItem>
+                        <ListItemText
+                          primary="Material Personalitzat"
+                          secondary="Sí"
+                        />
+                      </ListItem>
+                    )}
+                  </List>
+                </Box>
+
+                <Divider />
+
+                {/* Lliurament */}
+                {(selectedOrderForDrawer.monitorIntermediari || selectedOrderForDrawer.dataLliuramentPrevista) && (
+                  <>
+                    <Box>
+                      <Typography variant="overline" fontWeight="bold" color="primary" gutterBottom>
+                        🚚 Lliurament
+                      </Typography>
+                      <List dense>
+                        {selectedOrderForDrawer.responsablePreparacio && (
+                          <ListItem>
+                            <ListItemText
+                              primary="Responsable Preparació"
+                              secondary={selectedOrderForDrawer.responsablePreparacio}
+                            />
+                          </ListItem>
+                        )}
+                        {(() => {
+                          const estat = formatSentenceCase(selectedOrderForDrawer.estat as string);
+                          const monitor = selectedOrderForDrawer.monitorIntermediari;
+
+                          // Solo mostrar si el estado es Assignat o Lliurat
+                          if (estat === 'Assignat' || estat === 'Lliurat') {
+                            let label = 'Tipus de Lliurament';
+                            let value = 'Lliurament Directe';
+                            let color = '#2e7d32';
+                            let fontStyle = 'italic';
+
+                            // Si hay nombre de monitor (y no es "DIRECTA")
+                            if (monitor && monitor.trim() !== '' && monitor.toUpperCase() !== 'DIRECTA') {
+                              value = `Intermediari: ${monitor}`;
+                              color = '#1976d2';
+                              fontStyle = 'normal';
+                            }
+
+                            return (
+                              <ListItem>
+                                <ListItemText
+                                  primary={label}
+                                  secondary={value}
+                                  secondaryTypographyProps={{
+                                    style: {
+                                      color: color,
+                                      fontWeight: '500',
+                                      fontStyle: fontStyle
+                                    }
+                                  }}
+                                />
+                              </ListItem>
+                            );
+                          }
+                          return null;
+                        })()}
+                        {selectedOrderForDrawer.escolaDestinoIntermediari && (
+                          <ListItem>
+                            <ListItemText
+                              primary="Escola Destí"
+                              secondary={selectedOrderForDrawer.escolaDestinoIntermediari}
+                            />
+                          </ListItem>
+                        )}
+                        {selectedOrderForDrawer.dataLliuramentPrevista && (
+                          <ListItem>
+                            <ListItemText
+                              primary="Data Lliurament Prevista"
+                              secondary={formatDateCatalan(selectedOrderForDrawer.dataLliuramentPrevista)}
+                            />
+                          </ListItem>
+                        )}
+                        {selectedOrderForDrawer.distanciaAcademia && (
+                          <ListItem>
+                            <ListItemText
+                              primary="Distància"
+                              secondary={selectedOrderForDrawer.distanciaAcademia}
+                            />
+                          </ListItem>
+                        )}
+                        {selectedOrderForDrawer.notesEntrega && (
+                          <ListItem>
+                            <ListItemText
+                              primary="Notes Entrega"
+                              secondary={selectedOrderForDrawer.notesEntrega}
+                            />
+                          </ListItem>
+                        )}
+                      </List>
+                    </Box>
+                    <Divider />
+                  </>
+                )}
+
+                {/* Notes Internes */}
+                {selectedOrderForDrawer.notesInternes && selectedOrderForDrawer.notesInternes.trim() !== '' && (
+                  <>
+                    <Box>
+                      <Typography variant="overline" fontWeight="bold" color="primary" gutterBottom>
+                        📝 Notes Internes
+                      </Typography>
+                      <Typography variant="body2" sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                        {selectedOrderForDrawer.notesInternes}
+                      </Typography>
+                    </Box>
+                    <Divider />
+                  </>
+                )}
+              </Stack>
+            </Box>
+
+            {/* Actions Footer */}
+            <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
+              <Stack spacing={2}>
+                {/* Notificaciones - Solo si hay intermediario y notificaciones están activadas */}
+                {notificationsEnabled && selectedOrderForDrawer.monitorIntermediari && selectedOrderForDrawer.monitorIntermediari.trim() !== '' && (
+                  <>
+                    <Typography variant="overline" fontWeight="bold" color="text.secondary">
+                      📧 Notificacions
+                    </Typography>
+
+                    {/* Notificación Intermediario */}
+                    <Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          Intermediari:
+                        </Typography>
+                        {loadingNotificationStatuses ? (
+                          <CircularProgress size={20} />
+                        ) : (() => {
+                          // Calcular si es el primero del grupo (misma lógica que en las columnas)
+                          let groupMaterials = [];
+                          let isFirstInGroup = true;
+
+                          if (selectedOrderForDrawer.idLliurament && selectedOrderForDrawer.monitorIntermediari) {
+                            groupMaterials = orders.filter(o =>
+                              o.idLliurament &&
+                              o.idLliurament === selectedOrderForDrawer.idLliurament &&
+                              o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+                            ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
+
+                            isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === selectedOrderForDrawer.idItem;
+                          }
+
+                          const isSent = notificationStatuses[selectedOrderForDrawer.idItem]?.intermediario;
+
+                          if (isSent) {
+                            return <Chip label="✅ Enviada" size="small" color="success" />;
+                          } else if (!isFirstInGroup) {
+                            return <Chip label="Agrupat" size="small" color="default" />;
+                          } else {
+                            return (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                                startIcon={<span>📤</span>}
+                                onClick={() => openNotificationModal(selectedOrderForDrawer, 'intermediario')}
+                              >
+                                Enviar
+                              </Button>
+                            );
+                          }
+                        })()}
+                      </Stack>
+                    </Box>
+
+                    {/* Notificación Destinatario */}
+                    <Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          Destinatari:
+                        </Typography>
+                        {loadingNotificationStatuses ? (
+                          <CircularProgress size={20} />
+                        ) : (() => {
+                          // Calcular si es el primero del grupo (para destinatario agrupa diferente)
+                          let groupMaterials = [];
+                          let isFirstInGroup = true;
+
+                          // Para destinatario: agrupar por nomCognoms + escola + fecha
+                          groupMaterials = orders.filter(o =>
+                            o.nomCognoms === selectedOrderForDrawer.nomCognoms &&
+                            o.escola === selectedOrderForDrawer.escola &&
+                            o.dataNecessitat === selectedOrderForDrawer.dataNecessitat
+                          ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
+
+                          isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === selectedOrderForDrawer.idItem;
+
+                          const isSent = notificationStatuses[selectedOrderForDrawer.idItem]?.destinatario;
+
+                          if (isSent) {
+                            return <Chip label="✅ Enviada" size="small" color="success" />;
+                          } else if (!isFirstInGroup) {
+                            return <Chip label="Agrupat" size="small" color="default" />;
+                          } else {
+                            return (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                                startIcon={<span>📤</span>}
+                                onClick={() => openNotificationModal(selectedOrderForDrawer, 'destinatario')}
+                              >
+                                Enviar
+                              </Button>
+                            );
+                          }
+                        })()}
+                      </Stack>
+                    </Box>
+
+                    <Divider />
+                  </>
+                )}
+              </Stack>
+            </Box>
+          </Box>
+        )}
+      </Drawer>
     </Box>
   );
 }
