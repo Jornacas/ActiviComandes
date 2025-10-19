@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maqueta Header Optimitzat - ActiviComandes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .comparison {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+
+        .version {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .version-label {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .current {
+            background: #ff9800;
+            color: white;
+        }
+
+        .proposed {
+            background: #4caf50;
+            color: white;
+        }
+
+        /* HEADER ACTUAL (250px altura aprox) */
+        .old-header {
+            border: 2px dashed #ff9800;
+            padding: 20px;
+            background: #fafafa;
+        }
+
+        .old-title {
+            font-size: 32px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .old-subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        .old-stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+
+        .old-chip {
+            padding: 8px 16px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid;
+        }
+
+        .old-chip.total { background: #f5f5f5; border-color: #ddd; }
+        .old-chip.pendents { background: #ffebee; border-color: #ef5350; color: #c62828; }
+        .old-chip.proces { background: #fff3e0; border-color: #ff9800; color: #e65100; }
+        .old-chip.preparats { background: #e3f2fd; border-color: #2196f3; color: #1565c0; }
+        .old-chip.lliurats { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
+
+        .old-banner {
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .old-banner.blue {
+            background: #e3f2fd;
+            color: #1565c0;
+            border-left: 4px solid #2196f3;
+        }
+
+        .old-banner.yellow {
+            background: #fff3e0;
+            color: #e65100;
+            border-left: 4px solid #ff9800;
+        }
+
+        .old-warning-content {
+            margin-top: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .old-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .old-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .old-button.blue {
+            background: #2196f3;
+            color: white;
+        }
+
+        .old-button.green {
+            background: #4caf50;
+            color: white;
+        }
+
+        /* HEADER NUEVO (80px altura aprox) */
+        .new-header {
+            border: 2px dashed #4caf50;
+            padding: 16px 20px;
+            background: #fafafa;
+        }
+
+        .new-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .new-title-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .new-title {
+            font-size: 20px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .new-stats {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .new-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .new-stat-value {
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .new-stat.total .new-stat-value { background: #f5f5f5; color: #333; }
+        .new-stat.pendents .new-stat-value { background: #ffebee; color: #c62828; }
+        .new-stat.proces .new-stat-value { background: #fff3e0; color: #e65100; }
+        .new-stat.preparats .new-stat-value { background: #e3f2fd; color: #1565c0; }
+        .new-stat.lliurats .new-stat-value { background: #e8f5e9; color: #2e7d32; }
+
+        .new-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .new-icon-button {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid #ddd;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .new-icon-button:hover {
+            background: #f5f5f5;
+            border-color: #2196f3;
+        }
+
+        .new-icon-button svg {
+            width: 20px;
+            height: 20px;
+            fill: #666;
+        }
+
+        .new-warning-collapsed {
+            padding: 8px 12px;
+            background: #fff3e0;
+            border-left: 3px solid #ff9800;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #e65100;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s;
+        }
+
+        .new-warning-collapsed:hover {
+            background: #ffe0b2;
+        }
+
+        .new-warning-collapsed .arrow {
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+
+        .new-warning-collapsed.open .arrow {
+            transform: rotate(180deg);
+        }
+
+        /* Métricas de comparación */
+        .metrics {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-top: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .metrics h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #333;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .metric-card {
+            padding: 16px;
+            border-radius: 8px;
+            background: #f5f5f5;
+            border-left: 4px solid;
+        }
+
+        .metric-card.good { border-color: #4caf50; }
+        .metric-card.bad { border-color: #ff9800; }
+
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .metric-change {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .metric-change.good { color: #4caf50; }
+        .metric-change.bad { color: #ff9800; }
+
+        @media (max-width: 768px) {
+            .new-stats {
+                flex-wrap: wrap;
+            }
+
+            .old-stats, .old-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="comparison">
+        <h1>📐 Comparació Header: Actual vs Proposta Optimitzada</h1>
+
+        <!-- VERSION ACTUAL -->
+        <div class="version">
+            <span class="version-label current">❌ VERSIÓ ACTUAL (250px altura)</span>
+
+            <div class="old-header">
+                <div class="old-title">Panell d'Administració</div>
+                <div class="old-subtitle">Comandes de Materials</div>
+
+                <div class="old-stats">
+                    <div class="old-chip total">Total: 78</div>
+                    <div class="old-chip pendents">Pendents: 0</div>
+                    <div class="old-chip proces">En Procés: 0</div>
+                    <div class="old-chip preparats">Preparats: 4</div>
+                    <div class="old-chip lliurats">Lliurats: 0</div>
+                </div>
+
+                <div class="old-banner blue">
+                    <span>ℹ️</span>
+                    <span>⚠️ Sistema de notificacions manual activat - Pots enviar notificacions manualment des de la taula</span>
+                </div>
+
+                <div class="old-banner yellow">
+                    <div>
+                        <span style="font-weight: 600;">⚠️ Avisos de Sol·licituds Estancades</span>
+                        <div class="old-warning-content">
+                            Hi ha 2 sol·licituds sense canvi d'estat durant més de 5 dies.<br>
+                            • Julia Marques - Provençals - Ratolins.<br>
+                            • eixos - FarigolaVallcarca - IMPORTANT: S'ha de recuperar el MEDI-029 (que té un cop i no funciona) i portar-lo a l'oficina.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="old-buttons">
+                    <button class="old-button blue">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                            <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                        </svg>
+                        Sincronitzar Respostes
+                    </button>
+                    <button class="old-button green">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                            <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                        </svg>
+                        Sistema Manual Actiu
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VERSION PROPUESTA -->
+        <div class="version">
+            <span class="version-label proposed">✅ PROPOSTA OPTIMITZADA (80px altura - 68% menys espai)</span>
+
+            <div class="new-header">
+                <div class="new-top-bar">
+                    <div class="new-title-section">
+                        <div class="new-title">📦 Comandes</div>
+
+                        <div class="new-stats">
+                            <div class="new-stat total">
+                                <span class="new-stat-value">78</span>
+                                <span>total</span>
+                            </div>
+                            <span style="color: #ddd;">•</span>
+                            <div class="new-stat pendents">
+                                <span class="new-stat-value">0</span>
+                                <span>pendent</span>
+                            </div>
+                            <span style="color: #ddd;">•</span>
+                            <div class="new-stat proces">
+                                <span class="new-stat-value">0</span>
+                                <span>procés</span>
+                            </div>
+                            <span style="color: #ddd;">•</span>
+                            <div class="new-stat preparats">
+                                <span class="new-stat-value">4</span>
+                                <span>preparats</span>
+                            </div>
+                            <span style="color: #ddd;">•</span>
+                            <div class="new-stat lliurats">
+                                <span class="new-stat-value">0</span>
+                                <span>lliurats</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="new-actions">
+                        <button class="new-icon-button" title="Sincronitzar amb Google Sheets">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="new-warning-collapsed" onclick="this.classList.toggle('open')">
+                    <span>⚠️ 2 Sol·licituds Estancades</span>
+                    <span class="arrow">▼</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- MÉTRICAS DE COMPARACIÓN -->
+        <div class="metrics">
+            <h2>📊 Comparació de Mètriques</h2>
+            <div class="metrics-grid">
+                <div class="metric-card good">
+                    <div class="metric-label">Altura Total</div>
+                    <div class="metric-value">80px</div>
+                    <div class="metric-change good">▼ -170px (-68%)</div>
+                </div>
+
+                <div class="metric-card good">
+                    <div class="metric-label">Elements visibles</div>
+                    <div class="metric-value">2</div>
+                    <div class="metric-change good">▼ 5 elements eliminats</div>
+                </div>
+
+                <div class="metric-card good">
+                    <div class="metric-label">Clicks per veure avisos</div>
+                    <div class="metric-value">1</div>
+                    <div class="metric-change good">Collapsible sota demanda</div>
+                </div>
+
+                <div class="metric-card good">
+                    <div class="metric-label">Espai mòbil</div>
+                    <div class="metric-value">Optimitzat</div>
+                    <div class="metric-change good">Stats compactes inline</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LLEGENDA -->
+        <div class="metrics" style="margin-top: 20px;">
+            <h2>🎯 Canvis Implementats</h2>
+            <ul style="line-height: 2; color: #666;">
+                <li>❌ <strong>Eliminat:</strong> Banner blau "Sistema de notificacions manual activat"</li>
+                <li>❌ <strong>Eliminat:</strong> Botó verd "Sistema Manual Actiu"</li>
+                <li>✂️ <strong>Reduït:</strong> Títol de 32px → 20px amb icono 📦</li>
+                <li>✂️ <strong>Eliminat:</strong> Subtítol "Comandes de Materials"</li>
+                <li>📊 <strong>Compactat:</strong> Stats en línia horitzontal amb valors destacats</li>
+                <li>🔄 <strong>Iconitzat:</strong> Botó sync ara és icona amb tooltip</li>
+                <li>⚠️ <strong>Collapsible:</strong> Avisos estancades es poden amagar (clic per expandir)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Demo interactivo del collapsible
+        console.log('Maqueta optimitzada carregada. Fes clic a "2 Sol·licituds Estancades" per veure el comportament.');
+    </script>
+</body>
+</html>
