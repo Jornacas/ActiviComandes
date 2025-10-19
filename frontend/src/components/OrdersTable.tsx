@@ -121,7 +121,7 @@ export default function OrdersTable() {
   const [notificationType, setNotificationType] = useState<'intermediario' | 'destinatario'>('intermediario');
   const [customMessage, setCustomMessage] = useState('');
   const [isSendingNotification, setIsSendingNotification] = useState(false);
-  const [notificationStatus, setNotificationStatus] = useState<{open: boolean; message: string; severity: 'success' | 'error'}>({
+  const [notificationStatus, setNotificationStatus] = useState<{open: boolean; message: string; severity: 'success' | 'error' | 'warning'}>({
     open: false,
     message: '',
     severity: 'success'
