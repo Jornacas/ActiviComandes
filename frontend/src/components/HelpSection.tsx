@@ -181,7 +181,7 @@ export default function HelpSection() {
                 </TableRow>
                 <TableRow>
                   <TableCell><Chip label="Assignat" size="small" color="secondary" /></TableCell>
-                  <TableCell>🚚</TableCell>
+                  <TableCell>👤</TableCell>
                   <TableCell>Asignado a un intermediario</TableCell>
                   <TableCell>Cuando se planifica entrega con intermediario</TableCell>
                 </TableRow>
@@ -262,10 +262,38 @@ export default function HelpSection() {
                 </CardContent>
               </Card>
             </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>
+                    ✏️ Edición Directa
+                  </Typography>
+                  <Typography variant="body2">
+                    Haz doble clic en Material, Unitats, Comentaris o Responsable para editar inline
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom">
+                    🔄 Actualitzar Espais Xat
+                  </Typography>
+                  <Typography variant="body2">
+                    Refresca els espais de Google Chat per mantenir sincronitzats els canals
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
 
           <Alert severity="warning" sx={{ mt: 3 }}>
             <strong>Alertas automáticas:</strong> El sistema te avisará de pedidos estancados (más de 5 días sin cambio de estado)
+          </Alert>
+
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <strong>Responsable Obligatorio:</strong> Al cambiar el estado a "En proces" o "Preparat", es obligatorio asignar un responsable de preparación. El sistema bloqueará el cambio si falta.
           </Alert>
         </Box>
       ),
@@ -726,8 +754,47 @@ export default function HelpSection() {
             </AccordionSummary>
             <AccordionDetails>
               <Typography>
-                Usa el botón de exportación en la toolbar de la tabla (esquina superior derecha). 
+                Usa el botón de exportación en la toolbar de la tabla (esquina superior derecha).
                 Puedes exportar a CSV o Excel.
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography>¿Cómo edito el material o comentarios de un pedido?</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography>
+                Haz doble clic en la celda que quieres editar (Material, Unitats, Comentaris, Responsable).
+                Los cambios se guardan automáticamente al salir del campo.
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography>¿Por qué no puedo cambiar el estado si no he asignado responsable?</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography paragraph>
+                Al cambiar a "En proces" o "Preparat", es obligatorio tener un responsable asignado.
+              </Typography>
+              <Typography>
+                <strong>Solución:</strong> Primero haz doble clic en la columna "Responsable",
+                escribe el nombre del responsable, y luego cambia el estado.
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography>¿Para qué sirve el botón "Actualitzar Espais Xat"?</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography>
+                Refresca los espacios de Google Chat para mantener sincronizados los canales de notificaciones.
+                Úsalo si añades nuevos monitores o espacios de chat.
               </Typography>
             </AccordionDetails>
           </Accordion>

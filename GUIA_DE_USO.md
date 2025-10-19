@@ -73,8 +73,8 @@ Los pedidos pasan por diferentes estados durante su ciclo de vida:
 | **Pendent** | ⏳ | Recién recibido, sin procesar | Estado inicial automático |
 | **En procés** | ⏰ | Se está preparando el material | Cuando empiezas a prepararlo |
 | **Preparat** | ✅ | Material listo para entregar | Cuando está empaquetado y listo |
-| **Assignat** | 🚚 | Asignado a un intermediario | Cuando se planifica entrega con intermediario |
-| **Lliurat** | 📦 | Entregado al solicitante | Cuando el destinatario lo ha recibido |
+| **Assignat** | 👤 | Asignado a un intermediario | Cuando se planifica entrega con intermediario |
+| **Lliurat** | 🚚 | Entregado al solicitante | Cuando el destinatario lo ha recibido |
 
 #### Funciones de la Sección Solicitudes
 
@@ -104,10 +104,25 @@ Los pedidos pasan por diferentes estados durante su ciclo de vida:
    - Importa nuevas solicitudes del formulario de Google
    - Actualiza estadísticas en tiempo real
 
+**✏️ Edición Directa de Campos**
+   - Haz **doble clic** en Material, Unitats, Comentaris o Responsable
+   - Edita directamente en la tabla sin abrir modales
+   - Los cambios se guardan automáticamente
+
+**🔄 Actualitzar Espais de Xat**
+   - Botón junto a "Sincronitzar Respostes"
+   - Refresca los espais de Google Chat
+   - Mantiene sincronizados los canales de notificaciones
+
 **📊 Estadísticas en Tiempo Real**
    - Total de pedidos
    - Desglose por estados: Pendientes, En Proceso, Preparados, Entregados
    - Alertas de pedidos estancados (>5 días sin cambio)
+
+**⚠️ Validación de Responsable Obligatorio**
+   - Al cambiar estado a **"En proces"** o **"Preparat"**
+   - Es obligatorio asignar un responsable de preparación
+   - El sistema bloquea el cambio si falta el responsable
 
 **🔔 Sistema de Notificaciones Manuales** (Opcional)
    - Activa con el botón **"Activar Sistema Manual"**
@@ -415,8 +430,17 @@ R: El sistema te avisará si un pedido lleva >5 días sin cambio de estado. Revi
 **P: ¿Puedo eliminar una solicitud por error?**  
 R: Sí, pero es irreversible. Asegúrate antes de confirmar la eliminación.
 
-**P: ¿Cómo exporto los datos?**  
+**P: ¿Cómo exporto los datos?**
 R: Usa el botón de exportación en la toolbar de la tabla (esquina superior derecha). Puedes exportar a CSV o Excel.
+
+**P: ¿Cómo edito el material o comentarios de un pedido?**
+R: Haz doble clic en la celda que quieres editar (Material, Unitats, Comentaris, Responsable). Los cambios se guardan automáticamente.
+
+**P: ¿Por qué no puedo cambiar el estado si no he asignado responsable?**
+R: Al cambiar a "En proces" o "Preparat", es obligatorio tener un responsable asignado. Primero asigna un responsable (doble clic en la columna Responsable) y luego cambia el estado.
+
+**P: ¿Para qué sirve el botón "Actualitzar Espais Xat"?**
+R: Refresca los espacios de Google Chat para mantener sincronizados los canales de notificaciones. Úsalo si añades nuevos monitores o espacios.
 
 ---
 
