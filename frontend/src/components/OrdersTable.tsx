@@ -1054,16 +1054,6 @@ ${materialsText}
             let isFirstInGroup = true;
             let groupSize = 1;
 
-            // DEBUG: Log del ID_Lliurament (solo primeras 5 filas para no saturar)
-            if (orders.indexOf(order) < 5 && order.monitorIntermediari) {
-              console.log('🔍 DEBUG Notif Intermediari:', {
-                idItem: order.idItem?.substring(0, 20),
-                idLliurament: order.idLliurament,
-                hasIdLliurament: !!order.idLliurament,
-                monitor: order.monitorIntermediari
-              });
-            }
-
             // Si tiene ID_Lliurament, agrupar por ese ID (pedidos asignados JUNTOS en el mismo lote)
             if (order.idLliurament) {
               groupMaterials = orders.filter(o =>
@@ -1074,17 +1064,6 @@ ${materialsText}
                 // Ordenar por idItem para asegurar consistencia
                 return (a.idItem || '').localeCompare(b.idItem || '');
               });
-
-              // DEBUG (solo primeras 5 filas)
-              if (orders.indexOf(order) < 5 && order.monitorIntermediari) {
-                console.log('🔍 DEBUG Group:', {
-                  groupSize: groupMaterials.length,
-                  groupIds: groupMaterials.map(g => g.idItem?.substring(0, 15)),
-                  firstIdInGroup: groupMaterials[0]?.idItem?.substring(0, 20),
-                  currentId: order.idItem?.substring(0, 20),
-                  isFirst: groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem
-                });
-              }
 
               isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === order.idItem;
               groupSize = groupMaterials.length;
@@ -1413,13 +1392,6 @@ ${materialsText}
           return order;
         });
 
-        // DEBUG: Log de los primeros 3 pedidos para verificar idLliurament
-        console.log('🔍 DEBUG Orders cargados (primeros 3):', transformedOrders.slice(0, 3).map(o => ({
-          idItem: o.idItem?.substring(0, 20),
-          idLliurament: o.idLliurament,
-          monitor: o.monitorIntermediari
-        })));
-
         setOrders(transformedOrders);
         setStats(estadisticas);
 
@@ -1576,17 +1548,10 @@ ${materialsText}
     setDeleting(true);
     try {
       // Get UUIDs of selected orders
-      console.log('🔍 selectedRows:', selectedRows);
-      console.log('🔍 orders:', orders);
-
       const selectedUuids = selectedRows.map(rowId => {
         const order = orders.find(o => o.id === rowId);
-        console.log(`🔍 Looking for rowId ${rowId}, found:`, order);
-        console.log(`🔍 idPedido: ${order?.idPedido}, idItem: ${order?.idItem}, uuid: ${order?.uuid}`);
         return order?.idPedido || order?.idItem || order?.uuid || '';
       }).filter(uuid => uuid);
-
-      console.log('🔍 selectedUuids to delete:', selectedUuids);
 
       const response = await apiClient.deleteOrders(selectedUuids);
       if (response.success) {

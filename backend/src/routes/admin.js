@@ -52,29 +52,8 @@ router.get('/orders', async (req, res) => {
 
     const headersRow = data[0];
 
-    // DEBUG: Log headers para verificar
-    console.log('🔍 DEBUG Headers count:', headersRow.length);
-    console.log('🔍 DEBUG Header at index 21:', headersRow[21]);
     const idLliuramentIdx = headersRow.findIndex(h => String(h || '').trim() === 'ID_Lliurament');
     const distanciaIdx = headersRow.findIndex(h => String(h || '').trim() === 'Distancia_Academia');
-    console.log('🔍 DEBUG Índice ID_Lliurament:', idLliuramentIdx);
-    console.log('🔍 DEBUG Índice Distancia_Academia:', distanciaIdx);
-
-    if (data[1]) {
-      console.log('🔍 DEBUG First row length:', data[1].length);
-      console.log('🔍 DEBUG First row value at index 21:', data[1][21]);
-      console.log('🔍 DEBUG First row value type:', typeof data[1][21]);
-    }
-
-    // Buscar una fila que tenga ID_Lliurament
-    if (idLliuramentIdx !== -1) {
-      for (let i = 1; i < Math.min(data.length, 10); i++) {
-        if (data[i] && data[i][idLliuramentIdx]) {
-          console.log(`🔍 DEBUG Fila ${i} tiene ID_Lliurament:`, data[i][idLliuramentIdx]);
-          break;
-        }
-      }
-    }
 
     let rows = data.slice(1)
       .map(row => {
@@ -414,7 +393,6 @@ router.post('/orders/update-status', async (req, res) => {
             // Limpiar ID_Lliurament cuando se cancela el lliurament
             if (idLliuramentIndex !== -1) {
               row[idLliuramentIndex] = '';
-              console.log(`🆔 Eliminado ID_Lliurament de ${rowIdItem || rowIdPedido} (cambio de estado a ${newStatus})`);
             }
             console.log(`🧹 Limpiando campos de asignación para ${rowIdItem || rowIdPedido}`);
           }
@@ -1269,7 +1247,6 @@ router.post('/delivery/create', async (req, res) => {
       modalitatEntregaIndex = headers.findIndex(h => h === "Modalitat_Lliurament");
       console.log('⚠️ Using Modalitat_Lliurament column instead of Modalitat_Entrega');
     }
-    console.log('🔍 modalitatEntregaIndex:', modalitatEntregaIndex);
 
     const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
@@ -1284,11 +1261,9 @@ router.post('/delivery/create', async (req, res) => {
       idLliuramentIndex = headers.findIndex(h => h === "Distancia_Academia");
       console.log('⚠️ Using Distancia_Academia column as ID_Lliurament');
     }
-    console.log('🔍 idLliuramentIndex:', idLliuramentIndex);
 
     // Generar ID único para este lliurament (UUID simplificado con timestamp)
     const idLliurament = `LLI-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    console.log('🆔 ID Lliurament generado:', idLliurament);
 
     if (idItemIndex === -1 && idPedidoIndex === -1) {
       return res.json({
@@ -1306,7 +1281,6 @@ router.post('/delivery/create', async (req, res) => {
       // La escolaDestino es donde ENTREGA el intermediario (escola destino final)
       // Necesitamos buscar la actividad del intermediario en ESA escola
       activitatIntermediariValue = await getMonitorActivityInSchool(monitorIntermediaria, escolaDestino);
-      console.log(`🔍 Actividad del intermediario ${monitorIntermediaria} en ${escolaDestino}: ${activitatIntermediariValue}`);
     }
 
     // Actualizar las filas correspondientes
@@ -1364,11 +1338,9 @@ router.post('/delivery/create', async (req, res) => {
         // Asignar ID_Lliurament único a todos los pedidos de este lote
         if (idLliuramentIndex !== -1) {
           row[idLliuramentIndex] = idLliurament;
-          console.log(`🆔 Assigned ID_Lliurament: ${idLliurament} to row ${rowIdItem || rowIdPedido}`);
         }
 
         updatedRows++;
-        console.log(`✅ Updated row ${index}: ${rowIdItem || rowIdPedido}`);
       }
 
       return row;
@@ -1502,7 +1474,6 @@ router.post('/delivery/remove-intermediary', async (req, res) => {
         // Limpiar ID_Lliurament
         if (idLliuramentIndex !== -1) {
           row[idLliuramentIndex] = '';
-          console.log(`🆔 Cleared ID_Lliurament from row ${rowIdItem || rowIdPedido}`);
         }
 
         // Limpiar estados de notificaciones
@@ -2202,69 +2173,6 @@ router.post('/load-ids-lliurament', async (req, res) => {
       success: false,
       error: error.message
     });
-  }
-});
-
-/**
- * GET /api/admin/debug-column-v
- * Endpoint temporal para diagnosticar la columna V (ID_Lliurament)
- */
-router.get('/debug-column-v', async (req, res) => {
-  try {
-    console.log('🔍 DEBUG: Leyendo columna V directamente...');
-
-    const data = await sheets.getSheetData('Respostes');
-
-    if (!data || data.length === 0) {
-      return res.json({ error: 'No hay datos' });
-    }
-
-    const headers = data[0];
-    console.log('🔍 DEBUG: Headers length:', headers.length);
-    console.log('🔍 DEBUG: Headers:', headers);
-
-    const idLliuramentIdx = headers.findIndex(h => String(h || '').trim() === 'ID_Lliurament');
-    console.log('🔍 DEBUG: Index de ID_Lliurament:', idLliuramentIdx);
-
-    // Buscar filas con ID_Lliurament
-    const filasConID = [];
-    const filasSinID = [];
-
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const hasID = idLliuramentIdx !== -1 && row[idLliuramentIdx] && String(row[idLliuramentIdx]).trim() !== '';
-
-      const filaInfo = {
-        rowIndex: i,
-        rowLength: row.length,
-        idItem: row[2],
-        idLliurament: idLliuramentIdx !== -1 ? row[idLliuramentIdx] : 'N/A',
-        valueAtIndex21: row[21],
-        monitor: row[17]
-      };
-
-      if (hasID) {
-        filasConID.push(filaInfo);
-      } else if (filasSinID.length < 5) {
-        filasSinID.push(filaInfo);
-      }
-
-      if (filasConID.length >= 5) break;
-    }
-
-    res.json({
-      headersLength: headers.length,
-      idLliuramentIndex: idLliuramentIdx,
-      headerAt21: headers[21],
-      totalFilas: data.length - 1,
-      filasConID: filasConID.length,
-      ejemplosConID: filasConID,
-      ejemplosSinID: filasSinID
-    });
-
-  } catch (error) {
-    console.error('❌ Error en debug:', error);
-    res.status(500).json({ error: error.message });
   }
 });
 

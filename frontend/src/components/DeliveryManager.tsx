@@ -192,7 +192,6 @@ export default function DeliveryManager() {
       const result = await apiClient.getPreparatedOrders();
 
       if (result.success) {
-        console.log('📋 DEBUG - Preparated orders from backend:', result.data);
         // Add id field for DataGrid
         const ordersWithId = (result.data || []).map((order: any) => ({
           ...order,
@@ -211,10 +210,6 @@ export default function DeliveryManager() {
   };
 
   const getDeliveryOptionsForSelected = async () => {
-    console.log('🚀 DEBUG - getDeliveryOptionsForSelected CALLED!');
-    console.log('🚀 DEBUG - selectedOrders:', selectedOrders);
-    console.log('🚀 DEBUG - selectedOrders.length:', selectedOrders.length);
-
     if (selectedOrders.length === 0) {
       setError('Selecciona almenys una comanda');
       return;
@@ -228,10 +223,7 @@ export default function DeliveryManager() {
         selectedOrders.includes(order.id)
       );
 
-      console.log('🚀 DEBUG - selectedOrdersData:', selectedOrdersData);
-
       const result = await apiClient.getDeliveryOptions(selectedOrdersData);
-      console.log('🚀 DEBUG - Response data:', result);
 
       if (result.success) {
         setDeliveryOptions(result.data || []);
@@ -283,10 +275,7 @@ export default function DeliveryManager() {
         dataEntrega: dataEntrega || ''
       };
 
-      console.log('🚀 FRONTEND DEBUG - Datos a enviar:', deliveryData);
-
       const result = await apiClient.createDelivery(deliveryData);
-      console.log('📥 DEBUG - Backend response:', result);
 
       if (result.success) {
         // NO enviar notificaciones automáticamente - deben enviarse manualmente
