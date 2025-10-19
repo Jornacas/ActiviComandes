@@ -277,7 +277,7 @@ export default function HelpSection() {
             <Grid item xs={12} md={6}>
               <Card variant="outlined">
                 <CardContent>
-                  <Typography variant="subtitle1" gutterBottom">
+                  <Typography variant="subtitle1" gutterBottom>
                     🔄 Actualitzar Espais Xat
                   </Typography>
                   <Typography variant="body2">
@@ -336,43 +336,56 @@ export default function HelpSection() {
           </List>
 
           <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-            Tipos de Entrega
+            Modalidades de Entrega
           </Typography>
 
           <Stack spacing={2} sx={{ mt: 2 }}>
             <Paper sx={{ p: 2, bgcolor: '#f8fff8', border: '1px solid #4caf50' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <TrendingUp color="success" />
-                <Typography variant="subtitle1"><strong>Lliurament Optimitzat</strong></Typography>
-                <Chip label="★★★ Máxima" size="small" color="success" />
+                <Typography variant="subtitle1"><strong>1. Modalitat Intermediari</strong></Typography>
+                <Chip label="★★★ Màxima eficiència" size="small" color="success" />
               </Box>
-              <Typography variant="body2">
-                Usa monitor intermediario que ya va a la zona. <strong>Más eficiente.</strong>
+              <Typography variant="body2" paragraph>
+                El monitor intermediario recoge el material en su escuela (o en Eixos) y lo lleva al destinatario.
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                <strong>Cuándo usar:</strong> Hay un monitor que va regularmente a la escuela del destinatario
               </Typography>
             </Paper>
 
-            <Paper sx={{ p: 2, bgcolor: '#fff8f0' }}>
+            <Paper sx={{ p: 2, bgcolor: '#fff3e0', border: '1px solid #ff9800' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Route color="warning" />
-                <Typography variant="subtitle1"><strong>Ruta Multicentre</strong></Typography>
-                <Chip label="★★☆ Alta" size="small" color="warning" />
+                <LocalShipping color="warning" />
+                <Typography variant="subtitle1"><strong>2. Modalitat Directa (amb intermediari)</strong></Typography>
+                <Chip label="★★☆ Alta eficiència" size="small" color="warning" />
               </Box>
-              <Typography variant="body2">
-                Combina múltiples entregas en una ruta.
+              <Typography variant="body2" paragraph>
+                El monitor recoge en Eixos Creativa directamente y lo lleva al destinatario.
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                <strong>Cuándo usar:</strong> El monitor puede pasar por Eixos antes de ir a la escuela destino
               </Typography>
             </Paper>
 
-            <Paper sx={{ p: 2, bgcolor: '#f5f5f5' }}>
+            <Paper sx={{ p: 2, bgcolor: '#f5f5f5', border: '1px solid #757575' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <DirectionsCar />
-                <Typography variant="subtitle1"><strong>Lliurament Directe</strong></Typography>
-                <Chip label="★☆☆ Media" size="small" />
+                <DirectionsCar color="action" />
+                <Typography variant="subtitle1"><strong>3. Entrega Directa des d'Eixos</strong></Typography>
+                <Chip label="★☆☆ Eficiència mitjana" size="small" />
               </Box>
-              <Typography variant="body2">
-                Entrega directa desde Eixos Creativa. Para urgencias.
+              <Typography variant="body2" paragraph>
+                Entrega directa desde Eixos Creativa al destinatario sin intermediario.
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                <strong>Cuándo usar:</strong> Urgencias o cuando no hay intermediarios disponibles
               </Typography>
             </Paper>
           </Stack>
+
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <strong>Nota:</strong> El sistema recomienda automáticamente la mejor modalidad según disponibilidad de monitores y eficiencia de ruta.
+          </Alert>
         </Box>
       ),
     },
@@ -428,13 +441,48 @@ export default function HelpSection() {
             Cómo Asignar un Intermediario
           </Typography>
           <List dense>
-            <ListItem><ListItemText primary="1. Ve a la sección 'Lliuraments'" /></ListItem>
-            <ListItem><ListItemText primary="2. Selecciona las comandes preparadas" /></ListItem>
-            <ListItem><ListItemText primary="3. Haz clic en 'Planificar Lliurament'" /></ListItem>
-            <ListItem><ListItemText primary="4. El sistema mostrará monitores disponibles" /></ListItem>
-            <ListItem><ListItemText primary="5. Selecciona 'Modalitat Intermediari'" /></ListItem>
-            <ListItem><ListItemText primary="6. Elige el monitor y confirma" /></ListItem>
+            <ListItem>
+              <ListItemText
+                primary="1. Ve a la sección 'Lliuraments'"
+                secondary="Solo aparecen comandes con estado 'Preparat'"
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText
+                primary="2. Selecciona las comandes preparadas"
+                secondary="Usa los checkboxes para marcar las que quieres entregar"
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText
+                primary="3. Haz clic en 'Planificar Lliurament'"
+                secondary="El sistema analiza las opciones optimizadas"
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText
+                primary="4. Elige la modalidad"
+                secondary="Modalitat Intermediari, Modalitat Directa, o Entrega Directa des d'Eixos"
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText
+                primary="5. Selecciona el monitor intermediario"
+                secondary="El sistema muestra monitores ordenados por eficiencia"
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText
+                primary="6. Asigna fecha y confirma"
+                secondary="El sistema cambia el estado a 'Assignat' y envía notificaciones"
+              />
+            </ListItem>
           </List>
+
+          <Alert severity="success" sx={{ mt: 2 }}>
+            <strong>Consejo:</strong> El sistema marca como "RECOMANAT" el monitor más eficiente.
+            Elige ese siempre que sea posible.
+          </Alert>
 
           <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
             Cómo Eliminar un Intermediario
