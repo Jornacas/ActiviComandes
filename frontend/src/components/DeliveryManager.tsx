@@ -269,7 +269,7 @@ export default function DeliveryManager() {
 
       const deliveryData = {
         orderIds: orderIds,
-        modalitat: isDirect ? 'Directa' : 'Intermediari',
+        modalitat: isDirect ? 'Recollida' : 'Intermediari',
         monitorIntermediaria: isDirect ? '' : selectedMonitor,
         escolaDestino: escolaDestino,
         dataEntrega: dataEntrega || ''
@@ -337,7 +337,7 @@ export default function DeliveryManager() {
 
       if (isDirect) {
         // ══════════════════════════════════════════════
-        // CASO 1: ENTREGA DIRECTA
+        // CASO 1: RECOLLIDA A EIXOS CREATIVA
         // ══════════════════════════════════════════════
         for (const [dest, pedidos] of pedidosPorDestinatario) {
           const materialsText = pedidos.map((p, idx) =>
@@ -347,21 +347,21 @@ export default function DeliveryManager() {
           const recipientMessage = `📦 MATERIAL PREPARAT PER A ${dest}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Destinatària: ${dest}
-🏫 Escola: ${escolaReceptora}
+🏫 Escoles: ${escolaReceptora}
 
 📦 MATERIALS:
 ${materialsText}
 
-📍 LLIURAMENT:
-🚚 Entrega directa des d'Eixos Creativa
-🏫 Escola: ${escolaReceptora}
-📅 Data: ${formatDate(dataEntrega)}
-📍 Ubicació: Consergeria, AFA o Caixa de Material
+📍 RECOLLIDA:
+🏢 Recollida a Eixos Creativa
+📍 Adreça: Carrer de la Llacuna, 162, 08018 Barcelona
+📅 Data prevista: ${formatDate(dataEntrega)}
+🕒 Horari: Dilluns a Divendres, 9h-18h
 
-ℹ️ NOTA: El material t'arribarà directament a la teva escola.
+ℹ️ NOTA: Pots recollir el material a la nostra oficina en l'horari indicat.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
-          console.log('📤 Enviando notificación entrega directa:', spaceName);
+          console.log('📤 Enviando notificación recollida oficina:', spaceName);
           await apiClient.sendGroupedNotification(
             spaceName,
             recipientMessage,
@@ -765,8 +765,8 @@ ${materialsText}
                   }
                 };
 
-                const canDeliverDirect = option.monitorsDisponibles.some(m => m.tipus === 'directa');
-                const canDeliverViaIntermediary = option.monitorsDisponibles.some(m => m.tipus !== 'directa');
+                const canPickupAtOffice = option.monitorsDisponibles.some(m => m.tipus === 'recollida');
+                const canDeliverViaIntermediary = option.monitorsDisponibles.some(m => m.tipus !== 'recollida');
 
                 return (
                   <Card
@@ -953,7 +953,7 @@ ${materialsText}
                               onClick={() => createDeliveryForOption(option, index, true)}
                               startIcon={loading ? <CircularProgress size={16} /> : <CheckCircle />}
                             >
-                              Entregar Directament
+                              Recollida a Eixos
                             </Button>
                           </Box>
                         )}
@@ -973,7 +973,7 @@ ${materialsText}
                               </Typography>
                               <Stack spacing={1}>
                                 {option.monitorsDisponibles
-                                  .filter(m => m.tipus !== 'directa')
+                                  .filter(m => m.tipus !== 'recollida')
                                   .map((monitor, idx) => (
                                     <Card
                                       key={idx}

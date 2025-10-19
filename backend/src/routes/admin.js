@@ -904,26 +904,26 @@ router.post('/delivery/options', async (req, res) => {
       console.log(`   📋 Orders in group: ${group.orders.length}`);
       console.log(`   🏫 Schools in group: ${group.escoles.length}`);
 
-      // OPCIÓN 1: Entrega DIRECTA (el destinatario recoge todo en Academia)
+      // OPCIÓN 1: RECOLLIDA A EIXOS CREATIVA (el destinatario recoge en la oficina)
       // Esta opción SIEMPRE está disponible independientemente de las escuelas
-      const directOption = {
-        tipus: "Lliurament Directe",
-        escola: "Academia", // Siempre recoge en Academia
+      const pickupOption = {
+        tipus: "Recollida a Eixos Creativa",
+        escola: "Eixos Creativa", // Recoge en la oficina de Eixos
         escoles: group.escoles, // Pero los materiales son para múltiples escoles
-        adreça: "Carrer de la Llacuna, 162, 08018 Barcelona", // Dirección de Academia
-        eficiencia: "Màxima", // Entrega directa es siempre máxima eficiencia
-        prioritat: 1, // Máxima prioridad para entrega directa
+        adreça: "Carrer de la Llacuna, 162, 08018 Barcelona", // Dirección de Eixos Creativa
+        eficiencia: "Màxima", // Recogida en oficina es siempre máxima eficiencia
+        prioritat: 1, // Máxima prioridad
         nomCognoms: group.nomCognoms,
         dataNecessitat: group.dataNecessitat,
         monitorsDisponibles: [{
-          nom: "Recollida directa",
+          nom: "Recollida a oficina",
           dies: ["dilluns", "dimarts", "dimecres", "dijous", "divendres"],
-          tipus: "directa",
+          tipus: "recollida",
           activitat: 'N/A'
         }],
-        descripció: `Recollida directa a Academia (Eixos Creativa) per ${group.nomCognoms}`,
-        distanciaAcademia: "0 km",
-        tempsAcademia: "0 min",
+        descripció: `${group.nomCognoms} recull el material a Eixos Creativa (Llacuna 162)`,
+        distanciaAcademia: "Ubicació: Eixos Creativa",
+        tempsAcademia: "Horari: 9h-18h",
         comandes: group.orders,
         destinatari: {
           nom: group.nomCognoms,
@@ -931,7 +931,7 @@ router.post('/delivery/options', async (req, res) => {
         }
       };
 
-      deliveryOptions.push(directOption);
+      deliveryOptions.push(pickupOption);
 
       // OPCIÓN 2: Entrega con INTERMEDIARIO
       // Buscar monitores que coincidan con el destinatario en AL MENOS UNA de las escoles
