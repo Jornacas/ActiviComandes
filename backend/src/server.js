@@ -87,15 +87,26 @@ app.get('/debug/test-sheets', async (req, res) => {
     const authClient = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-    // Intentar leer una celda
+    // Primero intentar obtener metadata del spreadsheet
+    const metadata = await sheets.spreadsheets.get({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+    });
+
+    // Listar todas las hojas
+    const sheetNames = metadata.data.sheets.map(sheet => sheet.properties.title);
+
+    // Intentar leer una celda de la primera hoja
+    const firstSheet = sheetNames[0];
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.SPREADSHEET_ID,
-      range: 'Respostes!A1',
+      range: `${firstSheet}!A1`,
     });
 
     res.json({
       success: true,
       message: 'Conexión exitosa a Google Sheets',
+      availableSheets: sheetNames,
+      testedSheet: firstSheet,
       data: response.data,
       spreadsheetId: process.env.SPREADSHEET_ID?.substring(0, 10) + '...'
     });
