@@ -11,16 +11,32 @@ const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 // Inicializar cliente de Google Sheets y autenticación compartida
 let sheetsClient = null;
 
-// Crear objeto de autenticación compartido (para chat.js y otros servicios)
-const auth = new google.auth.GoogleAuth({
-  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+// Configurar autenticación: desde archivo en desarrollo, desde variable de entorno en producción
+let authConfig = {
   scopes: [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/chat.bot',
     'https://www.googleapis.com/auth/chat.spaces',
     'https://www.googleapis.com/auth/chat.messages'
   ],
-});
+};
+
+// Si existe GOOGLE_SERVICE_ACCOUNT_JSON (Vercel), usar esas credenciales
+if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+  try {
+    authConfig.credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    console.log('[SHEETS] Usando credenciales de variable de entorno');
+  } catch (error) {
+    console.error('[SHEETS] Error al parsear GOOGLE_SERVICE_ACCOUNT_JSON:', error.message);
+  }
+} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  // Si existe el archivo de credenciales (desarrollo local), usarlo
+  authConfig.keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  console.log('[SHEETS] Usando credenciales desde archivo:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+}
+
+// Crear objeto de autenticación compartido (para chat.js y otros servicios)
+const auth = new google.auth.GoogleAuth(authConfig);
 
 /**
  * Obtiene el cliente autenticado de Google Sheets
