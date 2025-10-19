@@ -239,11 +239,16 @@ export default function DeliveryManager() {
     }
   };
 
-  const createDeliveryForOption = async (option: DeliveryOption, optionIndex: number, isDirect: boolean) => {
+  const createDeliveryForOption = async (option: DeliveryOption, optionIndex: number, deliveryType: boolean | 'direct') => {
     const selectedMonitor = selectedMonitors[optionIndex];
     const dataEntrega = selectedDates[optionIndex];
 
-    if (!isDirect && !selectedMonitor) {
+    // deliveryType puede ser: true (recollida), 'direct' (entrega directa), false (intermediari)
+    const isPickup = deliveryType === true;
+    const isDirectDelivery = deliveryType === 'direct';
+    const isIntermediary = deliveryType === false;
+
+    if (isIntermediary && !selectedMonitor) {
       setError('Selecciona un monitor intermediari');
       return;
     }
@@ -263,14 +268,16 @@ export default function DeliveryManager() {
 
       // Buscar la escolaDestino
       let escolaDestino = '';
-      if (!isDirect && selectedMonitor) {
+      if (isIntermediary && selectedMonitor) {
+        escolaDestino = option.escola || '';
+      } else if (isDirectDelivery) {
         escolaDestino = option.escola || '';
       }
 
       const deliveryData = {
         orderIds: orderIds,
-        modalitat: isDirect ? 'Recollida' : 'Intermediari',
-        monitorIntermediaria: isDirect ? '' : selectedMonitor,
+        modalitat: isPickup ? 'Recollida' : isDirectDelivery ? 'Directa' : 'Intermediari',
+        monitorIntermediaria: isIntermediary ? selectedMonitor : '',
         escolaDestino: escolaDestino,
         dataEntrega: dataEntrega || ''
       };
@@ -304,11 +311,14 @@ export default function DeliveryManager() {
   // Función para enviar notificaciones después de crear un delivery
   const sendNotificationsForDelivery = async (
     option: DeliveryOption,
-    isDirect: boolean,
+    deliveryType: boolean | 'direct',
     selectedMonitor: string | undefined,
     dataEntrega: string,
     orderIds: string[]
   ) => {
+    const isPickup = deliveryType === true;
+    const isDirectDelivery = deliveryType === 'direct';
+    const isIntermediary = deliveryType === false;
     try {
       const destinatarioNom = option.nomCognoms || option.comandes[0]?.nomCognoms;
       const escolaReceptora = option.escola;
@@ -335,7 +345,7 @@ export default function DeliveryManager() {
 
       // LÓGICA MEJORADA DE NOTIFICACIONES
 
-      if (isDirect) {
+      if (isPickup) {
         // ══════════════════════════════════════════════
         // CASO 1: RECOLLIDA A EIXOS CREATIVA
         // ══════════════════════════════════════════════
@@ -370,9 +380,44 @@ ${materialsText}
           );
         }
 
+      } else if (isDirectDelivery) {
+        // ══════════════════════════════════════════════
+        // CASO 2: ENTREGA DIRECTA DESDE EIXOS
+        // ══════════════════════════════════════════════
+        for (const [dest, pedidos] of pedidosPorDestinatario) {
+          const materialsText = pedidos.map((p, idx) =>
+            `   ${idx + 1}. ${p.material} (${p.unitats || 1} unitats)`
+          ).join('\n');
+
+          const recipientMessage = `📦 MATERIAL PREPARAT PER A ${dest}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Destinatària: ${dest}
+🏫 Escola: ${escolaReceptora}
+
+📦 MATERIALS:
+${materialsText}
+
+📍 ENTREGA:
+🚚 Entrega directa per l'equip d'Eixos Creativa
+🏫 Escola: ${escolaReceptora}
+📅 Data prevista: ${formatDate(dataEntrega)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+ℹ️ NOTA: L'equip d'Eixos Creativa portarà el material directament a la teva escola.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+          console.log('📤 Enviando notificación entrega directa Eixos:', spaceName);
+          await apiClient.sendGroupedNotification(
+            spaceName,
+            recipientMessage,
+            pedidos.map(p => p.idItem),
+            'destinatario'
+          );
+        }
+
       } else if (selectedMonitor) {
         // ══════════════════════════════════════════════
-        // CASO 2-5: ENTREGA CON INTERMEDIARIO
+        // CASO 3-6: ENTREGA CON INTERMEDIARIO
         // ══════════════════════════════════════════════
 
         // Separar pedidos: del intermediario vs de otros
@@ -766,7 +811,8 @@ ${materialsText}
                 };
 
                 const canPickupAtOffice = option.monitorsDisponibles.some(m => m.tipus === 'recollida');
-                const canDeliverViaIntermediary = option.monitorsDisponibles.some(m => m.tipus !== 'recollida');
+                const canDeliverDirect = option.monitorsDisponibles.some(m => m.tipus === 'entrega-directa');
+                const canDeliverViaIntermediary = option.monitorsDisponibles.some(m => m.tipus === 'intermediari');
 
                 return (
                   <Card
@@ -958,6 +1004,56 @@ ${materialsText}
                           </Box>
                         )}
 
+                        {/* Direct Delivery from Eixos Option */}
+                        {canDeliverDirect && (
+                          <Box sx={{ p: 2, border: '1px solid #2196f3', borderRadius: 1, backgroundColor: '#e3f2fd' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                              <LocalShipping sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
+                              Entrega Directa des d'Eixos
+                            </Typography>
+
+                            <Alert severity="info" sx={{ mb: 1.5, py: 0.5 }}>
+                              <Typography variant="caption">
+                                🚚 L'equip d'Eixos Creativa portarà el material directament a l'escola
+                              </Typography>
+                            </Alert>
+
+                            <TextField
+                              fullWidth
+                              type="date"
+                              label="Data de lliurament"
+                              size="small"
+                              value={selectedDates[index] || ''}
+                              onChange={(e) => {
+                                const newDate = e.target.value;
+                                setSelectedDates({...selectedDates, [index]: newDate});
+                                validateDate(newDate, index, option);
+                              }}
+                              error={!!dateErrors[index]}
+                              helperText={dateErrors[index]}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ mb: 1.5 }}
+                            />
+
+                            {dateWarnings[index] && (
+                              <Alert severity="warning" sx={{ mb: 1.5, py: 0.5 }}>
+                                <Typography variant="caption">{dateWarnings[index]}</Typography>
+                              </Alert>
+                            )}
+
+                            <Button
+                              variant="contained"
+                              color="info"
+                              fullWidth
+                              disabled={loading || !selectedDates[index] || !!dateErrors[index]}
+                              onClick={() => createDeliveryForOption(option, index, 'direct')}
+                              startIcon={loading ? <CircularProgress size={16} /> : <LocalShipping />}
+                            >
+                              Assignar Entrega Directa
+                            </Button>
+                          </Box>
+                        )}
+
                         {/* Intermediary Delivery Option */}
                         {canDeliverViaIntermediary && (
                           <Box sx={{ p: 2, border: '1px solid #4caf50', borderRadius: 1, backgroundColor: '#f1f8f4' }}>
@@ -973,7 +1069,7 @@ ${materialsText}
                               </Typography>
                               <Stack spacing={1}>
                                 {option.monitorsDisponibles
-                                  .filter(m => m.tipus !== 'recollida')
+                                  .filter(m => m.tipus === 'intermediari')
                                   .map((monitor, idx) => (
                                     <Card
                                       key={idx}

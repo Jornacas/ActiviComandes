@@ -933,7 +933,51 @@ router.post('/delivery/options', async (req, res) => {
 
       deliveryOptions.push(pickupOption);
 
-      // OPCIÓN 2: Entrega con INTERMEDIARIO
+      // OPCIÓN 2: ENTREGA DIRECTA DESDE EIXOS (alguien de Eixos lleva a la escuela)
+      // Crear una opción para cada escuela del destinatario
+      for (const escolaDestino of group.escoles) {
+        // Buscar la dirección de esta escuela en los datos de monitores
+        let escolaAddress = null;
+        if (schoolData.data.monitors) {
+          for (const monitor of schoolData.data.monitors) {
+            const schoolInfo = monitor.escoles?.find(s => s.escola === escolaDestino);
+            if (schoolInfo?.adreça) {
+              escolaAddress = schoolInfo.adreça;
+              break;
+            }
+          }
+        }
+
+        const directDeliveryOption = {
+          tipus: "Entrega Directa des d'Eixos",
+          escola: escolaDestino, // Escuela de destino
+          escoles: group.escoles,
+          adreça: escolaAddress || "Adreça no disponible",
+          eficiencia: "Calculant...",
+          prioritat: 2, // Prioridad media (después de recollida pero antes de intermediari)
+          nomCognoms: group.nomCognoms,
+          dataNecessitat: group.dataNecessitat,
+          monitorsDisponibles: [{
+            nom: "Equip Eixos Creativa",
+            dies: ["dilluns", "dimarts", "dimecres", "dijous", "divendres"],
+            tipus: "entrega-directa",
+            activitat: 'N/A'
+          }],
+          descripció: `Eixos Creativa entrega directament a ${escolaDestino} per ${group.nomCognoms}`,
+          distanciaAcademia: "Calculant...",
+          tempsAcademia: "Calculant...",
+          notes: "Entrega directa per l'equip d'Eixos",
+          comandes: group.orders,
+          destinatari: {
+            nom: group.nomCognoms,
+            activitat: group.orders[0]?.activitat || 'N/A'
+          }
+        };
+
+        deliveryOptions.push(directDeliveryOption);
+      }
+
+      // OPCIÓN 3: Entrega con INTERMEDIARIO
       // Buscar monitores que coincidan con el destinatario en AL MENOS UNA de las escoles
       if (schoolData.data.monitors) {
         schoolData.data.monitors.forEach(monitor => {
