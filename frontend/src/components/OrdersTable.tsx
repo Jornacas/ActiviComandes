@@ -50,6 +50,8 @@ import {
   Inventory2,
   Edit,
   Save,
+  Refresh,
+  Person,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
 
@@ -84,7 +86,7 @@ const statusIcons = {
   'Lliurat': <LocalShipping />,
   // Legacy estados (por compatibilidad)
   'Entregat': <LocalShipping />,
-  'Assignat': <LocalShipping />,
+  'Assignat': <Person />,
   'Pendiente': <Pending />,
   'En proceso': <HourglassEmpty />,
   'Preparado': <CheckCircle />,
@@ -101,6 +103,7 @@ export default function OrdersTable() {
   const [newStatus, setNewStatus] = useState('');
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [refreshingSpaces, setRefreshingSpaces] = useState(false);
   const [staleOrders, setStaleOrders] = useState<Order[]>([]);
   const [staleOrdersExpanded, setStaleOrdersExpanded] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
@@ -870,7 +873,14 @@ ${materialsText}
               label={normalized || 'Pendent'}
               color={statusColors[normalized as keyof typeof statusColors] || 'default'}
               size="small"
-              sx={{ fontSize: '0.75rem' }}
+              sx={{
+                fontSize: '0.75rem',
+                height: '24px',
+                minWidth: '85px',
+                '& .MuiChip-label': {
+                  padding: '0 8px'
+                }
+              }}
               onClick={isEnProces && hasNotes ? () => handleOpenNotesFromChip(order) : undefined}
               clickable={!!(isEnProces && hasNotes)}
             />
@@ -1602,12 +1612,12 @@ ${materialsText}
       if (response.success) {
         await loadData(); // Reload data after sync
         setError(null);
-        
+
         // Show success message with details
         if (response.data?.message) {
           console.log('Sincronització:', response.data.message);
         }
-        
+
         // Update stats if provided
         if (response.data?.estadisticas) {
           setStats(response.data.estadisticas);
@@ -1623,8 +1633,57 @@ ${materialsText}
     }
   };
 
+  const refreshChatSpaces = async () => {
+    setRefreshingSpaces(true);
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '';
+
+      if (!API_BASE_URL) {
+        setError('URL de API no configurada');
+        return;
+      }
+
+      const url = new URL(API_BASE_URL);
+      url.searchParams.append('action', 'refreshChatSpaces');
+      url.searchParams.append('token', API_TOKEN);
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setError(null);
+        console.log('Espais de xat actualitzats correctament');
+      } else {
+        setError(result.error || 'Error actualitzant espais de xat');
+      }
+    } catch (err) {
+      setError('Error de connexió durant l\'actualització d\'espais');
+      console.error('Refresh spaces error:', err);
+    } finally {
+      setRefreshingSpaces(false);
+    }
+  };
+
   const updateStatus = async () => {
     if (!newStatus || selectedRows.length === 0) return;
+
+    // Validar que tengan responsable SOLO si se cambia a "En proces" o "Preparat"
+    if (newStatus === 'En proces' || newStatus === 'Preparat') {
+      const selectedOrders = selectedRows.map(rowId => orders.find(o => o.id === rowId)).filter(Boolean);
+      const ordersWithoutResponsible = selectedOrders.filter(order =>
+        !order?.responsablePreparacio || order.responsablePreparacio.trim() === ''
+      );
+
+      if (ordersWithoutResponsible.length > 0) {
+        setError(`⚠️ Cal assignar un responsable de preparació abans de canviar l'estat a "${newStatus}". Hi ha ${ordersWithoutResponsible.length} comanda${ordersWithoutResponsible.length > 1 ? 'es' : ''} sense responsable assignat.`);
+        return;
+      }
+    }
 
     // Si el nuevo estado es "En proces" y hay una sola orden seleccionada, abrir modal de notas
     if (newStatus === 'En proces' && selectedRows.length === 1) {
@@ -1844,21 +1903,40 @@ ${materialsText}
                 </Stack>
               </Box>
 
-              {/* Botón Sync iconizado */}
-              <Tooltip title="Sincronitzar amb Google Sheets">
-                <IconButton
-                  onClick={syncFormResponses}
-                  disabled={updating}
-                  color="primary"
-                  sx={{
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    '&:hover': { borderColor: 'primary.main' }
-                  }}
-                >
-                  <Sync />
-                </IconButton>
-              </Tooltip>
+              {/* Botones de acción agrupados */}
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {/* Botón Sync iconizado */}
+                <Tooltip title="Sincronitzar Sol·licituds">
+                  <IconButton
+                    onClick={syncFormResponses}
+                    disabled={updating}
+                    color="primary"
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&:hover': { borderColor: 'primary.main' }
+                    }}
+                  >
+                    <Sync />
+                  </IconButton>
+                </Tooltip>
+
+                {/* Botón Refresh Chat Spaces */}
+                <Tooltip title="Actualitzar espais de xat">
+                  <IconButton
+                    onClick={refreshChatSpaces}
+                    disabled={refreshingSpaces}
+                    color="secondary"
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&:hover': { borderColor: 'secondary.main' }
+                    }}
+                  >
+                    <Refresh />
+                  </IconButton>
+                </Tooltip>
+              </Box>
             </Box>
           </CardContent>
         </Card>
