@@ -960,12 +960,12 @@ ${materialsText}
                       </Typography>
 
                       <Stack spacing={2}>
-                        {/* Direct Delivery Option */}
-                        {canDeliverDirect && (
+                        {/* Pickup at Eixos Office Option */}
+                        {canPickupAtOffice && (
                           <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1, backgroundColor: '#fafafa' }}>
                             <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1.5 }}>
                               <DirectionsCar sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
-                              Lliurament Directe
+                              Recollida a Eixos Creativa
                             </Typography>
 
                             <TextField
