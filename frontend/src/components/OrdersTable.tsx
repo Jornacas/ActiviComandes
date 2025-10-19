@@ -1201,6 +1201,11 @@ ${materialsText}
             return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
           }
 
+          // Si el intermediario ES el destinatario, no mostrar botón (ya recibe notificación combinada)
+          if (order.nomCognoms === order.monitorIntermediari) {
+            return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
+          }
+
           // Lógica de estados de notificación
           if (estado === 'Assignat') {
             // Mostrar indicador de carga si aún se están cargando los estados
@@ -2272,49 +2277,52 @@ ${materialsText}
                     </Box>
 
                     {/* Notificación Destinatario */}
-                    <Box>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography variant="body2" sx={{ flex: 1 }}>
-                          Destinatari:
-                        </Typography>
-                        {loadingNotificationStatuses ? (
-                          <CircularProgress size={20} />
-                        ) : (() => {
-                          // Calcular si es el primero del grupo (para destinatario agrupa diferente)
-                          let groupMaterials = [];
-                          let isFirstInGroup = true;
+                    {/* Solo mostrar si intermediario ≠ destinatario */}
+                    {selectedOrderForDrawer.nomCognoms !== selectedOrderForDrawer.monitorIntermediari && (
+                      <Box>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography variant="body2" sx={{ flex: 1 }}>
+                            Destinatari:
+                          </Typography>
+                          {loadingNotificationStatuses ? (
+                            <CircularProgress size={20} />
+                          ) : (() => {
+                            // Calcular si es el primero del grupo (para destinatario agrupa diferente)
+                            let groupMaterials = [];
+                            let isFirstInGroup = true;
 
-                          // Para destinatario: agrupar por nomCognoms + escola + fecha
-                          groupMaterials = orders.filter(o =>
-                            o.nomCognoms === selectedOrderForDrawer.nomCognoms &&
-                            o.escola === selectedOrderForDrawer.escola &&
-                            o.dataNecessitat === selectedOrderForDrawer.dataNecessitat
-                          ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
+                            // Para destinatario: agrupar por nomCognoms + escola + fecha
+                            groupMaterials = orders.filter(o =>
+                              o.nomCognoms === selectedOrderForDrawer.nomCognoms &&
+                              o.escola === selectedOrderForDrawer.escola &&
+                              o.dataNecessitat === selectedOrderForDrawer.dataNecessitat
+                            ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
 
-                          isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === selectedOrderForDrawer.idItem;
+                            isFirstInGroup = groupMaterials.length > 0 && groupMaterials[0].idItem === selectedOrderForDrawer.idItem;
 
-                          const isSent = notificationStatuses[selectedOrderForDrawer.idItem]?.destinatario;
+                            const isSent = notificationStatuses[selectedOrderForDrawer.idItem]?.destinatario;
 
-                          if (isSent) {
-                            return <Chip label="✅ Enviada" size="small" color="success" />;
-                          } else if (!isFirstInGroup) {
-                            return <Chip label="Agrupat" size="small" color="default" />;
-                          } else {
-                            return (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="primary"
-                                startIcon={<span>📤</span>}
-                                onClick={() => openNotificationModal(selectedOrderForDrawer, 'destinatario')}
-                              >
-                                Enviar
-                              </Button>
-                            );
-                          }
-                        })()}
-                      </Stack>
-                    </Box>
+                            if (isSent) {
+                              return <Chip label="✅ Enviada" size="small" color="success" />;
+                            } else if (!isFirstInGroup) {
+                              return <Chip label="Agrupat" size="small" color="default" />;
+                            } else {
+                              return (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="primary"
+                                  startIcon={<span>📤</span>}
+                                  onClick={() => openNotificationModal(selectedOrderForDrawer, 'destinatario')}
+                                >
+                                  Enviar
+                                </Button>
+                              );
+                            }
+                          })()}
+                        </Stack>
+                      </Box>
+                    )}
 
                     <Divider />
                   </>
