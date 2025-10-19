@@ -34,14 +34,81 @@ app.get('/', (req, res) => {
 
 // Debug endpoint
 app.get('/debug/env', (req, res) => {
+  // Parsear credenciales para obtener email
+  let serviceAccountEmail = 'N/A';
+  try {
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
+      const decoded = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8');
+      const creds = JSON.parse(decoded);
+      serviceAccountEmail = creds.client_email;
+    } else if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+      const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+      serviceAccountEmail = creds.client_email;
+    }
+  } catch (e) {
+    serviceAccountEmail = 'Error: ' + e.message;
+  }
+
   res.json({
     hasSpreadsheetId: !!process.env.SPREADSHEET_ID,
     hasAuthToken: !!process.env.AUTH_TOKEN,
     hasGoogleBase64: !!process.env.GOOGLE_SERVICE_ACCOUNT_BASE64,
     hasGoogleJson: !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
     hasGoogleFile: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    spreadsheetIdLength: process.env.SPREADSHEET_ID?.length || 0
+    spreadsheetIdLength: process.env.SPREADSHEET_ID?.length || 0,
+    spreadsheetIdPrefix: process.env.SPREADSHEET_ID?.substring(0, 10) || 'N/A',
+    serviceAccountEmail: serviceAccountEmail,
+    authMethod: process.env.GOOGLE_SERVICE_ACCOUNT_BASE64 ? 'BASE64' :
+                process.env.GOOGLE_SERVICE_ACCOUNT_JSON ? 'JSON' :
+                process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'FILE' : 'NONE'
   });
+});
+
+// Test Google Sheets connection
+app.get('/debug/test-sheets', async (req, res) => {
+  const { google } = require('googleapis');
+
+  try {
+    // Configurar autenticación igual que en sheets.js
+    let authConfig = {
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    };
+
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
+      const decoded = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8');
+      authConfig.credentials = JSON.parse(decoded);
+    } else if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+      authConfig.credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      authConfig.keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    }
+
+    const auth = new google.auth.GoogleAuth(authConfig);
+    const authClient = await auth.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: authClient });
+
+    // Intentar leer una celda
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+      range: 'Respostes!A1',
+    });
+
+    res.json({
+      success: true,
+      message: 'Conexión exitosa a Google Sheets',
+      data: response.data,
+      spreadsheetId: process.env.SPREADSHEET_ID?.substring(0, 10) + '...'
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message,
+      code: error.code,
+      status: error.status,
+      details: error.errors || [],
+      spreadsheetId: process.env.SPREADSHEET_ID?.substring(0, 10) + '...'
+    });
+  }
 });
 
 // Routes
