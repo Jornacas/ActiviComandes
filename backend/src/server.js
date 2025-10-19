@@ -56,7 +56,7 @@ app.get('/debug/env', (req, res) => {
     hasGoogleJson: !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
     hasGoogleFile: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
     spreadsheetIdLength: process.env.SPREADSHEET_ID?.length || 0,
-    spreadsheetIdPrefix: process.env.SPREADSHEET_ID?.substring(0, 10) || 'N/A',
+    spreadsheetId: process.env.SPREADSHEET_ID || 'N/A',
     serviceAccountEmail: serviceAccountEmail,
     authMethod: process.env.GOOGLE_SERVICE_ACCOUNT_BASE64 ? 'BASE64' :
                 process.env.GOOGLE_SERVICE_ACCOUNT_JSON ? 'JSON' :
