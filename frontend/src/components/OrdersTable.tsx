@@ -1634,25 +1634,31 @@ ${materialsText}
                 sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
               />
               <Chip
-                label={`Pendents: ${stats.pendientes || stats.pendents || 0}`}
-                color="error"
+                label={`Pendents: ${stats.pendents || 0}`}
+                color="default"
                 variant="outlined"
                 sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
               />
               <Chip
-                label={`En Procés: ${stats.enProceso || stats.enProces || 0}`}
+                label={`En Procés: ${stats.enProces || 0}`}
                 color="warning"
                 variant="outlined"
                 sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
               />
               <Chip
-                label={`Preparats: ${stats.preparados || stats.preparats || 0}`}
+                label={`Preparats: ${stats.preparats || 0}`}
                 color="info"
                 variant="outlined"
                 sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
               />
               <Chip
-                label={`Lliurats: ${stats.entregados || stats.entregats || 0}`}
+                label={`Assignats: ${stats.assignats || 0}`}
+                color="secondary"
+                variant="outlined"
+                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
+              />
+              <Chip
+                label={`Lliurats: ${stats.lliurats || 0}`}
                 color="success"
                 variant="outlined"
                 sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}

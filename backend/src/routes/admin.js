@@ -189,7 +189,8 @@ router.get('/orders', async (req, res) => {
       pendents: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Pendent').length : 0,
       enProces: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'En proces').length : 0,
       preparats: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Preparat').length : 0,
-      entregats: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Entregat').length : 0
+      assignats: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Assignat').length : 0,
+      lliurats: estatColIndex >= 0 ? allRows.filter(row => row[estatColIndex] === 'Lliurat').length : 0
     };
 
     res.json({
