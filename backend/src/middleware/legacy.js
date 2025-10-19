@@ -46,7 +46,8 @@ function legacyCompatibility(req, res, next) {
     'getNotificationStatus': { method: 'GET', path: '/api/admin/notifications/status' },
     'getMultipleNotificationStatuses': { method: 'POST', path: '/api/admin/notifications/statuses' },
     'updateInternalNotes': { method: 'POST', path: '/api/admin/orders/update-notes' },
-    'sendToCompres': { method: 'POST', path: '/api/admin/notifications/send-to-compres' }
+    'sendToCompres': { method: 'POST', path: '/api/admin/notifications/send-to-compres' },
+    'refreshChatSpaces': { method: 'POST', path: '/api/admin/chat/refresh-spaces' }
   };
 
   const mapping = actionMap[action];

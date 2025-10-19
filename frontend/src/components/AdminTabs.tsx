@@ -21,6 +21,7 @@ import {
 import OrdersTable from './OrdersTable';
 import DeliveryManager from './DeliveryManager';
 import HelpSection from './HelpSection';
+import MobileAppWindow from './MobileAppWindow';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -53,6 +54,7 @@ function a11yProps(index: number) {
 
 export default function AdminTabs() {
   const [value, setValue] = useState(0);
+  const [mobileAppOpen, setMobileAppOpen] = useState(false);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -95,8 +97,7 @@ export default function AdminTabs() {
               variant="contained"
               color="secondary"
               startIcon={<PhoneAndroid />}
-              endIcon={<OpenInNew />}
-              onClick={() => window.open('https://activicomandes-mobil.vercel.app', '_blank')}
+              onClick={() => setMobileAppOpen(true)}
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,
@@ -182,6 +183,13 @@ export default function AdminTabs() {
           <HelpSection />
         </TabPanel>
       </Box>
+
+      {/* Finestra flotant de l'App Mòbil */}
+      <MobileAppWindow
+        open={mobileAppOpen}
+        onClose={() => setMobileAppOpen(false)}
+        url="https://activicomandes-mobil.vercel.app"
+      />
     </Box>
   );
 }
