@@ -48,6 +48,8 @@ import {
   Info,
   ExpandMore,
   Inventory2,
+  Edit,
+  Save,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
 
@@ -133,6 +135,16 @@ export default function OrdersTable() {
   // Estados para el Drawer lateral (panel de detalles)
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState<any>(null);
+
+  // États per edició de camps al drawer
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+  const [editedOrderData, setEditedOrderData] = useState({
+    material: '',
+    unitats: 0,
+    comentarisGenerals: ''
+  });
+  const [confirmEditDialogOpen, setConfirmEditDialogOpen] = useState(false);
+  const [isSavingEdits, setIsSavingEdits] = useState(false);
 
   // Guardar el estado en localStorage cuando cambie
   useEffect(() => {
@@ -1367,6 +1379,73 @@ ${materialsText}
     setNotesDialogOpen(true);
   };
 
+  // Funcions per editar camps de la comanda al drawer
+  const handleStartEditing = () => {
+    if (selectedOrderForDrawer) {
+      setEditedOrderData({
+        material: selectedOrderForDrawer.material || '',
+        unitats: selectedOrderForDrawer.unitats || 0,
+        comentarisGenerals: selectedOrderForDrawer.comentarisGenerals || ''
+      });
+      setIsEditingOrder(true);
+    }
+  };
+
+  const handleCancelEditing = () => {
+    setIsEditingOrder(false);
+    setEditedOrderData({
+      material: '',
+      unitats: 0,
+      comentarisGenerals: ''
+    });
+  };
+
+  const handleSaveEdits = () => {
+    // Obrir diàleg de confirmació
+    setConfirmEditDialogOpen(true);
+  };
+
+  const handleConfirmSaveEdits = async () => {
+    if (!selectedOrderForDrawer) return;
+
+    setIsSavingEdits(true);
+    try {
+      const result = await apiClient.updateOrderFields(selectedOrderForDrawer.idItem, {
+        material: editedOrderData.material,
+        unitats: editedOrderData.unitats,
+        comentaris_generals: editedOrderData.comentarisGenerals
+      });
+
+      if (result.success) {
+        setSuccess('Comanda actualitzada correctament');
+
+        // Actualitzar el state local
+        setOrders(orders.map(o =>
+          o.idItem === selectedOrderForDrawer.idItem
+            ? { ...o, ...editedOrderData }
+            : o
+        ));
+
+        // Actualitzar el drawer amb les noves dades
+        setSelectedOrderForDrawer({
+          ...selectedOrderForDrawer,
+          ...editedOrderData
+        });
+
+        // Sortir del mode edició
+        setIsEditingOrder(false);
+        setConfirmEditDialogOpen(false);
+      } else {
+        setError(result.error || 'Error actualitzant la comanda');
+      }
+    } catch (error) {
+      console.error('Error saving edits:', error);
+      setError('Error actualitzant la comanda');
+    } finally {
+      setIsSavingEdits(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -1825,13 +1904,43 @@ ${materialsText}
           disableRowSelectionOnClick
           onRowSelectionModelChange={setSelectedRows}
           rowSelectionModel={selectedRows}
+          processRowUpdate={async (newRow, oldRow) => {
+            // Detectar si s'ha canviat el responsable
+            if (newRow.responsablePreparacio !== oldRow.responsablePreparacio) {
+              try {
+                const result = await apiClient.updateOrderFields(newRow.idItem, {
+                  responsable_preparacio: newRow.responsablePreparacio || ''
+                });
+
+                if (result.success) {
+                  setSuccess('Responsable actualitzat correctament');
+                  // Actualitzar el state local
+                  setOrders(orders.map(o =>
+                    o.idItem === newRow.idItem ? newRow : o
+                  ));
+                } else {
+                  setError(result.error || 'Error actualitzant el responsable');
+                  return oldRow; // Revertir el canvi
+                }
+              } catch (error) {
+                console.error('Error updating responsable:', error);
+                setError('Error actualitzant el responsable');
+                return oldRow; // Revertir el canvi
+              }
+            }
+            return newRow;
+          }}
+          onProcessRowUpdateError={(error) => {
+            console.error('Error processing row update:', error);
+            setError('Error processant l\'actualització');
+          }}
           columnVisibilityModel={{
             // Ocultar columnas - los detalles están en el drawer lateral
             esMaterialPersonalitzat: false,
             distanciaAcademia: false,
             comentarisGenerals: false,
             modalitatEntrega: false,
-            responsablePreparacio: false,
+            responsablePreparacio: true, // ✅ Visible per edició inline
             escolaDestinoIntermediari: false,
             notesEntrega: false,
             notifIntermediario: false,
@@ -2094,37 +2203,111 @@ ${materialsText}
 
                 {/* Material */}
                 <Box>
-                  <Typography variant="overline" fontWeight="bold" color="primary" gutterBottom>
-                    📦 Material Sol·licitat
-                  </Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemText
-                        primary="Material"
-                        secondary={formatSentenceCase(selectedOrderForDrawer.material as string) || 'N/A'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Unitats"
-                        secondary={selectedOrderForDrawer.unitats || 'N/A'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Comentaris"
-                        secondary={selectedOrderForDrawer.comentarisGenerals || '-'}
-                      />
-                    </ListItem>
-                    {selectedOrderForDrawer.esMaterialPersonalitzat === 'TRUE' && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="overline" fontWeight="bold" color="primary">
+                      📦 Material Sol·licitat
+                    </Typography>
+                    {!isEditingOrder && (
+                      <Button
+                        size="small"
+                        startIcon={<Edit />}
+                        onClick={handleStartEditing}
+                        variant="outlined"
+                      >
+                        Editar
+                      </Button>
+                    )}
+                  </Box>
+
+                  {!isEditingOrder ? (
+                    <List dense>
                       <ListItem>
                         <ListItemText
-                          primary="Material Personalitzat"
-                          secondary="Sí"
+                          primary="Material"
+                          secondary={formatSentenceCase(selectedOrderForDrawer.material as string) || 'N/A'}
                         />
                       </ListItem>
-                    )}
-                  </List>
+                      <ListItem>
+                        <ListItemText
+                          primary="Unitats"
+                          secondary={selectedOrderForDrawer.unitats || 'N/A'}
+                        />
+                      </ListItem>
+                      <ListItem>
+                        <ListItemText
+                          primary="Comentaris"
+                          secondary={selectedOrderForDrawer.comentarisGenerals || '-'}
+                        />
+                      </ListItem>
+                      {selectedOrderForDrawer.esMaterialPersonalitzat === 'TRUE' && (
+                        <ListItem>
+                          <ListItemText
+                            primary="Material Personalitzat"
+                            secondary="Sí"
+                          />
+                        </ListItem>
+                      )}
+                    </List>
+                  ) : (
+                    <Box sx={{ mt: 2 }}>
+                      <Alert severity="warning" sx={{ mb: 2 }}>
+                        ⚠️ Estàs editant dades crítiques de la comanda. Els canvis s'aplicaran directament al Google Sheet.
+                      </Alert>
+
+                      <Stack spacing={2}>
+                        <TextField
+                          fullWidth
+                          label="Material"
+                          value={editedOrderData.material}
+                          onChange={(e) => setEditedOrderData({ ...editedOrderData, material: e.target.value })}
+                          variant="outlined"
+                          size="small"
+                        />
+
+                        <TextField
+                          fullWidth
+                          label="Unitats"
+                          type="number"
+                          value={editedOrderData.unitats}
+                          onChange={(e) => setEditedOrderData({ ...editedOrderData, unitats: parseInt(e.target.value) || 0 })}
+                          variant="outlined"
+                          size="small"
+                          inputProps={{ min: 0 }}
+                        />
+
+                        <TextField
+                          fullWidth
+                          label="Comentaris Generals"
+                          multiline
+                          rows={4}
+                          value={editedOrderData.comentarisGenerals}
+                          onChange={(e) => setEditedOrderData({ ...editedOrderData, comentarisGenerals: e.target.value })}
+                          variant="outlined"
+                          size="small"
+                          placeholder="Comentaris sobre el material..."
+                        />
+
+                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                          <Button
+                            variant="outlined"
+                            onClick={handleCancelEditing}
+                            disabled={isSavingEdits}
+                          >
+                            Cancel·lar
+                          </Button>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleSaveEdits}
+                            disabled={isSavingEdits}
+                            startIcon={isSavingEdits ? <CircularProgress size={16} /> : <Save />}
+                          >
+                            {isSavingEdits ? 'Guardant...' : 'Guardar Canvis'}
+                          </Button>
+                        </Box>
+                      </Stack>
+                    </Box>
+                  )}
                 </Box>
 
                 <Divider />
@@ -2348,6 +2531,74 @@ ${materialsText}
           </Box>
         )}
       </Drawer>
+
+      {/* Diàleg de Confirmació per Editar Comanda */}
+      <Dialog
+        open={confirmEditDialogOpen}
+        onClose={() => !isSavingEdits && setConfirmEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          ⚠️ Confirmar Canvis
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Estàs a punt de modificar dades crítiques de la comanda. Aquests canvis s'aplicaran directament al Google Sheet i no es poden desfer.
+          </Alert>
+
+          <Typography variant="body2" gutterBottom>
+            <strong>Canvis a aplicar:</strong>
+          </Typography>
+          <List dense>
+            {selectedOrderForDrawer && (
+              <>
+                {editedOrderData.material !== selectedOrderForDrawer.material && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Material"
+                      secondary={`"${selectedOrderForDrawer.material}" → "${editedOrderData.material}"`}
+                    />
+                  </ListItem>
+                )}
+                {editedOrderData.unitats !== selectedOrderForDrawer.unitats && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Unitats"
+                      secondary={`${selectedOrderForDrawer.unitats} → ${editedOrderData.unitats}`}
+                    />
+                  </ListItem>
+                )}
+                {editedOrderData.comentarisGenerals !== selectedOrderForDrawer.comentarisGenerals && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Comentaris"
+                      secondary={`"${selectedOrderForDrawer.comentarisGenerals || '-'}" → "${editedOrderData.comentarisGenerals || '-'}"`}
+                    />
+                  </ListItem>
+                )}
+              </>
+            )}
+          </List>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setConfirmEditDialogOpen(false)}
+            disabled={isSavingEdits}
+          >
+            Cancel·lar
+          </Button>
+          <Button
+            onClick={handleConfirmSaveEdits}
+            variant="contained"
+            color="primary"
+            disabled={isSavingEdits}
+            startIcon={isSavingEdits ? <CircularProgress size={16} /> : <Save />}
+          >
+            {isSavingEdits ? 'Guardant...' : 'Confirmar i Guardar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -522,6 +522,125 @@ router.post('/orders/update-notes', async (req, res) => {
 });
 
 /**
+ * PUT /api/admin/orders/:idItem
+ * Actualitza camps individuals d'una comanda (Material, Unitats, Comentaris, Responsable)
+ */
+router.put('/orders/:idItem', async (req, res) => {
+  try {
+    const { idItem } = req.params;
+    const updates = req.body; // { material, unitats, comentaris_generals, responsable_preparacio }
+
+    console.log('✏️ UPDATE ORDER FIELDS request received');
+    console.log('✏️ idItem:', idItem);
+    console.log('✏️ updates:', updates);
+
+    if (!idItem) {
+      return res.json({
+        success: false,
+        error: "No s'ha proporcionat l'ID de la comanda"
+      });
+    }
+
+    // Validar que hi hagi almenys un camp a actualitzar
+    const allowedFields = ['material', 'unitats', 'comentaris_generals', 'responsable_preparacio'];
+    const fieldsToUpdate = Object.keys(updates).filter(key => allowedFields.includes(key));
+
+    if (fieldsToUpdate.length === 0) {
+      return res.json({
+        success: false,
+        error: "No s'ha proporcionat cap camp vàlid per actualitzar"
+      });
+    }
+
+    const data = await sheets.getSheetData('Respostes');
+
+    if (!data || data.length <= 1) {
+      return res.json({
+        success: false,
+        error: "No hi ha dades a la fulla 'Respostes'"
+      });
+    }
+
+    const headers = data[0];
+    const idItemIndex = headers.findIndex(h => h === "ID_Item");
+
+    if (idItemIndex === -1) {
+      return res.json({
+        success: false,
+        error: "No s'ha trobat la columna 'ID_Item'"
+      });
+    }
+
+    // Trobar índexs de les columnes a actualitzar
+    const columnMapping = {
+      'material': headers.findIndex(h => h === "Material"),
+      'unitats': headers.findIndex(h => h === "Unitats"),
+      'comentaris_generals': headers.findIndex(h => h === "Comentaris_Generals"),
+      'responsable_preparacio': headers.findIndex(h => h === "Responsable_Preparacio")
+    };
+
+    // Validar que totes les columnes existeixin
+    for (const field of fieldsToUpdate) {
+      if (columnMapping[field] === -1) {
+        return res.json({
+          success: false,
+          error: `No s'ha trobat la columna per al camp '${field}'`
+        });
+      }
+    }
+
+    let updated = false;
+    let updatedRow = null;
+
+    const updatedData = data.map((row, index) => {
+      if (index === 0) return row;
+
+      const rowIdItem = row[idItemIndex];
+
+      if (idItem === rowIdItem) {
+        // Actualitzar els camps especificats
+        for (const field of fieldsToUpdate) {
+          const columnIndex = columnMapping[field];
+          row[columnIndex] = updates[field] !== undefined ? updates[field] : '';
+          console.log(`✏️ Updating ${field}: "${row[columnIndex]}"`);
+        }
+        updated = true;
+        updatedRow = row;
+      }
+
+      return row;
+    });
+
+    if (updated) {
+      // Actualitzar a Google Sheets
+      await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+
+      // Invalidar caché
+      cache.del('cache_respostes_data');
+
+      console.log('✅ Order fields updated successfully');
+
+      return res.json({
+        success: true,
+        message: "Camps actualitzats correctament",
+        updatedFields: fieldsToUpdate
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: "No s'ha trobat la comanda amb l'ID proporcionat"
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error updating order fields:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error actualitzant els camps: ' + error.message
+    });
+  }
+});
+
+/**
  * POST /api/admin/orders/delete
  * Elimina pedidos
  */

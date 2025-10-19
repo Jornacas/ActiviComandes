@@ -330,6 +330,40 @@ class ApiClient {
       };
     }
   }
+
+  async updateOrderFields(idItem: string, updates: {
+    material?: string;
+    unitats?: number;
+    comentaris_generals?: string;
+    responsable_preparacio?: string;
+  }): Promise<ApiResponse<{ updatedFields: string[] }>> {
+    // Node.js backend: PUT /api/admin/orders/:idItem
+    const url = `${API_BASE_URL}/api/admin/orders/${idItem}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
 }
 
 export const apiClient = new ApiClient();
