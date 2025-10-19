@@ -34,6 +34,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  Collapse,
 } from '@mui/material';
 import {
   Sync,
@@ -45,6 +46,8 @@ import {
   Clear,
   Close,
   Info,
+  ExpandMore,
+  Inventory2,
 } from '@mui/icons-material';
 import { apiClient, type Order, type Stats } from '../lib/api';
 
@@ -97,6 +100,7 @@ export default function OrdersTable() {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [staleOrders, setStaleOrders] = useState<Order[]>([]);
+  const [staleOrdersExpanded, setStaleOrdersExpanded] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     // Cargar el estado desde localStorage si existe
     if (typeof window !== 'undefined') {
@@ -1612,58 +1616,102 @@ ${materialsText}
       }
     }}>
 
-      {/* Header Mejorado */}
+      {/* Header Optimitzat */}
       {stats && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-              <Box>
-                <Typography variant="h5" fontWeight="bold" gutterBottom>
-                  Panell d'Administració
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Comandas de Materials
-                </Typography>
-              </Box>
-            </Box>
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {/* Título + Stats en línea */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Inventory2 sx={{ fontSize: 24, color: 'primary.main' }} />
+                  <Typography variant="h6" fontWeight="500">
+                    Comandes
+                  </Typography>
+                </Box>
 
-            {/* Stats - Diseño Mejorado */}
-            <Stack direction="row" spacing={1.5} flexWrap="wrap">
-              <Chip
-                label={`Total: ${stats.total}`}
-                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
-              />
-              <Chip
-                label={`Pendents: ${stats.pendents || 0}`}
-                color="default"
-                variant="outlined"
-                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
-              />
-              <Chip
-                label={`En Procés: ${stats.enProces || 0}`}
-                color="warning"
-                variant="outlined"
-                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
-              />
-              <Chip
-                label={`Preparats: ${stats.preparats || 0}`}
-                color="info"
-                variant="outlined"
-                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
-              />
-              <Chip
-                label={`Assignats: ${stats.assignats || 0}`}
-                color="secondary"
-                variant="outlined"
-                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
-              />
-              <Chip
-                label={`Lliurats: ${stats.lliurats || 0}`}
-                color="success"
-                variant="outlined"
-                sx={{ fontSize: '0.875rem', fontWeight: 'bold' }}
-              />
-            </Stack>
+                {/* Stats compactes */}
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Chip
+                    label={stats.total}
+                    size="small"
+                    sx={{ fontWeight: 600, minWidth: 40 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">total</Typography>
+
+                  <Typography variant="caption" color="text.disabled" sx={{ mx: 0.5 }}>•</Typography>
+
+                  <Chip
+                    label={stats.pendents || 0}
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                    sx={{ fontWeight: 600, minWidth: 35 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">pendent</Typography>
+
+                  <Typography variant="caption" color="text.disabled" sx={{ mx: 0.5 }}>•</Typography>
+
+                  <Chip
+                    label={stats.enProces || 0}
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    sx={{ fontWeight: 600, minWidth: 35 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">procés</Typography>
+
+                  <Typography variant="caption" color="text.disabled" sx={{ mx: 0.5 }}>•</Typography>
+
+                  <Chip
+                    label={stats.preparats || 0}
+                    size="small"
+                    color="info"
+                    variant="outlined"
+                    sx={{ fontWeight: 600, minWidth: 35 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">preparats</Typography>
+
+                  <Typography variant="caption" color="text.disabled" sx={{ mx: 0.5 }}>•</Typography>
+
+                  <Chip
+                    label={stats.assignats || 0}
+                    size="small"
+                    color="secondary"
+                    variant="outlined"
+                    sx={{ fontWeight: 600, minWidth: 35 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">assignats</Typography>
+
+                  <Typography variant="caption" color="text.disabled" sx={{ mx: 0.5 }}>•</Typography>
+
+                  <Chip
+                    label={stats.lliurats || 0}
+                    size="small"
+                    color="success"
+                    variant="outlined"
+                    sx={{ fontWeight: 600, minWidth: 35 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">lliurats</Typography>
+                </Stack>
+              </Box>
+
+              {/* Botón Sync iconizado */}
+              <Tooltip title="Sincronitzar amb Google Sheets">
+                <IconButton
+                  onClick={syncFormResponses}
+                  disabled={updating}
+                  color="primary"
+                  sx={{
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '&:hover': { borderColor: 'primary.main' }
+                  }}
+                >
+                  <Sync />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </CardContent>
         </Card>
       )}
@@ -1676,54 +1724,50 @@ ${materialsText}
           </Alert>
         )}
 
-        {notificationsEnabled && (
-          <Alert severity="info">
-            🔔 <strong>Sistema de notificacions manual activat</strong> - Pots enviar notificacions manualment des de la taula
-          </Alert>
-        )}
-
         {staleOrders.length > 0 && (
-          <Alert severity="warning">
-            <strong>⚠️ Avisos de Sol·licituds Estancades</strong>
-            <br />
-            Hi ha {staleOrders.length} sol·licitud{staleOrders.length > 1 ? 's' : ''} sense canvi d'estat durant més de 5 dies.
-            {staleOrders.length <= 3 && (
-              <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
+          <Box>
+            <Alert
+              severity="warning"
+              sx={{
+                cursor: 'pointer',
+                '&:hover': { bgcolor: 'warning.lighter' }
+              }}
+              onClick={() => setStaleOrdersExpanded(!staleOrdersExpanded)}
+              icon={<Info />}
+              action={
+                <IconButton
+                  size="small"
+                  sx={{
+                    transform: staleOrdersExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s'
+                  }}
+                >
+                  <ExpandMore />
+                </IconButton>
+              }
+            >
+              <strong>⚠️ {staleOrders.length} Sol·licitud{staleOrders.length > 1 ? 's' : ''} Estancad{staleOrders.length > 1 ? 'es' : 'a'}</strong>
+            </Alert>
+            <Collapse in={staleOrdersExpanded}>
+              <Box sx={{ p: 2, bgcolor: 'warning.lighter', borderBottomLeftRadius: 4, borderBottomRightRadius: 4 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Sense canvi d'estat durant més de 5 dies:
+                </Typography>
                 {staleOrders.map(order => (
-                  <div key={order.id}>
+                  <Typography key={order.id} variant="body2" sx={{ ml: 2, mb: 0.5 }}>
                     • {order.nomCognoms} - {order.escola} - {order.material}
-                  </div>
+                  </Typography>
                 ))}
-              </div>
-            )}
-          </Alert>
+              </Box>
+            </Collapse>
+          </Box>
         )}
       </Stack>
 
       {/* Toolbar de Acciones */}
-      <Card sx={{ mb: 3 }}>
-      <Stack direction="row" spacing={2} sx={{ p: 2 }}>
-        <Button
-          variant="contained"
-          startIcon={<Sync />}
-          onClick={syncFormResponses}
-          disabled={updating}
-        >
-          Sincronitzar Respostes
-        </Button>
-
-        <Button
-          variant={notificationsEnabled ? "contained" : "outlined"}
-          color={notificationsEnabled ? "success" : "primary"}
-          onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-          startIcon={notificationsEnabled ? <CheckCircle /> : <Pending />}
-        >
-          {notificationsEnabled ? 'Sistema Manual Actiu' : 'Activar Sistema Manual'}
-        </Button>
-
-
-        {selectedRows.length > 0 && (
-          <>
+      {selectedRows.length > 0 && (
+        <Card sx={{ mb: 3 }}>
+          <Stack direction="row" spacing={2} sx={{ p: 2 }}>
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel>Nou Estat</InputLabel>
               <Select
@@ -1735,7 +1779,7 @@ ${materialsText}
                 <MenuItem value="En proces">En procés</MenuItem>
                 <MenuItem value="Preparat">Preparat</MenuItem>
                 <MenuItem value="Assignat">Assignat</MenuItem>
-                                    <MenuItem value="Lliurat">Lliurat</MenuItem>
+                <MenuItem value="Lliurat">Lliurat</MenuItem>
               </Select>
             </FormControl>
 
@@ -1767,11 +1811,12 @@ ${materialsText}
             >
               Eliminar Intermediari ({selectedRows.length})
             </Button>
-          </>
-        )}
-      </Stack>
+          </Stack>
+        </Card>
+      )}
 
-        {/* DataGrid */}
+      {/* DataGrid */}
+      <Card>
         <Box sx={{ height: 600, width: '100%', px: 2, pb: 2 }}>
           <DataGrid
             rows={orders}
