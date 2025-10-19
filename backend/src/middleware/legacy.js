@@ -66,8 +66,8 @@ function legacyCompatibility(req, res, next) {
   req.method = mapping.method;
 
   if (originalMethod === 'GET' && mapping.method === 'POST') {
-    // Trasladar todos los query params al body (excepto action)
-    const { action, ...queryParams } = req.query;
+    // Trasladar todos los query params al body (excepto action y token)
+    const { action, token, ...queryParams } = req.query;
 
     // Parsear valores que son JSON strings
     const parsedParams = {};
@@ -86,7 +86,8 @@ function legacyCompatibility(req, res, next) {
     }
 
     req.body = { ...req.body, ...parsedParams };
-    req.query = {};
+    // Preservar el token en query para autenticación
+    req.query = token ? { token } : {};
   }
 
   // Agregar parámetros adicionales si existen en el mapeo
