@@ -28,6 +28,7 @@ export interface Order {
   responsablePreparacio?: string;
   notesInternes?: string;
   // Delivery assignment fields
+  idLliurament?: string;
   modalitatEntrega?: string;
   monitorIntermediari?: string;
   escolaDestinoIntermediari?: string;
