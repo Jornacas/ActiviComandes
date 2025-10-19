@@ -1417,7 +1417,11 @@ ${materialsText}
       });
 
       if (result.success) {
-        setSuccess('Comanda actualitzada correctament');
+        setNotificationStatus({
+          open: true,
+          message: 'Comanda actualitzada correctament',
+          severity: 'success'
+        });
 
         // Actualitzar el state local
         setOrders(orders.map(o =>
@@ -1913,7 +1917,11 @@ ${materialsText}
                 });
 
                 if (result.success) {
-                  setSuccess('Responsable actualitzat correctament');
+                  setNotificationStatus({
+                    open: true,
+                    message: 'Responsable actualitzat correctament',
+                    severity: 'success'
+                  });
                   // Actualitzar el state local
                   setOrders(orders.map(o =>
                     o.idItem === newRow.idItem ? newRow : o
