@@ -45,7 +45,8 @@ function legacyCompatibility(req, res, next) {
     'sendManualNotificationGrouped': { method: 'POST', path: '/api/admin/notifications/send-grouped' },
     'getNotificationStatus': { method: 'GET', path: '/api/admin/notifications/status' },
     'getMultipleNotificationStatuses': { method: 'POST', path: '/api/admin/notifications/statuses' },
-    'updateInternalNotes': { method: 'POST', path: '/api/admin/orders/update-notes' }
+    'updateInternalNotes': { method: 'POST', path: '/api/admin/orders/update-notes' },
+    'sendToCompres': { method: 'POST', path: '/api/admin/notifications/send-to-compres' }
   };
 
   const mapping = actionMap[action];

@@ -1372,6 +1372,71 @@ ${materialsText}
     }
   };
 
+  // Guardar, actualizar estado Y enviar al espacio /Staff/COMPRES
+  const handleSaveAndSendNotes = async () => {
+    if (!selectedOrderForNotes) return;
+
+    setSavingNotes(true);
+    try {
+      // Actualizar el estado y las notas
+      await performStatusUpdate([selectedOrderForNotes.id], newStatus, internalNotes);
+
+      // Enviar mensaje a /Staff/COMPRES
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '';
+
+      if (API_BASE_URL) {
+        try {
+          const url = new URL(API_BASE_URL);
+          url.searchParams.append('action', 'sendToCompres');
+          url.searchParams.append('token', API_TOKEN);
+
+          const response = await fetch(url.toString(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              dataNecessitat: selectedOrderForNotes.dataNecessitat,
+              notes: internalNotes
+            })
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            setNotificationStatus({
+              open: true,
+              message: 'Estat actualitzat i notificació enviada a /Staff/COMPRES',
+              severity: 'success'
+            });
+          } else {
+            setNotificationStatus({
+              open: true,
+              message: 'Estat actualitzat però no s\'ha pogut enviar la notificació',
+              severity: 'warning'
+            });
+          }
+        } catch (notifError) {
+          console.error('Error enviant notificació:', notifError);
+          setNotificationStatus({
+            open: true,
+            message: 'Estat actualitzat però error enviant notificació',
+            severity: 'warning'
+          });
+        }
+      }
+
+      // Cerrar el modal
+      setNotesDialogOpen(false);
+      setSelectedOrderForNotes(null);
+      setInternalNotes('');
+    } catch (error) {
+      console.error('Error guardando notas:', error);
+      setError('Error guardant les notes');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
   // Abrir el modal de notas desde el chip de estado
   const handleOpenNotesFromChip = (order: any) => {
     setSelectedOrderForNotes(order);
@@ -2114,12 +2179,21 @@ ${materialsText}
           </Button>
           <Button
             onClick={handleSaveNotes}
-            variant="contained"
+            variant="outlined"
             color="primary"
-            disabled={savingNotes}
+            disabled={savingNotes || !internalNotes.trim()}
             startIcon={savingNotes ? <CircularProgress size={20} /> : null}
           >
-            {savingNotes ? 'Guardant...' : 'Guardar i Actualitzar Estat'}
+            Guardar
+          </Button>
+          <Button
+            onClick={handleSaveAndSendNotes}
+            variant="contained"
+            color="primary"
+            disabled={savingNotes || !internalNotes.trim()}
+            startIcon={savingNotes ? <CircularProgress size={20} /> : null}
+          >
+            {savingNotes ? 'Enviant...' : 'Enviar a Compres'}
           </Button>
         </DialogActions>
       </Dialog>

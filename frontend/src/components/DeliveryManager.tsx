@@ -1088,7 +1088,7 @@ ${materialsText}
                                     >
                                       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                                         <Box sx={{ flex: 1 }}>
-                                          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                                          <Typography variant="body2" component="div" sx={{ fontWeight: 'bold', mb: 0.5 }}>
                                             {monitor.nom}
                                             {monitor.activitat && monitor.activitat !== 'N/A' && (
                                               <span style={{ fontWeight: 'normal', color: '#666' }}> - {monitor.activitat}</span>
@@ -1099,17 +1099,17 @@ ${materialsText}
                                           </Typography>
                                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                             {monitor.dies && monitor.dies.length > 0 && (
-                                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                              <Typography variant="caption" component="div" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                 📅 <strong>Dies:</strong> {monitor.dies.join(', ')}
                                               </Typography>
                                             )}
                                             {monitor.escola && (
-                                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                              <Typography variant="caption" component="div" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                 🏫 <strong>Escola intermediària:</strong> {monitor.escola}
                                               </Typography>
                                             )}
                                             {monitor.destinoFinal && (
-                                              <Typography variant="caption" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                              <Typography variant="caption" component="div" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                                                 🎯 <strong>Destí final:</strong> {monitor.destinoFinal.escola} ({monitor.destinoFinal.dies?.join(', ')})
                                               </Typography>
                                             )}

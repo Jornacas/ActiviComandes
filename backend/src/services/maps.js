@@ -51,8 +51,17 @@ async function calculateDistances(addresses) {
       try {
         console.log(`🗺️ Calculating distance to: ${address}`);
 
-        // Si la dirección es "Academia", es Eixos Creativa mismo (distancia 0)
-        if (address && (address.toLowerCase().includes('academia') || address.toLowerCase() === 'eixos creativa')) {
+        // Si la dirección es "Academia" o coincide con la dirección de Eixos Creativa, distancia 0
+        const isEixosCreativa = address && (
+          address.toLowerCase().includes('academia') ||
+          address.toLowerCase().includes('eixos creativa') ||
+          address.toLowerCase().includes('ramon turró, 73') ||
+          address.toLowerCase().includes('carrer ramon turró 73') ||
+          address.toLowerCase().includes('llacuna, 162') ||
+          address.toLowerCase().includes('carrer de la llacuna, 162')
+        );
+
+        if (isEixosCreativa) {
           console.log('✅ Address is Academia/Eixos Creativa - returning 0 distance');
           results.push({
             address: address,

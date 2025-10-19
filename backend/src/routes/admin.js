@@ -2049,6 +2049,82 @@ router.post('/chat/refresh-spaces', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/notifications/send-to-compres
+ * Envía notificación al espacio /Staff/COMPRES cuando un pedido se pone en "En Procés"
+ */
+router.post('/notifications/send-to-compres', async (req, res) => {
+  try {
+    const { dataNecessitat, notes } = req.body;
+
+    console.log('🛒 SEND TO COMPRES request received');
+    console.log('🛒 dataNecessitat:', dataNecessitat);
+    console.log('🛒 notes:', notes);
+
+    if (!dataNecessitat || !notes) {
+      return res.json({
+        success: false,
+        error: "Falten dades obligatòries (dataNecessitat, notes)"
+      });
+    }
+
+    // Formatear la fecha de forma legible (ej: "dimarts 25 de novembre")
+    const formatDate = (dateStr) => {
+      let date;
+
+      // Detectar el formato: DD/MM/YYYY o YYYY-MM-DD
+      if (dateStr.includes('/')) {
+        // Formato DD/MM/YYYY
+        const [day, month, year] = dateStr.split('/');
+        date = new Date(year, month - 1, day);
+      } else if (dateStr.includes('-')) {
+        // Formato ISO YYYY-MM-DD
+        date = new Date(dateStr);
+      } else {
+        // Formato desconocido, intentar parsear directamente
+        date = new Date(dateStr);
+      }
+
+      const diasSemana = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+      const mesesAny = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny',
+                        'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+
+      const diaSemana = diasSemana[date.getDay()];
+      const dia = date.getDate();
+      const mes = mesesAny[date.getMonth()];
+
+      return `${diaSemana} ${dia} de ${mes}`;
+    };
+
+    const dataFormatada = formatDate(dataNecessitat);
+
+    // Formatear el mensaje simple
+    const message = `📅 **Data necessitat: ${dataFormatada}**\n\n💬 **Notes**: ${notes}`;
+
+    // Enviar al espacio **/Staff/COMPRES
+    const result = await chat.sendChatNotification('**/Staff/COMPRES', message);
+
+    if (result.success) {
+      console.log('✅ Notificación enviada a **/Staff/COMPRES');
+      return res.json({
+        success: true,
+        message: 'Notificació enviada a **/Staff/COMPRES correctament'
+      });
+    } else {
+      return res.json({
+        success: false,
+        error: result.error || 'Error enviant notificació a **/Staff/COMPRES'
+      });
+    }
+  } catch (error) {
+    console.error('Error sending notification to COMPRES:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error enviant notificació a COMPRES: ' + error.message
+    });
+  }
+});
+
 // ======================================================
 // UTILIDADES
 // ======================================================
