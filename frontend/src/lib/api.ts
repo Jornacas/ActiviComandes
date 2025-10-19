@@ -33,6 +33,7 @@ export interface Order {
   monitorIntermediari?: string;
   escolaDestinoIntermediari?: string;
   dataEntregaPrevista?: string;
+  dataLliuramentPrevista?: string;
   distanciaAcademia?: string;
   notesEntrega?: string;
   // Legacy fields for backward compatibility
