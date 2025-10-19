@@ -194,135 +194,182 @@ export default function OrdersTable() {
     }
   };
 
-  // Función para generar el mensaje de notificación AGRUPADO por pedido
+  // Función para generar el mensaje de notificación MEJORADO
   const generateNotificationMessage = (order: any, type: 'intermediario' | 'destinatario'): string => {
-    let orderMaterials: any[] = [];
+    // Agrupar materiales del mismo lote (ID_Lliurament)
+    const orderMaterials = orders.filter(o =>
+      o.idLliurament && o.idLliurament === order.idLliurament &&
+      o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
+    ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
 
+    // Verificar si es entrega directa (sin intermediario)
+    const isDirectDelivery = !order.monitorIntermediari || order.monitorIntermediari.trim() === '';
+
+    // CASO: ENTREGA DIRECTA
+    if (isDirectDelivery && type === 'destinatario') {
+      let materialsText = orderMaterials.map((item, index) =>
+        `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+      ).join('\n');
+
+      return `📦 MATERIAL PREPARAT PER A ${order.nomCognoms || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Destinatària: ${order.nomCognoms || 'N/A'}
+🏫 Escola: ${order.escola || 'N/A'}
+
+📦 MATERIALS:
+${materialsText}
+
+📍 LLIURAMENT:
+🚚 Entrega directa des d'Eixos Creativa
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data: ${formatDate(order.dataNecessitat)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+ℹ️ NOTA: El material t'arribarà directament a la teva escola.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    }
+
+    // CASO: INTERMEDIARIO
     if (type === 'intermediario') {
-      // Para intermediario: agrupar por ID_Lliurament
-      // IMPORTANTE: Solo agrupa materiales que fueron asignados JUNTOS (mismo ID_Lliurament)
-      orderMaterials = orders.filter(o =>
-        o.idLliurament && o.idLliurament === order.idLliurament && // CLAVE: mismo lote de lliurament
-        o.monitorIntermediari && o.monitorIntermediari.trim() !== '' // Que tenga intermediario asignado
-      ).sort((a, b) => {
-        // Ordenar por idItem para asegurar consistencia con la tabla
-        return (a.idItem || '').localeCompare(b.idItem || '');
-      });
-    } else {
-      // Para destinatario: agrupar por Nom_Cognoms + Escola + Data_Lliurament_Prevista
-      // Esto permite agrupar todos los materiales de la misma persona, misma escola y misma fecha
-      orderMaterials = orders.filter(o =>
+      // Separar materiales: propios vs de otros
+      const materialesPropios = orderMaterials.filter(o => o.nomCognoms === order.monitorIntermediari);
+      const materialesOtros = orderMaterials.filter(o => o.nomCognoms !== order.monitorIntermediari);
+
+      // Obtener destinatarios únicos (excluyendo al intermediario)
+      const destinatariosOtros = [...new Set(materialesOtros.map(o => o.nomCognoms))];
+
+      // CASO 4: Intermediario = Destinatario (solo su material)
+      if (materialesPropios.length > 0 && materialesOtros.length === 0) {
+        const materialsText = materialesPropios.map((item, index) =>
+          `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+        ).join('\n');
+
+        return `📦 RECOLLIDA DEL TEU MATERIAL - ${order.monitorIntermediari || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📥 RECOLLIDA:
+🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
+📅 Data: ${formatDate(order.dataLliuramentPrevista)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+🟢 EL TEU MATERIAL:
+${materialsText}
+
+📤 DESTÍ FINAL:
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data que necessites: ${formatDate(order.dataNecessitat)}
+
+ℹ️ NOTA: Recolliràs el teu material a ${order.escolaDestinoIntermediari || 'N/A'}
+i te'l portaràs a ${order.escola || 'N/A'} per a la teva activitat.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+      }
+
+      // CASO 5: Intermediario = Destinatario + otros
+      if (materialesPropios.length > 0 && materialesOtros.length > 0) {
+        const materialsPropisText = materialesPropios.map((item, index) =>
+          `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+        ).join('\n');
+
+        const paquetsText = destinatariosOtros.map(dest => {
+          const escolaDest = materialesOtros.find(o => o.nomCognoms === dest)?.escola || 'N/A';
+          const dataDest = materialesOtros.find(o => o.nomCognoms === dest)?.dataNecessitat || order.dataNecessitat;
+          return `   • ${dest} (${escolaDest}, ${formatDate(dataDest)})`;
+        }).join('\n');
+
+        return `📦 RECOLLIDA DE MATERIALS - ${order.monitorIntermediari || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 El teu rol: Intermediària i Destinatària
+
+📥 RECOLLIDA:
+🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
+📅 Data: ${formatDate(order.dataLliuramentPrevista)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+🟢 EL TEU MATERIAL:
+${materialsPropisText}
+
+🔵 PAQUETS PER ENTREGAR:
+${paquetsText}
+
+ℹ️ NOTA: Recolliràs el teu material i paquets per altres companys.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+      }
+
+      // CASO 2: Solo intermediario (sin materiales propios)
+      if (materialesPropios.length === 0 && materialesOtros.length > 0) {
+        const paquetsText = destinatariosOtros.map(dest => {
+          const escolaDest = materialesOtros.find(o => o.nomCognoms === dest)?.escola || 'N/A';
+          const dataDest = materialesOtros.find(o => o.nomCognoms === dest)?.dataNecessitat || order.dataNecessitat;
+          return `   • ${dest} (${escolaDest}, ${formatDate(dataDest)})`;
+        }).join('\n');
+
+        return `🔔 NOVA ASSIGNACIÓ COM A INTERMEDIÀRIA - ${order.monitorIntermediari || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📥 RECOLLIDA:
+🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
+📅 Data: ${formatDate(order.dataLliuramentPrevista)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+📤 PAQUETS PER ENTREGAR:
+${paquetsText}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+      }
+    }
+
+    // CASO: DESTINATARIO (con intermediario)
+    if (type === 'destinatario') {
+      // Verificar si el destinatario es el mismo que el intermediario
+      const isIntermediarioSameAsDestinatario = order.nomCognoms === order.monitorIntermediari;
+
+      // Si es el mismo, NO enviar mensaje de destinatario (ya recibió el combinado)
+      if (isIntermediarioSameAsDestinatario) {
+        return ''; // No generar mensaje
+      }
+
+      // Filtrar solo materiales de este destinatario
+      const materialsDestinatario = orders.filter(o =>
         o.nomCognoms === order.nomCognoms &&
         o.escola === order.escola &&
         o.dataLliuramentPrevista === order.dataLliuramentPrevista &&
-        o.monitorIntermediari && o.monitorIntermediari.trim() !== '' // Solo pedidos con intermediario
-      ).sort((a, b) => {
-        // Ordenar por idItem para asegurar consistencia
-        return (a.idItem || '').localeCompare(b.idItem || '');
-      });
-    }
-
-    if (type === 'intermediario') {
-      // Obtener los destinatarios únicos (puede haber varios pedidos pero un solo destinatario común)
-      const destinatarios = [...new Set(orderMaterials.map(o => o.nomCognoms))];
-      const destinatarioText = destinatarios.join(', ');
-
-      // IMPORTANTE: El intermediario SIEMPRE entrega en la PRIMERA escola del grupo
-      // Buscar la primera escola en TODOS los materiales del grupo del intermediario (ya ordenados)
-      const escolaEntregaIntermediari = orderMaterials.length > 0 ? orderMaterials[0].escola : (order.escola || 'N/A');
-
-      return `🔔 NOVA ASSIGNACIÓ DE MATERIAL COM INTERMEDIARI PER ${order.monitorIntermediari || 'N/A'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
-
-📥 REBRÀS MATERIAL:
-🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
-📅 Data: ${formatDate(order.dataLliuramentPrevista)}
-📦 Total: ${orderMaterials.length} materials
-📍 Ubicació: Consergeria o caixa de material
-
-📤 LLIURARÀS MATERIAL:
-🏫 Escola: ${escolaEntregaIntermediari}
-📅 Data: ${formatDate(order.dataNecessitat)}
-👤 Per: ${destinatarioText}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[✅ Confirmar recepció] [❌ Hi ha un problema]`;
-    } else {
-      let materialsText = '';
-      if (orderMaterials.length > 1) {
-        // Múltiples materiales - listarlos
-        materialsText = orderMaterials.map((item, index) =>
-          `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
-        ).join('\n');
-      } else {
-        // Un solo material
-        materialsText = `   ${order.material || 'N/A'} (${order.unitats || 1} unitats)`;
-      }
-
-      // LÓGICA DE DETECCIÓN DE ENTREGA DEL INTERMEDIARIO:
-      // El intermediario SIEMPRE entrega en la PRIMERA escola donde coincide con algún material del grupo
-      // Necesitamos buscar en TODOS los materiales del intermediario (no solo del pedido actual)
-
-      // 1. Obtener TODOS los materiales del mismo grupo del intermediario (ordenados)
-      // IMPORTANTE: Solo materiales que fueron asignados JUNTOS (mismo ID_Lliurament)
-      const grupoIntermediari = orders.filter(o =>
-        o.idLliurament && o.idLliurament === order.idLliurament && // CLAVE: mismo lote de lliurament
         o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
-      ).sort((a, b) => {
-        // Ordenar por idItem para asegurar consistencia
-        return (a.idItem || '').localeCompare(b.idItem || '');
-      });
+      ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
 
-      // 2. Encontrar la PRIMERA escola donde el intermediario entrega (primera del grupo ordenado)
-      const escolaEntregaIntermediari = grupoIntermediari.length > 0 ? grupoIntermediari[0].escola : null;
+      const materialsText = materialsDestinatario.map((item, index) =>
+        `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+      ).join('\n');
 
-      // 3. Verificar si la escola del pedido actual coincide con la escola de entrega del intermediario
-      const intermediarioCoincideEnEscola = order.escola === escolaEntregaIntermediari;
+      return `📦 MATERIAL PREPARAT PER A ${order.nomCognoms || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Destinatària: ${order.nomCognoms || 'N/A'}
 
-      let lliuramentInfo = '';
-      if (intermediarioCoincideEnEscola) {
-        // El intermediario entrega en la misma escola donde trabaja el destinatario
-        lliuramentInfo = `🚚 LLIURAMENT:
-👤 Intermediari: ${order.monitorIntermediari || 'N/A'}
-🏫 Escola: ${order.escola || 'N/A'}
-📅 Data que necessites: ${formatDate(order.dataNecessitat)}
-⏰ Hora: Abans de l'activitat`;
-      } else {
-        // El intermediario NO entrega en esta escola (destinatario se lo lleva él/ella mismo/a)
-        // La escola de entrega es la primera del grupo del intermediario
-        const escolaEntrega = escolaEntregaIntermediari || 'N/A';
-
-        lliuramentInfo = `🚚 LLIURAMENT:
-👤 Intermediari: ${order.monitorIntermediari || 'N/A'} (t'ho entregarà a ${escolaEntrega})
-🏫 Escola destí: ${order.escola || 'N/A'}
-📅 Data que necessites: ${formatDate(order.dataNecessitat)}
-
-ℹ️ NOTA: ${order.monitorIntermediari} t'entregarà aquest material a ${escolaEntrega}.
-Tu mateixa te'l portaràs a ${order.escola} el ${formatDate(order.dataNecessitat)}.`;
-      }
-
-      return `📦 MATERIAL PREPARAT PER ${order.nomCognoms || 'N/A'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 Destinatari: ${order.nomCognoms || 'N/A'}
-🏫 Escola: ${order.escola || 'N/A'}
-📅 Data necessitat: ${formatDate(order.dataNecessitat)}
-
-📦 MATERIALS (${orderMaterials.length} ${orderMaterials.length === 1 ? 'unitat' : 'unitats'}):
+📦 MATERIALS:
 ${materialsText}
 
-${lliuramentInfo}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[✅ Confirmar recepció] [❌ Hi ha un problema]`;
+🚚 LLIURAMENT:
+👤 Intermediària: ${order.monitorIntermediari || 'N/A'}
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data: ${formatDate(order.dataNecessitat)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     }
+
+    return ''; // Fallback
   };
 
   // Función para abrir el modal de notificación
   const openNotificationModal = (order: any, type: 'intermediario' | 'destinatario') => {
+    const message = generateNotificationMessage(order, type);
+
+    // Si el mensaje está vacío (caso destinatario === intermediario), no abrir modal
+    if (!message || message.trim() === '') {
+      console.log('⚠️ No se genera notificación: destinatario es el mismo que intermediario');
+      return;
+    }
+
     setSelectedOrderForNotification(order);
     setNotificationType(type);
-    setCustomMessage(generateNotificationMessage(order, type));
+    setCustomMessage(message);
     setNotificationModalOpen(true);
   };
 

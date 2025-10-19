@@ -334,103 +334,156 @@ export default function DeliveryManager() {
         spaceName += activitat;
       }
 
-      // Construir lista de materiales agrupados por escola solicitante
-      const materialsBySchool = new Map<string, Array<{material: string, unitats: number}>>();
+      // Agrupar pedidos por destinatario único
+      const pedidosPorDestinatario = new Map<string, Array<any>>();
       option.comandes.forEach(comanda => {
-        const escola = comanda.escola;
-        if (!materialsBySchool.has(escola)) {
-          materialsBySchool.set(escola, []);
+        const dest = comanda.nomCognoms || destinatarioNom;
+        if (!pedidosPorDestinatario.has(dest)) {
+          pedidosPorDestinatario.set(dest, []);
         }
-        materialsBySchool.get(escola)!.push({
-          material: comanda.material,
-          unitats: comanda.unitats
-        });
+        pedidosPorDestinatario.get(dest)!.push(comanda);
       });
 
-      // 1. NOTIFICACIÓN AL DESTINATARIO
-      let recipientMessage = `📦 *Material preparat per a tu*\n\n`;
+      // LÓGICA MEJORADA DE NOTIFICACIONES
 
       if (isDirect) {
-        // Entrega directa
-        recipientMessage += `🏫 *Recollir a:* Academia (Eixos Creativa)\n`;
-        recipientMessage += `📅 *Data prevista:* ${formatDate(dataEntrega)}\n`;
-      } else {
-        // Entrega con intermediario
-        recipientMessage += `👤 *T'ho entregarà:* ${selectedMonitor}\n`;
-        recipientMessage += `🏫 *A l'escola:* ${escolaReceptora}\n`;
-        recipientMessage += `📅 *Data prevista:* ${formatDate(dataEntrega)}\n`;
-      }
+        // ══════════════════════════════════════════════
+        // CASO 1: ENTREGA DIRECTA
+        // ══════════════════════════════════════════════
+        for (const [dest, pedidos] of pedidosPorDestinatario) {
+          const materialsText = pedidos.map((p, idx) =>
+            `   ${idx + 1}. ${p.material} (${p.unitats || 1} unitats)`
+          ).join('\n');
 
-      // Listado de materiales
-      recipientMessage += `\n📋 *Materials:*\n`;
-      for (const [escola, materials] of materialsBySchool) {
-        recipientMessage += `   🏫 *Per ${escola}:*\n`;
-        materials.forEach(item => {
-          recipientMessage += `   • ${item.material}`;
-          if (item.unitats && item.unitats > 1) {
-            recipientMessage += ` (${item.unitats} unitats)`;
-          }
-          recipientMessage += `\n`;
-        });
-        if (materialsBySchool.size > 1) {
-          recipientMessage += `\n`;
+          const recipientMessage = `📦 MATERIAL PREPARAT PER A ${dest}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Destinatària: ${dest}
+🏫 Escola: ${escolaReceptora}
+
+📦 MATERIALS:
+${materialsText}
+
+📍 LLIURAMENT:
+🚚 Entrega directa des d'Eixos Creativa
+🏫 Escola: ${escolaReceptora}
+📅 Data: ${formatDate(dataEntrega)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+ℹ️ NOTA: El material t'arribarà directament a la teva escola.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+          console.log('📤 Enviando notificación entrega directa:', spaceName);
+          await apiClient.sendGroupedNotification(
+            spaceName,
+            recipientMessage,
+            pedidos.map(p => p.idItem),
+            'destinatario'
+          );
         }
-      }
 
-      if (materialsBySchool.size > 1) {
-        recipientMessage += `⚠️ *Nota:* Hi ha material per diferents centres. Revisa el detall.`;
-      }
+      } else if (selectedMonitor) {
+        // ══════════════════════════════════════════════
+        // CASO 2-5: ENTREGA CON INTERMEDIARIO
+        // ══════════════════════════════════════════════
 
-      // Enviar notificación al destinatario
-      console.log('📤 Enviando notificación al destinatario:', spaceName);
-      const recipientResult = await apiClient.sendGroupedNotification(
-        spaceName,
-        recipientMessage,
-        orderIds,
-        'destinatario'
-      );
+        // Separar pedidos: del intermediario vs de otros
+        const pedidosIntermediari = option.comandes.filter(c => c.nomCognoms === selectedMonitor);
+        const pedidosOtros = option.comandes.filter(c => c.nomCognoms !== selectedMonitor);
 
-      if (recipientResult.success) {
-        console.log('✅ Notificación al destinatario enviada:', recipientResult);
-      } else {
-        console.warn('⚠️ Error enviando notificación al destinatario:', recipientResult.error);
-      }
+        // Obtener destinatarios únicos (excluyendo al intermediario)
+        const destinatariosOtros = [...new Set(pedidosOtros.map(p => p.nomCognoms))];
 
-      // 2. NOTIFICACIÓN AL INTERMEDIARIO (solo si NO es entrega directa)
-      if (!isDirect && selectedMonitor) {
-        // Buscar info del monitor intermediario
         const monitorInfo = option.monitorsDisponibles.find(m => m.nom === selectedMonitor);
+        const escolaRecollida = monitorInfo?.escola || 'N/A';
 
-        if (monitorInfo) {
-          const escolaOrigen = monitorInfo.escola; // Donde recoge el material
-          const escolaDestino = monitorInfo.destinoFinal?.escola || escolaReceptora; // Donde entrega
+        // Construir spaceName del intermediario
+        let intermediarySpaceName = escolaRecollida.replace(/\s+/g, '');
+        if (!intermediarySpaceName.startsWith('/')) {
+          intermediarySpaceName = '/' + intermediarySpaceName;
+        }
+        if (monitorInfo?.activitat && monitorInfo.activitat !== 'N/A') {
+          intermediarySpaceName += monitorInfo.activitat;
+        }
 
-          // Construir spaceName del intermediario
-          let intermediarySpaceName = escolaOrigen.replace(/\s+/g, '');
-          if (!intermediarySpaceName.startsWith('/')) {
-            intermediarySpaceName = '/' + intermediarySpaceName;
-          }
-          if (monitorInfo.activitat && monitorInfo.activitat !== 'N/A') {
-            intermediarySpaceName += monitorInfo.activitat;
-          }
+        // ═════ NOTIFICACIÓN AL INTERMEDIARIO ═════
+        let intermediaryMessage = '';
 
-          // Construir mensaje para intermediario (SIN lista de materiales)
-          let intermediaryMessage = `📦 *Tens una entrega per un altre company*\n\n`;
+        if (pedidosIntermediari.length > 0 && pedidosOtros.length === 0) {
+          // CASO 3: Intermediario = Destinatario (solo su material)
+          const materialsText = pedidosIntermediari.map((p, idx) =>
+            `   ${idx + 1}. ${p.material} (${p.unitats || 1} unitats)`
+          ).join('\n');
 
-          // Primero: Dónde y cuándo recoge el material
-          if (escolaOrigen && monitorInfo.dies && monitorInfo.dies.length > 0) {
-            // Calcular próxima fecha de ese día de la semana en escolaOrigen
-            // Por simplicidad, usamos la misma fecha de entrega
-            intermediaryMessage += `📍 Recollir el material a l'escola *${escolaOrigen}*\n`;
-            intermediaryMessage += `📅 Dies disponibles: ${monitorInfo.dies.join(', ')}\n\n`;
-          }
+          intermediaryMessage = `📦 RECOLLIDA DEL TEU MATERIAL - ${selectedMonitor}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-          // Después: Destinatario y dónde/cuándo entregar
-          intermediaryMessage += `👤 *Destinatari:* ${destinatarioNom}\n`;
-          intermediaryMessage += `🏫 *Escola de lliurament:* ${escolaDestino}\n`;
-          intermediaryMessage += `📅 *Data prevista:* ${formatDate(dataEntrega)}\n`;
+📥 RECOLLIDA:
+🏫 Escola: ${escolaRecollida}
+📅 Data: ${formatDate(dataEntrega)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
 
-          // Enviar notificación al intermediario
+🟢 EL TEU MATERIAL:
+${materialsText}
+
+📤 DESTÍ FINAL:
+🏫 Escola: ${escolaReceptora}
+📅 Data que necessites: ${formatDate(dataEntrega)}
+
+ℹ️ NOTA: Recolliràs el teu material a ${escolaRecollida}
+i te'l portaràs a ${escolaReceptora} per a la teva activitat.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+        } else if (pedidosIntermediari.length > 0 && pedidosOtros.length > 0) {
+          // CASO 4: Intermediario = Destinatario + otros
+          const materialsPropisText = pedidosIntermediari.map((p, idx) =>
+            `   ${idx + 1}. ${p.material} (${p.unitats || 1} unitats)`
+          ).join('\n');
+
+          const paquetsText = destinatariosOtros.map(dest => {
+            const pedidoDest = pedidosOtros.find(p => p.nomCognoms === dest);
+            return `   • ${dest} (${pedidoDest?.escola || escolaReceptora}, ${formatDate(dataEntrega)})`;
+          }).join('\n');
+
+          intermediaryMessage = `📦 RECOLLIDA DE MATERIALS - ${selectedMonitor}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 El teu rol: Intermediària i Destinatària
+
+📥 RECOLLIDA:
+🏫 Escola: ${escolaRecollida}
+📅 Data: ${formatDate(dataEntrega)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+🟢 EL TEU MATERIAL:
+${materialsPropisText}
+
+🔵 PAQUETS PER ENTREGAR:
+${paquetsText}
+
+ℹ️ NOTA: Recolliràs el teu material i paquets per altres companys.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+        } else if (pedidosIntermediari.length === 0 && pedidosOtros.length > 0) {
+          // CASO 2: Solo intermediario (sin materiales propios)
+          const paquetsText = destinatariosOtros.map(dest => {
+            const pedidoDest = pedidosOtros.find(p => p.nomCognoms === dest);
+            return `   • ${dest} (${pedidoDest?.escola || escolaReceptora}, ${formatDate(dataEntrega)})`;
+          }).join('\n');
+
+          intermediaryMessage = `🔔 NOVA ASSIGNACIÓ COM A INTERMEDIÀRIA - ${selectedMonitor}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📥 RECOLLIDA:
+🏫 Escola: ${escolaRecollida}
+📅 Data: ${formatDate(dataEntrega)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+📤 PAQUETS PER ENTREGAR:
+${paquetsText}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+        }
+
+        // Enviar notificación al intermediario
+        if (intermediaryMessage) {
           console.log('📤 Enviando notificación al intermediario:', intermediarySpaceName);
           const intermediaryResult = await apiClient.sendGroupedNotification(
             intermediarySpaceName,
@@ -440,10 +493,45 @@ export default function DeliveryManager() {
           );
 
           if (intermediaryResult.success) {
-            console.log('✅ Notificación al intermediario enviada:', intermediaryResult);
+            console.log('✅ Notificación al intermediario enviada');
           } else {
             console.warn('⚠️ Error enviando notificación al intermediario:', intermediaryResult.error);
           }
+        }
+
+        // ═════ NOTIFICACIONES A DESTINATARIOS (solo si !== intermediario) ═════
+        for (const [dest, pedidos] of pedidosPorDestinatario) {
+          // Si el destinatario es el intermediario, ya recibió notificación combinada
+          if (dest === selectedMonitor) {
+            console.log(`⏩ Saltando notificación de destinatario para ${dest} (es el intermediario)`);
+            continue;
+          }
+
+          const materialsText = pedidos.map((p, idx) =>
+            `   ${idx + 1}. ${p.material} (${p.unitats || 1} unitats)`
+          ).join('\n');
+
+          const recipientMessage = `📦 MATERIAL PREPARAT PER A ${dest}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Destinatària: ${dest}
+
+📦 MATERIALS:
+${materialsText}
+
+🚚 LLIURAMENT:
+👤 Intermediària: ${selectedMonitor}
+🏫 Escola: ${escolaReceptora}
+📅 Data: ${formatDate(dataEntrega)}
+📍 Ubicació: Consergeria, AFA o Caixa de Material
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+          console.log('📤 Enviando notificación a destinatario:', dest);
+          await apiClient.sendGroupedNotification(
+            spaceName,
+            recipientMessage,
+            pedidos.map(p => p.idItem),
+            'destinatario'
+          );
         }
       }
     } catch (error) {
