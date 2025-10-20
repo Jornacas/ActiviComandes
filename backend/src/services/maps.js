@@ -133,13 +133,15 @@ async function calculateDistances(addresses) {
           });
         }
       } catch (addressError) {
-        console.error(`❌ Error for address ${address}:`, addressError.response?.data || addressError.message);
+        const errorDetail = addressError.response?.data || addressError.message;
+        console.error(`❌ Error for address ${address}:`, errorDetail);
         results.push({
           address: address,
           distance: "Error",
           duration: "Error",
           distanceValue: 99999,
-          durationValue: 99999
+          durationValue: 99999,
+          errorDetail: JSON.stringify(errorDetail) // TEMPORAL: Para debug
         });
       }
     }
