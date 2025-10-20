@@ -17,11 +17,6 @@ build/
 .env.production.local
 # Allow .env.production for Vercel deployment
 !.env.production
-# Vercel CLI generated files (contain secrets)
-.env.vercel.local
-.env.vercel.production
-**/.env.vercel.local
-**/.env.vercel.production
 
 # Logs
 npm-debug.log*
