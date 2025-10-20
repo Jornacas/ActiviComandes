@@ -110,3 +110,11 @@ $RECYCLE.BIN/
 credentials.json
 activiconta-*.json
 backend/credentials.json
+
+# Documentation files with sensitive info
+# Keep documentation files local, don't push to repo
+*ESTADO*.md
+*SITUACION*.md
+*DEPLOYMENT*.md
+*_backup*.gs
+Code_backup*.gs

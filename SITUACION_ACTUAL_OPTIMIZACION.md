@@ -12,7 +12,7 @@
 ### **2. Google Maps API Corregido**
 - ✅ **`calculateDistances()` convertido** de `Maps.newDistanceMatrixService()` a `UrlFetch`
 - ✅ **Error mapeo distancias corregido**: `result.school` → `result.address`
-- ✅ **API Key funcional**: `AIzaSyDR7fVL6kQvQfn5d_6Znd5ZpHIHOGj9cYc`
+- ✅ **API Key funcional**: `[REDACTED - Configurada en variables de entorno]`
 
 ### **3. Estructura Datos Validada**
 - ✅ **Hoja "Dades"**: 46 escuelas con direcciones completas
@@ -73,7 +73,7 @@ const response = Maps.newDistanceMatrixService()
   .getDistanceMatrix(origin, address, Maps.Mode.DRIVING);
 
 // AHORA (CORREGIDO):
-const apiKey = "AIzaSyDR7fVL6kQvQfn5d_6Znd5ZpHIHOGj9cYc";
+const apiKey = PropertiesService.getScriptProperties().getProperty('GOOGLE_MAPS_API_KEY');
 const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(address)}&mode=driving&key=${apiKey}`;
 const response = UrlFetchApp.fetch(url);
 const data = JSON.parse(response.getContentText());

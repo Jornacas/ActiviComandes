@@ -55,7 +55,7 @@ REQUEST_DENIED - You're calling a legacy API, which is not enabled for your proj
 2. **Nueva API Key**:
    - Creada en el proyecto `activiconta`
    - Routes API habilitada
-   - API Key: `AIzaSyByO41A21_Ze-M-0wjbsooHVf0mElEnatI`
+   - API Key: `[REDACTED - Configurada en variables de entorno]`
 
 3. **Verificación exitosa**:
    ```json
