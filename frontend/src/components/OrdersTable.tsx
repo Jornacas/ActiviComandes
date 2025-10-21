@@ -882,11 +882,11 @@ ${materialsText}
         // Build tooltip text
         const buildTooltip = () => {
           if (!isAssignatOrLliurat) return '';
-          const lines = [];
+          const lines = ['📤 Notificacions:'];
           if (!isDirecta) {
-            lines.push(`Intermediari: ${notifIntermediari === 'Enviada' ? '✅ Enviada' : '⏳ Pendiente'}`);
+            lines.push(`  • Intermediari: ${notifIntermediari === 'Enviada' ? '✅ Enviada' : '⏳ Pendent'}`);
           }
-          lines.push(`Destinatari: ${notifDestinatari === 'Enviada' ? '✅ Enviada' : '⏳ Pendiente'}`);
+          lines.push(`  • Destinatari: ${notifDestinatari === 'Enviada' ? '✅ Enviada' : '⏳ Pendent'}`);
           return lines.join('\n');
         };
 
