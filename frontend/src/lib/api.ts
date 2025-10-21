@@ -36,6 +36,9 @@ export interface Order {
   dataLliuramentPrevista?: string;
   distanciaAcademia?: string;
   notesEntrega?: string;
+  // Notification status fields
+  notificacionIntermediari?: string;
+  notificacionDestinatari?: string;
   // Legacy fields for backward compatibility
   nombre?: string;
   fecha?: string;

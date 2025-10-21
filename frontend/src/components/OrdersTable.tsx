@@ -859,12 +859,36 @@ ${materialsText}
     {
       field: 'estat',
       headerName: 'Estat',
-      width: 120,
+      width: 160,
       renderCell: (params) => {
         const normalized = formatSentenceCase(params.value as string);
         const order = params.row;
         const hasNotes = order.notesInternes && order.notesInternes.trim() !== '';
         const isEnProces = normalized === 'En proces';
+        const isAssignatOrLliurat = normalized === 'Assignat' || normalized === 'Lliurat';
+
+        // Notification status
+        const notifIntermediari = order.notificacionIntermediari;
+        const notifDestinatari = order.notificacionDestinatari;
+        const modalitat = order.modalitatEntrega;
+        const isDirecta = modalitat === 'Directa';
+
+        // Helper function to get notification color
+        const getNotifColor = (status: string | undefined) => {
+          if (status === 'Enviada') return '#4caf50'; // Green
+          return '#ffc107'; // Yellow (Pendiente or empty)
+        };
+
+        // Build tooltip text
+        const buildTooltip = () => {
+          if (!isAssignatOrLliurat) return '';
+          const lines = [];
+          if (!isDirecta) {
+            lines.push(`Intermediari: ${notifIntermediari === 'Enviada' ? '✅ Enviada' : '⏳ Pendiente'}`);
+          }
+          lines.push(`Destinatari: ${notifDestinatari === 'Enviada' ? '✅ Enviada' : '⏳ Pendiente'}`);
+          return lines.join('\n');
+        };
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -889,6 +913,32 @@ ${materialsText}
                 <span style={{ fontSize: '1rem', cursor: 'pointer' }} onClick={() => handleOpenNotesFromChip(order)}>
                   📝
                 </span>
+              </Tooltip>
+            )}
+            {isAssignatOrLliurat && (
+              <Tooltip title={buildTooltip()} placement="top">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, ml: 0.5 }}>
+                  {!isDirecta && (
+                    <Box
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        backgroundColor: getNotifColor(notifIntermediari),
+                        border: '1px solid rgba(0,0,0,0.1)',
+                      }}
+                    />
+                  )}
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      backgroundColor: getNotifColor(notifDestinatari),
+                      border: '1px solid rgba(0,0,0,0.1)',
+                    }}
+                  />
+                </Box>
               </Tooltip>
             )}
           </Box>

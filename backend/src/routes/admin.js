@@ -144,7 +144,9 @@ router.get('/orders', async (req, res) => {
         'Data_Lliurament_Prevista': 'dataLliuramentPrevista',
         'ID_Lliurament': 'idLliurament',
         'Distancia_Academia': 'idLliurament', // Columna V reutilizada como ID_Lliurament
-        'Notes_Entrega': 'notesEntrega'
+        'Notes_Entrega': 'notesEntrega',
+        'Notificacion_Intermediari': 'notificacionIntermediari',
+        'Notificacion_Destinatari': 'notificacionDestinatari'
       };
       return map[headerTrimmed] || String(headerTrimmed).toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
     });
