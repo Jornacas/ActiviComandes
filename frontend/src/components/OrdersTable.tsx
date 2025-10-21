@@ -879,15 +879,24 @@ ${materialsText}
           return '#ffc107'; // Yellow (Pendiente or empty)
         };
 
-        // Build tooltip text
+        // Build tooltip component
         const buildTooltip = () => {
-          if (!isAssignatOrLliurat) return '';
-          const lines = ['📤 Notificacions:'];
-          if (!isDirecta) {
-            lines.push(`  • Intermediari: ${notifIntermediari === 'Enviada' ? '✅ Enviada' : '⏳ Pendent'}`);
-          }
-          lines.push(`  • Destinatari: ${notifDestinatari === 'Enviada' ? '✅ Enviada' : '⏳ Pendent'}`);
-          return lines.join('\n');
+          if (!isAssignatOrLliurat) return null;
+          return (
+            <Box sx={{ p: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+                📤 Notificacions
+              </Typography>
+              {!isDirecta && (
+                <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                  • Intermediari: {notifIntermediari === 'Enviada' ? '✅ Enviada' : '⏳ Pendent'}
+                </Typography>
+              )}
+              <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                • Destinatari: {notifDestinatari === 'Enviada' ? '✅ Enviada' : '⏳ Pendent'}
+              </Typography>
+            </Box>
+          );
         };
 
         return (
