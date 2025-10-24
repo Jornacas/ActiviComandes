@@ -873,10 +873,33 @@ ${materialsText}
         const modalitat = order.modalitatEntrega;
         const isDirecta = modalitat === 'Directa';
 
+        // DEBUG: Log notification values for orders with Assignat/Lliurat status
+        if ((normalized === 'Assignat' || normalized === 'Lliurat') && (notifIntermediari || notifDestinatari)) {
+          console.log(`🔍 DEBUG Notificacions (${order.idItem}):`, {
+            estat: normalized,
+            notifIntermediari: `[${notifIntermediari}]`,
+            notifDestinatari: `[${notifDestinatari}]`,
+            modalitat,
+            intermediariLen: notifIntermediari?.length,
+            destinatariLen: notifDestinatari?.length
+          });
+        }
+
+        // Helper function to check if notification was sent
+        const isNotificationSent = (status: string | undefined): boolean => {
+          const normalizedStatus = status?.toString().trim().toLowerCase() || '';
+          return normalizedStatus === 'enviada' || normalizedStatus === 'enviat';
+        };
+
         // Helper function to get notification color
         const getNotifColor = (status: string | undefined) => {
-          if (status === 'Enviada') return '#4caf50'; // Green
-          return '#ffc107'; // Yellow (Pendiente or empty)
+          // Check if sent (Enviada/Enviat)
+          if (isNotificationSent(status)) {
+            return '#4caf50'; // Green
+          }
+
+          // Default: Yellow (Pendiente or empty)
+          return '#ffc107';
         };
 
         // Build tooltip component
@@ -889,11 +912,11 @@ ${materialsText}
               </Typography>
               {!isDirecta && (
                 <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
-                  • Intermediari: {notifIntermediari === 'Enviada' ? '✅ Enviada' : '⏳ Pendent'}
+                  • Intermediari: {isNotificationSent(notifIntermediari) ? '✅ Enviada' : '⏳ Pendent'}
                 </Typography>
               )}
               <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
-                • Destinatari: {notifDestinatari === 'Enviada' ? '✅ Enviada' : '⏳ Pendent'}
+                • Destinatari: {isNotificationSent(notifDestinatari) ? '✅ Enviada' : '⏳ Pendent'}
               </Typography>
             </Box>
           );
