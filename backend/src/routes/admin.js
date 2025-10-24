@@ -1165,6 +1165,104 @@ router.post('/delivery/options', async (req, res) => {
             }
           }
         });
+
+        // 🆕 OPCIÓN 4: ESCUELAS COMPARTIDAS (FASE 2)
+        // Detectar cuando el DESTINATARIO coincide con un INTERMEDIARIO en alguna escuela
+        console.log(`🔍 FASE 2: Buscando escuelas compartidas para ${group.nomCognoms}`);
+
+        // Buscar en qué escuelas trabaja el destinatario
+        const destinatarioMonitor = schoolData.data.monitors.find(m =>
+          m.nom.toLowerCase().includes(group.nomCognoms.toLowerCase()) ||
+          group.nomCognoms.toLowerCase().includes(m.nom.toLowerCase())
+        );
+
+        if (destinatarioMonitor && destinatarioMonitor.escoles?.length > 0) {
+          console.log(`   ✓ Destinatario ${group.nomCognoms} trabaja en: [${destinatarioMonitor.escoles.map(e => e.escola).join(', ')}]`);
+
+          // Buscar otros monitores que coincidan en alguna escuela con el destinatario
+          schoolData.data.monitors.forEach(potentialIntermediary => {
+            // No considerarse a sí mismo como intermediario
+            if (potentialIntermediary.nom === destinatarioMonitor.nom) return;
+
+            // Solo monitores multicentro
+            if (potentialIntermediary.escoles?.length > 1) {
+
+              // Buscar escuelas compartidas
+              destinatarioMonitor.escoles.forEach(destSchool => {
+                const sharedSchoolInIntermediary = potentialIntermediary.escoles.find(
+                  intSchool => intSchool.escola === destSchool.escola
+                );
+
+                if (sharedSchoolInIntermediary) {
+                  // ✓ COINCIDEN en esta escuela!
+                  console.log(`   ⭐ ${potentialIntermediary.nom} coincide con ${group.nomCognoms} en: ${destSchool.escola}`);
+
+                  // Proponer entregas en OTRAS escuelas del intermediario
+                  potentialIntermediary.escoles.forEach(pickupSchool => {
+                    if (pickupSchool.escola !== destSchool.escola) {
+                      const sharedSchoolOption = {
+                        tipus: "Lliurament amb Coincidència", // Tipo especial
+                        escola: pickupSchool.escola, // Donde entregamos (a intermediario)
+                        escolaCoincidencia: destSchool.escola, // Donde coinciden
+                        escolaDestino: group.escoles[0], // Destino final (escuela del pedido)
+                        escoles: group.escoles,
+                        adreça: pickupSchool.adreça,
+                        eficiencia: "Calculant...",
+                        prioritat: 99999, // Se calculará después con distancia
+                        nomCognoms: group.nomCognoms,
+                        dataNecessitat: group.dataNecessitat,
+                        monitorsDisponibles: [{
+                          nom: potentialIntermediary.nom,
+                          dies: pickupSchool.dies,
+                          tipus: "intermediari-compartit",
+                          escolaOrigen: pickupSchool.escola,
+                          activitat: pickupSchool.activitat || 'N/A',
+                          destinoFinal: {
+                            escola: destSchool.escola,
+                            dies: sharedSchoolInIntermediary.dies,
+                            activitat: sharedSchoolInIntermediary.activitat || 'N/A',
+                            destinatari: group.nomCognoms
+                          }
+                        }],
+                        descripció: `Entrega a ${potentialIntermediary.nom} a ${pickupSchool.escola} → ${potentialIntermediary.nom} porta a ${destSchool.escola} → ${group.nomCognoms} recull a ${destSchool.escola}`,
+                        distanciaAcademia: "Calculant...",
+                        tempsAcademia: "Calculant...",
+                        notes: `Coincidència a ${destSchool.escola} - ${group.nomCognoms} recull allà`,
+                        comandes: group.orders,
+                        destinatari: {
+                          nom: group.nomCognoms,
+                          activitat: group.orders[0]?.activitat || 'N/A'
+                        },
+                        // 🆕 Metadatos adicionales para debugging
+                        metadata: {
+                          fase: 2,
+                          sharedSchool: destSchool.escola,
+                          intermediary: potentialIntermediary.nom,
+                          recipient: group.nomCognoms
+                        }
+                      };
+
+                      // Evitar duplicados
+                      const isDuplicate = deliveryOptions.some(opt =>
+                        opt.nomCognoms === sharedSchoolOption.nomCognoms &&
+                        opt.escola === sharedSchoolOption.escola &&
+                        opt.escolaCoincidencia === sharedSchoolOption.escolaCoincidencia &&
+                        opt.monitorsDisponibles[0]?.nom === sharedSchoolOption.monitorsDisponibles[0]?.nom
+                      );
+
+                      if (!isDuplicate) {
+                        deliveryOptions.push(sharedSchoolOption);
+                        console.log(`      → Opción añadida: ${pickupSchool.escola} (${potentialIntermediary.nom}) → ${destSchool.escola} (${group.nomCognoms})`);
+                      }
+                    }
+                  });
+                }
+              });
+            }
+          });
+        } else {
+          console.log(`   ℹ️ Destinatario ${group.nomCognoms} no encontrado en monitores (puede ser solo destinatario)`);
+        }
       }
     }
 
@@ -1183,20 +1281,82 @@ router.post('/delivery/options', async (req, res) => {
     const distanceResults = await maps.calculateDistances(addresses);
 
     if (distanceResults.success) {
-      // Aplicar distancias calculadas a las opciones
+      // 🆕 FASE 1: Aplicar distancias y calcular prioridad mejorada
       deliveryOptions.forEach(option => {
         const distanceData = distanceResults.data.find(d => d.address === option.adreça);
         if (distanceData) {
           option.distanciaAcademia = distanceData.distance;
           option.tempsAcademia = distanceData.duration;
-          option.prioritat = distanceData.distanceValue;
 
-          // Calcular eficiencia basada en distancia
           const km = distanceData.distanceValue / 1000;
-          if (km < 2) option.eficiencia = "Màxima";
-          else if (km < 4) option.eficiencia = "Alta";
-          else if (km < 6) option.eficiencia = "Mitjana";
-          else option.eficiencia = "Baixa";
+
+          // 🎯 CÁLCULO DE PRIORIDAD MEJORADO
+          let basePriority = distanceData.distanceValue; // Metros desde Eixos
+          let eficienciaScore = 0;
+          let tipusModifier = 0;
+
+          // Modificador por tipo de entrega
+          if (option.tipus === "Recollida a Eixos Creativa") {
+            tipusModifier = -10000; // Máxima prioridad (siempre primera)
+            option.eficiencia = "Màxima";
+            eficienciaScore = 100;
+          }
+          else if (option.tipus === "Lliurament amb Coincidència") {
+            // 🆕 FASE 2: Opciones con escuelas compartidas tienen ALTA prioridad
+            // Mejor que entrega directa pero después de recollida
+            tipusModifier = -5000; // Alta prioridad
+
+            // Calcular eficiencia considerando que hay intermediario
+            if (km < 3) {
+              option.eficiencia = "Màxima";
+              eficienciaScore = 95;
+            } else if (km < 5) {
+              option.eficiencia = "Alta";
+              eficienciaScore = 85;
+            } else {
+              option.eficiencia = "Mitjana";
+              eficienciaScore = 70;
+            }
+          }
+          else if (option.tipus === "Lliurament amb Intermediari") {
+            // Intermediario normal: mejor que directa lejana
+            tipusModifier = -3000;
+
+            if (km < 3) {
+              option.eficiencia = "Alta";
+              eficienciaScore = 80;
+            } else if (km < 6) {
+              option.eficiencia = "Mitjana";
+              eficienciaScore = 65;
+            } else {
+              option.eficiencia = "Baixa";
+              eficienciaScore = 50;
+            }
+          }
+          else if (option.tipus === "Entrega Directa des d'Eixos") {
+            // Directa: solo buena si es cercana
+            tipusModifier = 0;
+
+            if (km < 2) {
+              option.eficiencia = "Alta";
+              eficienciaScore = 75;
+            } else if (km < 4) {
+              option.eficiencia = "Mitjana";
+              eficienciaScore = 60;
+            } else if (km < 7) {
+              option.eficiencia = "Baixa";
+              eficienciaScore = 45;
+            } else {
+              option.eficiencia = "Molt Baixa";
+              eficienciaScore = 30;
+            }
+          }
+
+          // Prioridad final: menor es mejor
+          option.prioritat = basePriority + tipusModifier;
+          option.eficienciaScore = eficienciaScore; // Para debugging
+
+          console.log(`   📊 ${option.tipus} - ${option.escola}: ${km.toFixed(1)}km → Prioridad: ${option.prioritat}, Eficiència: ${option.eficiencia}`);
         }
       });
     } else {
@@ -1205,13 +1365,21 @@ router.post('/delivery/options', async (req, res) => {
       deliveryOptions.forEach((option, index) => {
         option.distanciaAcademia = "N/A";
         option.tempsAcademia = "N/A";
-        option.prioritat = index + 1;
+
+        // Prioridad por tipo sin distancias
+        if (option.tipus === "Recollida a Eixos Creativa") option.prioritat = 1;
+        else if (option.tipus === "Lliurament amb Coincidència") option.prioritat = 100 + index;
+        else if (option.tipus === "Lliurament amb Intermediari") option.prioritat = 500 + index;
+        else option.prioritat = 1000 + index;
+
         option.eficiencia = "Alta";
       });
     }
 
-    // Ordenar por prioridad (menor distancia = mayor eficiencia = primero)
+    // Ordenar por prioridad (menor = mejor)
     deliveryOptions.sort((a, b) => a.prioritat - b.prioritat);
+
+    console.log(`\n✅ ${deliveryOptions.length} opciones generadas y ordenadas por eficiencia`);
 
     res.json({
       success: true,
