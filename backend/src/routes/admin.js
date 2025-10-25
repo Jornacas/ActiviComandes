@@ -1062,14 +1062,36 @@ router.post('/delivery/options', async (req, res) => {
       // OPCIÓN 2: ENTREGA DIRECTA DESDE EIXOS (alguien de Eixos lleva a la escuela)
       // Crear una opción para cada escuela del destinatario
       for (const escolaDestino of group.escoles) {
-        // Buscar la dirección de esta escuela en los datos de monitores
+        // Buscar la dirección de esta escuela y los días de actividad del destinatario
         let escolaAddress = null;
+        let diesDisponibles = ["dilluns", "dimarts", "dimecres", "dijous", "divendres"]; // Default
+
         if (schoolData.data.monitors) {
-          for (const monitor of schoolData.data.monitors) {
-            const schoolInfo = monitor.escoles?.find(s => s.escola === escolaDestino);
-            if (schoolInfo?.adreça) {
-              escolaAddress = schoolInfo.adreça;
-              break;
+          // Buscar al destinatario en los monitores
+          const destinatarioMonitor = schoolData.data.monitors.find(m =>
+            m.nom.toLowerCase().includes(group.nomCognoms.toLowerCase()) ||
+            group.nomCognoms.toLowerCase().includes(m.nom.toLowerCase())
+          );
+
+          // Si encontramos al destinatario, usar sus días de actividad en esta escuela
+          if (destinatarioMonitor) {
+            const schoolInfo = destinatarioMonitor.escoles?.find(s => s.escola === escolaDestino);
+            if (schoolInfo) {
+              if (schoolInfo.adreça) escolaAddress = schoolInfo.adreça;
+              if (schoolInfo.dies && schoolInfo.dies.length > 0) {
+                diesDisponibles = schoolInfo.dies;
+              }
+            }
+          }
+
+          // Si no encontramos la dirección del destinatario, buscar en otros monitores
+          if (!escolaAddress) {
+            for (const monitor of schoolData.data.monitors) {
+              const schoolInfo = monitor.escoles?.find(s => s.escola === escolaDestino);
+              if (schoolInfo?.adreça) {
+                escolaAddress = schoolInfo.adreça;
+                break;
+              }
             }
           }
         }
@@ -1085,7 +1107,7 @@ router.post('/delivery/options', async (req, res) => {
           dataNecessitat: group.dataNecessitat,
           monitorsDisponibles: [{
             nom: "Equip Eixos Creativa",
-            dies: ["dilluns", "dimarts", "dimecres", "dijous", "divendres"],
+            dies: diesDisponibles,
             tipus: "entrega-directa",
             activitat: 'N/A'
           }],

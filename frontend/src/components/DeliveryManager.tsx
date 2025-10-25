@@ -936,15 +936,23 @@ ${materialsText}
                               )}
                             </Typography>
                           </Box>
-                          {/* Mostrar días de actividad en la escuela intermediaria */}
-                          {option.monitorsDisponibles && option.monitorsDisponibles.length > 0 && option.monitorsDisponibles[0].dies && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Schedule color="action" fontSize="small" />
-                              <Typography variant="body2" color="text.secondary">
-                                Dies disponibles: {option.monitorsDisponibles[0].dies.join(', ')}
-                              </Typography>
-                            </Box>
-                          )}
+                          {/* Mostrar días de actividad en la escuela */}
+                          {option.monitorsDisponibles && option.monitorsDisponibles.length > 0 && (() => {
+                            // For direct delivery, show recipient's activity days
+                            // For intermediary delivery, show intermediary's availability days
+                            const directDeliveryMonitor = option.monitorsDisponibles.find(m => m.tipus === 'entrega-directa');
+                            const intermediaryMonitor = option.monitorsDisponibles.find(m => m.tipus === 'intermediari');
+                            const monitor = directDeliveryMonitor || intermediaryMonitor;
+
+                            return monitor?.dies && monitor.dies.length > 0 && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Schedule color="action" fontSize="small" />
+                                <Typography variant="body2" color="text.secondary">
+                                  Dies disponibles: {monitor.dies.join(', ')}
+                                </Typography>
+                              </Box>
+                            );
+                          })()}
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mt: 1 }}>
                             <Chip
                               icon={<LocalShipping />}
