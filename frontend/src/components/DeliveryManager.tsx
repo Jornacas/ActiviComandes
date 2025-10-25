@@ -266,12 +266,17 @@ export default function DeliveryManager() {
       // Get order IDs from this option
       const orderIds = option.comandes.map(c => c.id);
 
-      // Buscar la escolaDestino
+      // Buscar la escolaDestino y escolaRecollida
       let escolaDestino = '';
+      let escolaRecollida = '';
       if (isIntermediary && selectedMonitor) {
         // Para opciones Fase 2: usar escolaDestino (donde ENTREGA el intermediario)
         // Para opciones normales: usar escola (escuela del destinatario final)
         escolaDestino = option.escolaDestino || option.escola || '';
+
+        // Buscar la escola donde recoge el intermediario
+        const monitorInfo = option.monitorsDisponibles?.find(m => m.nom === selectedMonitor);
+        escolaRecollida = monitorInfo?.escola || '';
       } else if (isDirectDelivery) {
         escolaDestino = option.escola || '';
       }
@@ -281,6 +286,7 @@ export default function DeliveryManager() {
         modalitat: isPickup ? 'Recollida' : isDirectDelivery ? 'Directa' : 'Intermediari',
         monitorIntermediaria: isIntermediary ? selectedMonitor : '',
         escolaDestino: escolaDestino,
+        escolaRecollida: escolaRecollida,
         dataEntrega: dataEntrega || ''
       };
 
