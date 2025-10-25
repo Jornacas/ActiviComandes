@@ -432,13 +432,6 @@ ${materialsText}
         const monitorInfo = option.monitorsDisponibles.find(m => m.nom === selectedMonitor);
         const escolaRecollida = monitorInfo?.escola || 'N/A';
 
-        console.log('🔍 DEBUG NOTIFICACIÓN INTERMEDIARIO:');
-        console.log('  - option.escola:', option.escola);
-        console.log('  - option.escolaDestino:', option.escolaDestino);
-        console.log('  - monitorInfo?.escola:', monitorInfo?.escola);
-        console.log('  - monitorInfo?.destinoFinal?.escola:', monitorInfo?.destinoFinal?.escola);
-        console.log('  - escolaRecollida (DEBE SER DONDE RECOGE):', escolaRecollida);
-
         // Construir spaceName del intermediario
         let intermediarySpaceName = escolaRecollida.replace(/\s+/g, '');
         if (!intermediarySpaceName.startsWith('/')) {
