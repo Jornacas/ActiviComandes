@@ -156,6 +156,32 @@ export default function OrdersTable() {
     }
   }, [notificationsEnabled]);
 
+  // Helper: Calculate next occurrence of a weekday from a base date
+  const getNextDateForWeekday = (baseDate: string, weekdayName: string): string => {
+    if (!baseDate || !weekdayName) return baseDate;
+
+    const weekdayMap: { [key: string]: number } = {
+      'dilluns': 1, 'dimarts': 2, 'dimecres': 3, 'dijous': 4,
+      'divendres': 5, 'dissabte': 6, 'diumenge': 0
+    };
+
+    const targetDay = weekdayMap[weekdayName.toLowerCase()];
+    if (targetDay === undefined) return baseDate;
+
+    const base = new Date(baseDate);
+    const currentDay = base.getDay();
+
+    // Calculate days to add (0 if same day, positive otherwise)
+    let daysToAdd = targetDay - currentDay;
+    if (daysToAdd < 0) daysToAdd += 7; // Next week if target day already passed
+    if (daysToAdd === 0) daysToAdd = 0; // Same day
+
+    const resultDate = new Date(base);
+    resultDate.setDate(base.getDate() + daysToAdd);
+
+    return resultDate.toISOString().split('T')[0];
+  };
+
   // Función para formatear fecha a DD/MM/YYYY
   const formatDate = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
@@ -290,9 +316,23 @@ i te'l portaràs a ${order.escola || 'N/A'} per a la teva activitat.
         ).join('\n');
 
         const paquetsText = destinatariosOtros.map(dest => {
-          const escolaDest = materialesOtros.find(o => o.nomCognoms === dest)?.escola || 'N/A';
-          const dataDest = materialesOtros.find(o => o.nomCognoms === dest)?.dataNecessitat || order.dataNecessitat;
-          return `   • ${dest} (${escolaDest}, ${formatDate(dataDest)})`;
+          const orderDest = materialesOtros.find(o => o.nomCognoms === dest);
+          // Para pedidos existentes: usar escolaDestinoIntermediari (escuela de coincidencia/entrega)
+          // Si no existe, fallback a escola (escuela final del destinatario)
+          const escolaDest = orderDest?.escolaDestinoIntermediari || orderDest?.escola || 'N/A';
+
+          // Calcular fecha de entrega: si hay diaEntregaIntermediari, usarlo; sino, estimar +1 día
+          let deliveryDate;
+          if (orderDest?.diaEntregaIntermediari) {
+            deliveryDate = getNextDateForWeekday(order.dataLliuramentPrevista, orderDest.diaEntregaIntermediari);
+          } else {
+            // Fallback: asumir entrega al día siguiente del pickup
+            const pickupDate = new Date(order.dataLliuramentPrevista);
+            pickupDate.setDate(pickupDate.getDate() + 1);
+            deliveryDate = pickupDate.toISOString().split('T')[0];
+          }
+
+          return `   • ${dest} (${escolaDest}, ${formatDate(deliveryDate)})`;
         }).join('\n');
 
         return `📦 RECOLLIDA DE MATERIALS - ${order.monitorIntermediari || 'N/A'}
@@ -317,9 +357,23 @@ ${paquetsText}
       // CASO 2: Solo intermediario (sin materiales propios)
       if (materialesPropios.length === 0 && materialesOtros.length > 0) {
         const paquetsText = destinatariosOtros.map(dest => {
-          const escolaDest = materialesOtros.find(o => o.nomCognoms === dest)?.escola || 'N/A';
-          const dataDest = materialesOtros.find(o => o.nomCognoms === dest)?.dataNecessitat || order.dataNecessitat;
-          return `   • ${dest} (${escolaDest}, ${formatDate(dataDest)})`;
+          const orderDest = materialesOtros.find(o => o.nomCognoms === dest);
+          // Para pedidos existentes: usar escolaDestinoIntermediari (escuela de coincidencia/entrega)
+          // Si no existe, fallback a escola (escuela final del destinatario)
+          const escolaDest = orderDest?.escolaDestinoIntermediari || orderDest?.escola || 'N/A';
+
+          // Calcular fecha de entrega: si hay diaEntregaIntermediari, usarlo; sino, estimar +1 día
+          let deliveryDate;
+          if (orderDest?.diaEntregaIntermediari) {
+            deliveryDate = getNextDateForWeekday(order.dataLliuramentPrevista, orderDest.diaEntregaIntermediari);
+          } else {
+            // Fallback: asumir entrega al día siguiente del pickup
+            const pickupDate = new Date(order.dataLliuramentPrevista);
+            pickupDate.setDate(pickupDate.getDate() + 1);
+            deliveryDate = pickupDate.toISOString().split('T')[0];
+          }
+
+          return `   • ${dest} (${escolaDest}, ${formatDate(deliveryDate)})`;
         }).join('\n');
 
         return `🔔 NOVA ASSIGNACIÓ COM A INTERMEDIÀRIA - ${order.monitorIntermediari || 'N/A'}
@@ -358,6 +412,17 @@ ${paquetsText}
         `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
       ).join('\n');
 
+      // Calcular fecha de entrega del intermediario
+      let deliveryDate;
+      if (order.diaEntregaIntermediari) {
+        deliveryDate = getNextDateForWeekday(order.dataLliuramentPrevista, order.diaEntregaIntermediari);
+      } else {
+        // Fallback: asumir entrega al día siguiente del pickup
+        const pickupDate = new Date(order.dataLliuramentPrevista);
+        pickupDate.setDate(pickupDate.getDate() + 1);
+        deliveryDate = pickupDate.toISOString().split('T')[0];
+      }
+
       return `📦 MATERIAL PREPARAT PER A ${order.nomCognoms || 'N/A'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Destinatària: ${order.nomCognoms || 'N/A'}
@@ -367,8 +432,8 @@ ${materialsText}
 
 🚚 LLIURAMENT:
 👤 Intermediària: ${order.monitorIntermediari || 'N/A'}
-🏫 Escola: ${order.escola || 'N/A'}
-📅 Data: ${formatDate(order.dataNecessitat)}
+🏫 Escola: ${order.escolaDestinoIntermediari || order.escola || 'N/A'}
+📅 Data: ${formatDate(deliveryDate)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     }

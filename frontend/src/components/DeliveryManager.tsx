@@ -269,7 +269,9 @@ export default function DeliveryManager() {
       // Buscar la escolaDestino
       let escolaDestino = '';
       if (isIntermediary && selectedMonitor) {
-        escolaDestino = option.escola || '';
+        // Para opciones Fase 2: usar escolaDestino (donde ENTREGA el intermediario)
+        // Para opciones normales: usar escola (escuela del destinatario final)
+        escolaDestino = option.escolaDestino || option.escola || '';
       } else if (isDirectDelivery) {
         escolaDestino = option.escola || '';
       }
@@ -430,6 +432,13 @@ ${materialsText}
         const monitorInfo = option.monitorsDisponibles.find(m => m.nom === selectedMonitor);
         const escolaRecollida = monitorInfo?.escola || 'N/A';
 
+        console.log('🔍 DEBUG NOTIFICACIÓN INTERMEDIARIO:');
+        console.log('  - option.escola:', option.escola);
+        console.log('  - option.escolaDestino:', option.escolaDestino);
+        console.log('  - monitorInfo?.escola:', monitorInfo?.escola);
+        console.log('  - monitorInfo?.destinoFinal?.escola:', monitorInfo?.destinoFinal?.escola);
+        console.log('  - escolaRecollida (DEBE SER DONDE RECOGE):', escolaRecollida);
+
         // Construir spaceName del intermediario
         let intermediarySpaceName = escolaRecollida.replace(/\s+/g, '');
         if (!intermediarySpaceName.startsWith('/')) {
@@ -475,7 +484,14 @@ i te'l portaràs a ${escolaReceptora} per a la teva activitat.
 
           const paquetsText = destinatariosOtros.map(dest => {
             const pedidoDest = pedidosOtros.find(p => p.nomCognoms === dest);
-            return `   • ${dest} (${pedidoDest?.escola || escolaReceptora}, ${formatDate(dataEntrega)})`;
+            // Para opciones de coincidencia, calcular la fecha del día que el intermediario entrega
+            const deliveryDate = monitorInfo?.destinoFinal?.dies?.[0]
+              ? getNextDateForWeekday(dataEntrega, monitorInfo.destinoFinal.dies[0])
+              : dataEntrega;
+            // Para opciones Fase 2: usar escola de coincidencia (destinoFinal.escola)
+            // Para opciones normales: usar escola del destinatario final
+            const escolaEntrega = monitorInfo?.destinoFinal?.escola || pedidoDest?.escola || escolaReceptora;
+            return `   • ${dest} (${escolaEntrega}, ${formatDate(deliveryDate)})`;
           }).join('\n');
 
           intermediaryMessage = `📦 RECOLLIDA DE MATERIALS - ${selectedMonitor}
@@ -500,7 +516,14 @@ ${paquetsText}
           // CASO 2: Solo intermediario (sin materiales propios)
           const paquetsText = destinatariosOtros.map(dest => {
             const pedidoDest = pedidosOtros.find(p => p.nomCognoms === dest);
-            return `   • ${dest} (${pedidoDest?.escola || escolaReceptora}, ${formatDate(dataEntrega)})`;
+            // Para opciones de coincidencia, calcular la fecha del día que el intermediario entrega
+            const deliveryDate = monitorInfo?.destinoFinal?.dies?.[0]
+              ? getNextDateForWeekday(dataEntrega, monitorInfo.destinoFinal.dies[0])
+              : dataEntrega;
+            // Para opciones Fase 2: usar escola de coincidencia (destinoFinal.escola)
+            // Para opciones normales: usar escola del destinatario final
+            const escolaEntrega = monitorInfo?.destinoFinal?.escola || pedidoDest?.escola || escolaReceptora;
+            return `   • ${dest} (${escolaEntrega}, ${formatDate(deliveryDate)})`;
           }).join('\n');
 
           intermediaryMessage = `🔔 NOVA ASSIGNACIÓ COM A INTERMEDIÀRIA - ${selectedMonitor}
@@ -545,6 +568,15 @@ ${paquetsText}
             `   ${idx + 1}. ${p.material} (${p.unitats || 1} unitats)`
           ).join('\n');
 
+          // Para opciones Fase 2: usar escola de coincidencia (destinoFinal.escola)
+          // Para opciones normales: usar escola del destinatario final
+          const escolaEntrega = monitorInfo?.destinoFinal?.escola || escolaReceptora;
+
+          // Calcular fecha de entrega del intermediario
+          const deliveryDate = monitorInfo?.destinoFinal?.dies?.[0]
+            ? getNextDateForWeekday(dataEntrega, monitorInfo.destinoFinal.dies[0])
+            : dataEntrega;
+
           const recipientMessage = `📦 MATERIAL PREPARAT PER A ${dest}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Destinatària: ${dest}
@@ -554,8 +586,8 @@ ${materialsText}
 
 🚚 LLIURAMENT:
 👤 Intermediària: ${selectedMonitor}
-🏫 Escola: ${escolaReceptora}
-📅 Data: ${formatDate(dataEntrega)}
+🏫 Escola: ${escolaEntrega}
+📅 Data: ${formatDate(deliveryDate)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
@@ -574,9 +606,35 @@ ${materialsText}
     }
   };
 
+  // Helper: Calculate next occurrence of a weekday from a base date
+  const getNextDateForWeekday = (baseDate: string, weekdayName: string): string => {
+    if (!baseDate || !weekdayName) return baseDate;
+
+    const weekdayMap: { [key: string]: number } = {
+      'dilluns': 1, 'dimarts': 2, 'dimecres': 3, 'dijous': 4,
+      'divendres': 5, 'dissabte': 6, 'diumenge': 0
+    };
+
+    const targetDay = weekdayMap[weekdayName.toLowerCase()];
+    if (targetDay === undefined) return baseDate;
+
+    const base = new Date(baseDate);
+    const currentDay = base.getDay();
+
+    // Calculate days to add (0 if same day, positive otherwise)
+    let daysToAdd = targetDay - currentDay;
+    if (daysToAdd < 0) daysToAdd += 7; // Next week if target day already passed
+    if (daysToAdd === 0) daysToAdd = 0; // Same day
+
+    const resultDate = new Date(base);
+    resultDate.setDate(base.getDate() + daysToAdd);
+
+    return resultDate.toISOString().split('T')[0];
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    
+
     // Si es una fecha ISO con Z (UTC), extraer solo la parte de fecha
     if (dateString.includes('T') && dateString.includes('Z')) {
       const dateOnly = dateString.split('T')[0]; // "2025-10-01"

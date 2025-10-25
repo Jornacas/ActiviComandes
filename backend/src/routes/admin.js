@@ -1204,7 +1204,7 @@ router.post('/delivery/options', async (req, res) => {
                         tipus: "Lliurament amb Coincidència", // Tipo especial
                         escola: pickupSchool.escola, // Donde entregamos (a intermediario)
                         escolaCoincidencia: destSchool.escola, // Donde coinciden
-                        escolaDestino: group.escoles[0], // Destino final (escuela del pedido)
+                        escolaDestino: destSchool.escola, // ✅ Donde el intermediario ENTREGA (Auro, NO TuroBlau)
                         escoles: group.escoles,
                         adreça: pickupSchool.adreça,
                         eficiencia: "Calculant...",
@@ -1214,8 +1214,10 @@ router.post('/delivery/options', async (req, res) => {
                         monitorsDisponibles: [{
                           nom: potentialIntermediary.nom,
                           dies: pickupSchool.dies,
-                          tipus: "intermediari-compartit",
+                          tipus: "intermediari",
+                          escola: pickupSchool.escola, // Escola donde recogemos
                           escolaOrigen: pickupSchool.escola,
+                          adreça: pickupSchool.adreça,
                           activitat: pickupSchool.activitat || 'N/A',
                           destinoFinal: {
                             escola: destSchool.escola,
@@ -1612,8 +1614,9 @@ router.post('/delivery/create', async (req, res) => {
     // Si hay intermediario, buscar su actividad en la hoja Dades
     let activitatIntermediariValue = null;
     if (modalitat === 'Intermediari' && monitorIntermediaria && escolaDestino) {
-      // La escolaDestino es donde ENTREGA el intermediario (escola destino final)
-      // Necesitamos buscar la actividad del intermediario en ESA escola
+      // La escolaDestino es donde ENTREGA el intermediario
+      // En casos normales: escola del destinatario final
+      // En casos de coincidencia (Fase 2): escola donde coinciden intermediario y destinatario
       activitatIntermediariValue = await getMonitorActivityInSchool(monitorIntermediaria, escolaDestino);
     }
 
