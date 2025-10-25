@@ -393,25 +393,61 @@ ${materialsText}
         // CASO 2: ENTREGA DIRECTA DESDE EIXOS
         // ══════════════════════════════════════════════
         for (const [dest, pedidos] of pedidosPorDestinatario) {
-          const materialsText = pedidos.map((p, idx) =>
-            `   ${idx + 1}. ${p.material} (${p.unitats || 1} unitats)`
-          ).join('\n');
+          // Agrupar pedidos por escuela
+          const pedidosPorEscola = new Map();
+          for (const pedido of pedidos) {
+            const escola = pedido.escola;
+            if (!pedidosPorEscola.has(escola)) {
+              pedidosPorEscola.set(escola, []);
+            }
+            pedidosPorEscola.get(escola).push(pedido);
+          }
+
+          // Construir el texto de materiales agrupado por escuela
+          let materialsText = '';
+          let counter = 1;
+
+          // Primero mostrar materiales para la escuela receptora (donde se entrega)
+          if (pedidosPorEscola.has(escolaReceptora)) {
+            materialsText += `🏫 Material per ${escolaReceptora}:\n`;
+            const pedidosEscolaReceptora = pedidosPorEscola.get(escolaReceptora);
+            pedidosEscolaReceptora.forEach((p) => {
+              materialsText += `   ${counter}. ${p.material} (${p.unitats || 1} unitats)\n`;
+              counter++;
+            });
+            materialsText += '\n';
+          }
+
+          // Luego mostrar materiales para otras escuelas (que debe llevar)
+          for (const [escola, pedidosEscola] of pedidosPorEscola) {
+            if (escola !== escolaReceptora) {
+              // Buscar la fecha de necesidad de estos pedidos
+              const dataNecessitat = pedidosEscola[0]?.dataNecessitat || '';
+              const dataFormatted = dataNecessitat ? ` (per portar el ${formatDate(dataNecessitat)})` : '';
+
+              materialsText += `🏫 Material per ${escola}${dataFormatted}:\n`;
+              pedidosEscola.forEach((p) => {
+                materialsText += `   ${counter}. ${p.material} (${p.unitats || 1} unitats)\n`;
+                counter++;
+              });
+              materialsText += '\n';
+            }
+          }
 
           const recipientMessage = `📦 MATERIAL PREPARAT PER A ${dest}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Destinatària: ${dest}
-🏫 Escola: ${escolaReceptora}
+🏫 Escola d'entrega: ${escolaReceptora}
 
 📦 MATERIALS:
 ${materialsText}
-
 📍 ENTREGA:
 🚚 Entrega directa per l'equip d'Eixos Creativa
 🏫 Escola: ${escolaReceptora}
 📅 Data prevista: ${formatDate(dataEntrega)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
 
-ℹ️ NOTA: L'equip d'Eixos Creativa portarà el material directament a la teva escola.
+ℹ️ NOTA: L'equip d'Eixos Creativa portarà tot el material directament a ${escolaReceptora}.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
           console.log('📤 Enviando notificación entrega directa Eixos:', spaceName);
