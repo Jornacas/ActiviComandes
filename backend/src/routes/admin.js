@@ -139,6 +139,7 @@ router.get('/orders', async (req, res) => {
         'Modalitat_Lliurament': 'modalitatEntrega', // Support both column names
         'Monitor_Intermediari': 'monitorIntermediari',
         'Escola_Destino_Intermediari': 'escolaDestinoIntermediari',
+        'Escola_Recollida_Intermediari': 'pickupSchool',
         'Activitat_Intermediari': 'activitatIntermediari',
         'Data_Entrega_Prevista': 'dataEntregaPrevista',
         'Data_Lliurament_Prevista': 'dataLliuramentPrevista',
@@ -333,6 +334,7 @@ router.post('/orders/update-status', async (req, res) => {
 
     const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
+    const pickupSchoolIndex = headers.findIndex(h => h === "Escola_Recollida_Intermediari");
     const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
     const notifIntermediariIndex = headers.findIndex(h => h === "Notificacion_Intermediari");
     const notifDestinatariIndex = headers.findIndex(h => h === "Notificacion_Destinatari");
@@ -383,6 +385,9 @@ router.post('/orders/update-status', async (req, res) => {
             }
             if (escolaDestinoIndex !== -1) {
               row[escolaDestinoIndex] = '';
+            }
+            if (pickupSchoolIndex !== -1) {
+              row[pickupSchoolIndex] = '';
             }
             if (dataLliuramentIndex !== -1) {
               row[dataLliuramentIndex] = '';
@@ -1544,7 +1549,7 @@ router.post('/delivery/create', async (req, res) => {
       });
     }
 
-    const { orderIds, modalitat, monitorIntermediaria, escolaDestino, dataEntrega } = deliveryData;
+    const { orderIds, modalitat, monitorIntermediaria, escolaDestino, escolaRecollida, dataEntrega } = deliveryData;
 
     if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
       return res.json({
@@ -1586,6 +1591,7 @@ router.post('/delivery/create', async (req, res) => {
 
     const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
+    const pickupSchoolIndex = headers.findIndex(h => h === "Escola_Recollida_Intermediari");
     const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
 
     // Buscar columna de Activitat_Intermediari (puede que no exista todavía)
@@ -1651,6 +1657,9 @@ router.post('/delivery/create', async (req, res) => {
           if (escolaDestinoIndex !== -1) {
             row[escolaDestinoIndex] = escolaDestino || '';
           }
+          if (pickupSchoolIndex !== -1) {
+            row[pickupSchoolIndex] = escolaRecollida || '';
+          }
           // Guardar actividad del intermediario si existe
           if (activitatIntermediariIndex !== -1 && activitatIntermediariValue) {
             row[activitatIntermediariIndex] = activitatIntermediariValue;
@@ -1662,6 +1671,9 @@ router.post('/delivery/create', async (req, res) => {
           }
           if (escolaDestinoIndex !== -1) {
             row[escolaDestinoIndex] = '';
+          }
+          if (pickupSchoolIndex !== -1) {
+            row[pickupSchoolIndex] = '';
           }
         }
 
@@ -1753,6 +1765,7 @@ router.post('/delivery/remove-intermediary', async (req, res) => {
 
     const monitorIntermediariIndex = headers.findIndex(h => h === "Monitor_Intermediari");
     const escolaDestinoIndex = headers.findIndex(h => h === "Escola_Destino_Intermediari");
+    const pickupSchoolIndex = headers.findIndex(h => h === "Escola_Recollida_Intermediari");
     const dataLliuramentIndex = headers.findIndex(h => h === "Data_Lliurament_Prevista");
     const notifIntermediariIndex = headers.findIndex(h => h === "Notificacion_Intermediari");
     const notifDestinatariIndex = headers.findIndex(h => h === "Notificacion_Destinatari");
@@ -1801,6 +1814,9 @@ router.post('/delivery/remove-intermediary', async (req, res) => {
         }
         if (escolaDestinoIndex !== -1) {
           row[escolaDestinoIndex] = '';
+        }
+        if (pickupSchoolIndex !== -1) {
+          row[pickupSchoolIndex] = '';
         }
 
         // Limpiar fecha de lliurament

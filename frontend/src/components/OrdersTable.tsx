@@ -293,7 +293,7 @@ ${materialsText}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📥 RECOLLIDA:
-🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
+🏫 Escola: ${order.pickupSchool || 'N/A'}
 📅 Data: ${formatDate(order.dataLliuramentPrevista)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
 
@@ -340,7 +340,7 @@ i te'l portaràs a ${order.escola || 'N/A'} per a la teva activitat.
 👤 El teu rol: Intermediària i Destinatària
 
 📥 RECOLLIDA:
-🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
+🏫 Escola: ${order.pickupSchool || 'N/A'}
 📅 Data: ${formatDate(order.dataLliuramentPrevista)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
 
@@ -380,7 +380,7 @@ ${paquetsText}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📥 RECOLLIDA:
-🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
+🏫 Escola: ${order.pickupSchool || 'N/A'}
 📅 Data: ${formatDate(order.dataLliuramentPrevista)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
 
@@ -430,11 +430,16 @@ ${paquetsText}
 📦 MATERIALS:
 ${materialsText}
 
-🚚 LLIURAMENT:
+📥 RECOLLIDA:
 👤 Intermediària: ${order.monitorIntermediari || 'N/A'}
-🏫 Escola: ${order.escolaDestinoIntermediari || order.escola || 'N/A'}
+🏫 Escola: ${order.escolaDestinoIntermediari || 'N/A'}
 📅 Data: ${formatDate(deliveryDate)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+📤 DESTÍ FINAL:
+🏫 Escola: ${order.escola || 'N/A'}
+📅 Data: ${formatDate(order.dataNecessitat)}
+🎯 Per a la teva activitat a aquesta escola
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     }
 
@@ -2671,10 +2676,18 @@ ${materialsText}
                           }
                           return null;
                         })()}
+                        {selectedOrderForDrawer.pickupSchool && (
+                          <ListItem>
+                            <ListItemText
+                              primary="Escola Recollida"
+                              secondary={selectedOrderForDrawer.pickupSchool}
+                            />
+                          </ListItem>
+                        )}
                         {selectedOrderForDrawer.escolaDestinoIntermediari && (
                           <ListItem>
                             <ListItemText
-                              primary="Escola Destí"
+                              primary="Escola Entrega"
                               secondary={selectedOrderForDrawer.escolaDestinoIntermediari}
                             />
                           </ListItem>

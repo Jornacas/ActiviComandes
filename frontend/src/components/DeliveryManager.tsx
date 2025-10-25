@@ -576,6 +576,9 @@ ${paquetsText}
             ? getNextDateForWeekday(dataEntrega, monitorInfo.destinoFinal.dies[0])
             : dataEntrega;
 
+          // Fecha del destino final (actividad del destinatario)
+          const finalDestinationDate = pedidos[0]?.dataNecessitat || dataEntrega;
+
           const recipientMessage = `📦 MATERIAL PREPARAT PER A ${dest}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Destinatària: ${dest}
@@ -583,11 +586,16 @@ ${paquetsText}
 📦 MATERIALS:
 ${materialsText}
 
-🚚 LLIURAMENT:
+📥 RECOLLIDA:
 👤 Intermediària: ${selectedMonitor}
 🏫 Escola: ${escolaEntrega}
 📅 Data: ${formatDate(deliveryDate)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
+
+📤 DESTÍ FINAL:
+🏫 Escola: ${escolaReceptora}
+📅 Data: ${formatDate(finalDestinationDate)}
+🎯 Per a la teva activitat a aquesta escola
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
           console.log('📤 Enviando notificación a destinatario:', dest);

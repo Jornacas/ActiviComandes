@@ -32,6 +32,7 @@ export interface Order {
   modalitatEntrega?: string;
   monitorIntermediari?: string;
   escolaDestinoIntermediari?: string;
+  pickupSchool?: string;
   dataEntregaPrevista?: string;
   dataLliuramentPrevista?: string;
   distanciaAcademia?: string;
