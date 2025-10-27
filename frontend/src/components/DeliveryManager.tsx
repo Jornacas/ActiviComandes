@@ -411,7 +411,7 @@ ${materialsText}
           if (pedidosPorEscola.has(escolaReceptora)) {
             materialsText += `🏫 Material per ${escolaReceptora}:\n`;
             const pedidosEscolaReceptora = pedidosPorEscola.get(escolaReceptora);
-            pedidosEscolaReceptora.forEach((p) => {
+            pedidosEscolaReceptora.forEach((p: any) => {
               materialsText += `   ${counter}. ${p.material} (${p.unitats || 1} unitats)\n`;
               counter++;
             });
@@ -419,6 +419,7 @@ ${materialsText}
           }
 
           // Luego mostrar materiales para otras escuelas (que debe llevar)
+          const otrasEscuelas: Array<{ escola: string; dataNecessitat: string }> = [];
           for (const [escola, pedidosEscola] of pedidosPorEscola) {
             if (escola !== escolaReceptora) {
               // Buscar la fecha de necesidad de estos pedidos
@@ -426,12 +427,35 @@ ${materialsText}
               const dataFormatted = dataNecessitat ? ` (per portar el ${formatDate(dataNecessitat)})` : '';
 
               materialsText += `🏫 Material per ${escola}${dataFormatted}:\n`;
-              pedidosEscola.forEach((p) => {
+              pedidosEscola.forEach((p: any) => {
                 materialsText += `   ${counter}. ${p.material} (${p.unitats || 1} unitats)\n`;
                 counter++;
               });
               materialsText += '\n';
+
+              // Guardar info de otras escuelas para la nota
+              otrasEscuelas.push({
+                escola: escola,
+                dataNecessitat: dataNecessitat
+              });
             }
+          }
+
+          // Construir nota dinámica según si hay múltiples escuelas
+          let nota = '';
+          if (otrasEscuelas.length === 0) {
+            // Solo una escuela: nota simple
+            nota = `ℹ️ NOTA: L'equip d'Eixos Creativa portarà tot el material directament a ${escolaReceptora}.`;
+          } else {
+            // Múltiples escuelas: nota con trazabilidad completa
+            nota = `ℹ️ NOTA: Recolliràs tot el material a ${escolaReceptora} el ${formatDate(dataEntrega)}.`;
+            otrasEscuelas.forEach(({ escola, dataNecessitat }) => {
+              if (dataNecessitat) {
+                nota += `\nRecorda portar el material de ${escola} el ${formatDate(dataNecessitat)}.`;
+              } else {
+                nota += `\nRecorda portar el material de ${escola}.`;
+              }
+            });
           }
 
           const recipientMessage = `📦 MATERIAL PREPARAT PER A ${dest}
@@ -447,7 +471,7 @@ ${materialsText}
 📅 Data prevista: ${formatDate(dataEntrega)}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
 
-ℹ️ NOTA: L'equip d'Eixos Creativa portarà tot el material directament a ${escolaReceptora}.
+${nota}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
           console.log('📤 Enviando notificación entrega directa Eixos:', spaceName);

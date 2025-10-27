@@ -247,8 +247,10 @@ export default function OrdersTable() {
       o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
     ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
 
-    // Verificar si es entrega directa (sin intermediario)
-    const isDirectDelivery = !order.monitorIntermediari || order.monitorIntermediari.trim() === '';
+    // Verificar si es entrega directa (sin intermediario o marcado como DIRECTA)
+    const isDirectDelivery = !order.monitorIntermediari ||
+                             order.monitorIntermediari.trim() === '' ||
+                             order.monitorIntermediari.toUpperCase() === 'DIRECTA';
 
     // CASO: ENTREGA DIRECTA
     if (isDirectDelivery && type === 'destinatario') {
@@ -1212,8 +1214,10 @@ ${materialsText}
           const order = params.row;
           const estado = order.estat;
 
-          // Si no tiene intermediario asignado, no mostrar nada
-          if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
+          // Si no tiene intermediario asignado O es entrega directa, no mostrar nada
+          if (!order.monitorIntermediari ||
+              order.monitorIntermediari.trim() === '' ||
+              order.monitorIntermediari.toUpperCase() === 'DIRECTA') {
             return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
           }
 
@@ -1353,13 +1357,17 @@ ${materialsText}
           const order = params.row;
           const estado = order.estat;
 
-          // Si no tiene intermediario asignado, no mostrar nada
+          // Determinar si es entrega directa
+          const isDirectDelivery = order.monitorIntermediari &&
+                                   order.monitorIntermediari.toUpperCase() === 'DIRECTA';
+
+          // Si no tiene intermediario Y no es entrega directa, no mostrar nada
           if (!order.monitorIntermediari || order.monitorIntermediari.trim() === '') {
             return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
           }
 
-          // Si el intermediario ES el destinatario, no mostrar botón (ya recibe notificación combinada)
-          if (order.nomCognoms === order.monitorIntermediari) {
+          // Si el intermediario ES el destinatario (y NO es entrega directa), no mostrar botón (ya recibe notificación combinada)
+          if (!isDirectDelivery && order.nomCognoms === order.monitorIntermediari) {
             return <span style={{ color: '#999', fontSize: '0.8rem' }}>--</span>;
           }
 
