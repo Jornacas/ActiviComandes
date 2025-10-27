@@ -254,25 +254,65 @@ export default function OrdersTable() {
 
     // CASO: ENTREGA DIRECTA
     if (isDirectDelivery && type === 'destinatario') {
-      let materialsText = orderMaterials.map((item, index) =>
-        `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
-      ).join('\n');
+      // Agrupar materiales por escuela de destino
+      const materialsBySchool: { [key: string]: any[] } = {};
+      orderMaterials.forEach(item => {
+        const school = item.escola || 'N/A';
+        if (!materialsBySchool[school]) {
+          materialsBySchool[school] = [];
+        }
+        materialsBySchool[school].push(item);
+      });
 
-      return `📦 MATERIAL PREPARAT PER A ${order.nomCognoms || 'N/A'}
+      // Ordenar escuelas por fecha de necesidad (más cercana primero)
+      const sortedSchools = Object.entries(materialsBySchool).sort((a, b) => {
+        const dateA = new Date(a[1][0].dataNecessitat).getTime();
+        const dateB = new Date(b[1][0].dataNecessitat).getTime();
+        return dateA - dateB;
+      });
+
+      // La escuela de recogida es la primera por fecha (si no está especificada)
+      const pickupSchool = orderMaterials[0]?.escolaRecollida || orderMaterials[0]?.pickupSchool || sortedSchools[0][0];
+      const pickupDate = formatDate(order.dataLliuramentPrevista);
+
+      // Generar texto de materiales agrupados por escuela (ordenados por fecha)
+      let schoolsText = sortedSchools.map(([school, materials]) => {
+        const deliveryDate = formatDate(materials[0].dataNecessitat);
+        const materialsText = materials.map((item, index) =>
+          `      ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+        ).join('\n');
+
+        return `🏫 Per a ${school} (${deliveryDate}):\n${materialsText}`;
+      }).join('\n\n');
+
+      // Generar nota dinámica: solo mencionar escuelas DESPUÉS de la primera
+      const otherSchools = sortedSchools.slice(1); // Todas excepto la primera
+      let noteText;
+      if (otherSchools.length === 0) {
+        // Solo una escuela (la de recogida)
+        noteText = '';
+      } else if (otherSchools.length === 1) {
+        // Una escuela adicional
+        const [school, materials] = otherSchools[0];
+        const date = formatDate(materials[0].dataNecessitat);
+        noteText = `\nℹ️ NOTA: Recorda portar el material a ${school} el dia ${date}.`;
+      } else {
+        // Múltiples escuelas adicionales
+        noteText = '\nℹ️ NOTA: Recorda distribuir el material a les diferents escoles segons les dates indicades.';
+      }
+
+      return `📦 RECOLLIDA DE MATERIAL - ${order.nomCognoms || 'N/A'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 Destinatària: ${order.nomCognoms || 'N/A'}
-🏫 Escola: ${order.escola || 'N/A'}
 
-📦 MATERIALS:
-${materialsText}
-
-📍 LLIURAMENT:
-🚚 Entrega directa des d'Eixos Creativa
-🏫 Escola: ${order.escola || 'N/A'}
-📅 Data: ${formatDate(order.dataNecessitat)}
+📥 RECOLLIDA:
+🏫 Escola: ${pickupSchool}
+📅 Data: ${pickupDate}
 📍 Ubicació: Consergeria, AFA o Caixa de Material
 
-ℹ️ NOTA: El material t'arribarà directament a la teva escola.
+📦 MATERIAL A REPARTIR:
+
+${schoolsText}${noteText}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     }
 
@@ -2750,22 +2790,23 @@ ${materialsText}
             {/* Actions Footer */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
               <Stack spacing={2}>
-                {/* Notificaciones - Solo si hay intermediario y notificaciones están activadas */}
-                {notificationsEnabled && selectedOrderForDrawer.monitorIntermediari && selectedOrderForDrawer.monitorIntermediari.trim() !== '' && (
+                {/* Notificaciones - Mostrar siempre si están habilitadas */}
+                {notificationsEnabled && (
                   <>
                     <Typography variant="overline" fontWeight="bold" color="text.secondary">
                       📧 Notificacions
                     </Typography>
 
-                    {/* Notificación Intermediario */}
-                    <Box>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography variant="body2" sx={{ flex: 1 }}>
-                          Intermediari:
-                        </Typography>
-                        {loadingNotificationStatuses ? (
-                          <CircularProgress size={20} />
-                        ) : (() => {
+                    {/* Notificación Intermediario - Solo si NO es entrega DIRECTA */}
+                    {selectedOrderForDrawer.modalitatEntrega !== 'DIRECTA' && selectedOrderForDrawer.monitorIntermediari && selectedOrderForDrawer.monitorIntermediari.trim() !== '' && (
+                      <Box>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography variant="body2" sx={{ flex: 1 }}>
+                            Intermediari:
+                          </Typography>
+                          {loadingNotificationStatuses ? (
+                            <CircularProgress size={20} />
+                          ) : (() => {
                           // Calcular si es el primero del grupo (misma lógica que en las columnas)
                           let groupMaterials = [];
                           let isFirstInGroup = true;
@@ -2799,13 +2840,14 @@ ${materialsText}
                               </Button>
                             );
                           }
-                        })()}
-                      </Stack>
-                    </Box>
+                          })()}
+                        </Stack>
+                      </Box>
+                    )}
 
                     {/* Notificación Destinatario */}
-                    {/* Solo mostrar si intermediario ≠ destinatario */}
-                    {selectedOrderForDrawer.nomCognoms !== selectedOrderForDrawer.monitorIntermediari && (
+                    {/* Mostrar siempre si es DIRECTA O si intermediario ≠ destinatario */}
+                    {(selectedOrderForDrawer.modalitatEntrega === 'DIRECTA' || selectedOrderForDrawer.nomCognoms !== selectedOrderForDrawer.monitorIntermediari) && (
                       <Box>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <Typography variant="body2" sx={{ flex: 1 }}>
