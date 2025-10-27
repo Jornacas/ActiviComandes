@@ -983,7 +983,7 @@ ${materialsText}
         const notifIntermediari = order.notificacionIntermediari;
         const notifDestinatari = order.notificacionDestinatari;
         const modalitat = order.modalitatEntrega;
-        const isDirecta = modalitat === 'Directa';
+        const isDirecta = modalitat === 'DIRECTA';
 
         // DEBUG: Log notification values for orders with Assignat/Lliurat status
         if ((normalized === 'Assignat' || normalized === 'Lliurat') && (notifIntermediari || notifDestinatari)) {
@@ -1148,15 +1148,35 @@ ${materialsText}
       width: 120,
       flex: 0.8,
       renderCell: (params) => {
+        const order = params.row;
         const escola = params.value as string;
+
+        // Si es entrega DIRECTA, mostrar escuelas de los materiales
+        if (order.modalitatEntrega === 'DIRECTA') {
+          const materials = order.materials || [];
+          const schools = [...new Set(materials.map((m: any) => m.escola).filter(Boolean))];
+          if (schools.length > 0) {
+            return (
+              <span style={{
+                color: '#2e7d32',
+                fontSize: '0.85rem',
+                fontWeight: '500'
+              }}>
+                {schools.join(', ')}
+              </span>
+            );
+          }
+        }
+
+        // Para entregas con intermediario
         if (!escola || escola.trim() === '') {
           return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>--</span>;
         }
         return (
-          <span style={{ 
-            color: '#1976d2', 
-            fontSize: '0.85rem', 
-            fontWeight: '500' 
+          <span style={{
+            color: '#1976d2',
+            fontSize: '0.85rem',
+            fontWeight: '500'
           }}>
             {escola}
           </span>
@@ -2740,6 +2760,65 @@ ${materialsText}
                             />
                           </ListItem>
                         )}
+                        {/* Para entregas DIRECTA, mostrar escola de recollida y escuelas de destino */}
+                        {selectedOrderForDrawer.modalitatEntrega === 'DIRECTA' && (() => {
+                          // Obtener todos los materiales del mismo lliurament
+                          const orderMaterials = orders.filter(o =>
+                            o.idLliurament && o.idLliurament === selectedOrderForDrawer.idLliurament
+                          );
+
+                          // Agrupar y ordenar por fecha
+                          const materialsBySchool: { [key: string]: any[] } = {};
+                          orderMaterials.forEach(item => {
+                            const school = item.escola || 'N/A';
+                            if (!materialsBySchool[school]) {
+                              materialsBySchool[school] = [];
+                            }
+                            materialsBySchool[school].push(item);
+                          });
+
+                          const sortedSchools = Object.entries(materialsBySchool).sort((a, b) => {
+                            const dateA = new Date(a[1][0].dataNecessitat).getTime();
+                            const dateB = new Date(b[1][0].dataNecessitat).getTime();
+                            return dateA - dateB;
+                          });
+
+                          const pickupSchool = sortedSchools[0]?.[0];
+                          const allSchools = sortedSchools.map(([school]) => school);
+
+                          return (
+                            <>
+                              {pickupSchool && (
+                                <ListItem>
+                                  <ListItemText
+                                    primary="Escola Recollida"
+                                    secondary={pickupSchool}
+                                    secondaryTypographyProps={{
+                                      style: {
+                                        color: '#1976d2',
+                                        fontWeight: '500'
+                                      }
+                                    }}
+                                  />
+                                </ListItem>
+                              )}
+                              {allSchools.length > 0 && (
+                                <ListItem>
+                                  <ListItemText
+                                    primary={allSchools.length === 1 ? "Escola Destí" : "Escoles Destí"}
+                                    secondary={allSchools.join(', ')}
+                                    secondaryTypographyProps={{
+                                      style: {
+                                        color: '#2e7d32',
+                                        fontWeight: '500'
+                                      }
+                                    }}
+                                  />
+                                </ListItem>
+                              )}
+                            </>
+                          );
+                        })()}
                         {selectedOrderForDrawer.dataLliuramentPrevista && (
                           <ListItem>
                             <ListItemText
