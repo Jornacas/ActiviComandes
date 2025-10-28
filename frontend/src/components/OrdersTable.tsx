@@ -1241,6 +1241,74 @@ ${materialsText}
       },
     },
     {
+      field: 'escolaRecollida',
+      headerName: 'Escola Recollida',
+      width: 120,
+      valueGetter: (params) => {
+        const order = params.row;
+        if (order.modalitatEntrega === 'DIRECTA') {
+          // Obtener todos los materiales del mismo lliurament
+          const orderMaterials = orders.filter(o =>
+            o.idLliurament && o.idLliurament === order.idLliurament
+          );
+
+          // Agrupar y ordenar por fecha
+          const materialsBySchool: { [key: string]: any[] } = {};
+          orderMaterials.forEach(item => {
+            const school = item.escola || 'N/A';
+            if (!materialsBySchool[school]) {
+              materialsBySchool[school] = [];
+            }
+            materialsBySchool[school].push(item);
+          });
+
+          const sortedSchools = Object.entries(materialsBySchool).sort((a, b) => {
+            const dateA = new Date(a[1][0].dataNecessitat).getTime();
+            const dateB = new Date(b[1][0].dataNecessitat).getTime();
+            return dateA - dateB;
+          });
+
+          return sortedSchools[0]?.[0] || '';
+        }
+        // Para entregas con intermediario, la escuela de recogida es la escolaDestinoIntermediari
+        return order.escolaDestinoIntermediari || '';
+      },
+    },
+    {
+      field: 'escolesDestiFinal',
+      headerName: 'Escoles Destí',
+      width: 150,
+      valueGetter: (params) => {
+        const order = params.row;
+        if (order.modalitatEntrega === 'DIRECTA') {
+          // Obtener todos los materiales del mismo lliurament
+          const orderMaterials = orders.filter(o =>
+            o.idLliurament && o.idLliurament === order.idLliurament
+          );
+
+          // Agrupar y ordenar por fecha
+          const materialsBySchool: { [key: string]: any[] } = {};
+          orderMaterials.forEach(item => {
+            const school = item.escola || 'N/A';
+            if (!materialsBySchool[school]) {
+              materialsBySchool[school] = [];
+            }
+            materialsBySchool[school].push(item);
+          });
+
+          const sortedSchools = Object.entries(materialsBySchool).sort((a, b) => {
+            const dateA = new Date(a[1][0].dataNecessitat).getTime();
+            const dateB = new Date(b[1][0].dataNecessitat).getTime();
+            return dateA - dateB;
+          });
+
+          return sortedSchools.map(([school]) => school).join(', ');
+        }
+        // Para entregas con intermediario, el destí final es la escola del destinatario
+        return order.escola || '';
+      },
+    },
+    {
       field: 'distanciaAcademia',
       headerName: 'Distància',
       width: 100,
@@ -2313,6 +2381,8 @@ ${materialsText}
             modalitatEntrega: false,
             responsablePreparacio: true, // ✅ Visible per edició inline
             escolaDestinoIntermediari: false,
+            escolaRecollida: false, // ✅ Oculta però apareix en CSV/impressió
+            escolesDestiFinal: false, // ✅ Oculta però apareix en CSV/impressió
             notesEntrega: false,
             notifIntermediario: false,
             notifDestinatario: false,
@@ -2323,6 +2393,12 @@ ${materialsText}
           slotProps={{
             toolbar: {
               showQuickFilter: true,
+              csvOptions: {
+                allColumns: true, // Incluir todas las columnas incluso las ocultas
+              },
+              printOptions: {
+                allColumns: true, // Incluir todas las columnas incluso las ocultas
+              },
             },
           }}
           autoHeight={false}
