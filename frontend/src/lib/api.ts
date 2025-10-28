@@ -32,12 +32,15 @@ export interface Order {
   modalitatEntrega?: string;
   monitorIntermediari?: string;
   escolaDestinoIntermediari?: string;
+  escolaRecollida?: string;
   diaEntregaIntermediari?: string;
+  activitatIntermediari?: string;
   pickupSchool?: string;
   dataEntregaPrevista?: string;
   dataLliuramentPrevista?: string;
   distanciaAcademia?: string;
   notesEntrega?: string;
+  materials?: any[];
   // Notification status fields
   notificacionIntermediari?: string;
   notificacionDestinatari?: string;
