@@ -1303,11 +1303,15 @@ router.post('/delivery/options', async (req, res) => {
       }
     });
 
-    const addresses = Array.from(addressesMap.keys());
-    console.log('🗺️ Calculating distances for addresses:', addresses);
+    // Crear array de objetos {escola, adreça} para el cálculo de distancias
+    const schoolAddresses = Array.from(addressesMap.entries()).map(([adreça, escola]) => ({
+      escola,
+      adreça
+    }));
+    console.log('🗺️ Calculating distances for schools:', schoolAddresses.map(s => s.escola));
 
     // Calcular distancias usando Google Maps API
-    const distanceResults = await maps.calculateDistances(addresses);
+    const distanceResults = await maps.calculateDistances(schoolAddresses);
 
     if (distanceResults.success) {
       // 🆕 FASE 1: Aplicar distancias y calcular prioridad mejorada

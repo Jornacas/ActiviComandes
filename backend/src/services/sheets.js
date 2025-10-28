@@ -271,6 +271,81 @@ async function batchGet(ranges) {
   }
 }
 
+/**
+ * Obtener todas las distancias guardadas en caché (hoja "Distancies")
+ * @returns {Promise<Array<{escola: string, adreça: string, distanciaMetres: number, duracioMinuts: number, dataActualitzacio: string}>>}
+ */
+async function getDistanciesCached() {
+  try {
+    console.log('[SHEETS] Obtenint distàncies en caché de la hoja "Distancies"...');
+
+    const data = await getSheetData('Distancies');
+
+    if (!data || !data.values || data.values.length <= 1) {
+      console.log('[SHEETS] No hi ha distàncies guardades encara');
+      return [];
+    }
+
+    // Convertir filas a objetos (saltar header)
+    const headers = data.values[0];
+    const rows = data.values.slice(1);
+
+    const distancies = rows.map(row => ({
+      escola: row[0] || '',
+      adreça: row[1] || '',
+      distanciaMetres: parseInt(row[2]) || 0,
+      duracioMinuts: parseFloat(row[3]) || 0,
+      dataActualitzacio: row[4] || ''
+    }));
+
+    console.log(`[SHEETS] ✓ ${distancies.length} distàncies trobades en caché`);
+    return distancies;
+  } catch (error) {
+    console.error('[SHEETS] Error obtenint distàncies:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Guardar o actualizar distancia en la hoja "Distancies"
+ * @param {string} escola - Nombre de la escuela
+ * @param {string} adreça - Dirección completa
+ * @param {number} distanciaMetres - Distancia en metros
+ * @param {number} duracioMinuts - Duración en minutos
+ * @returns {Promise<{success: boolean, message?: string}>}
+ */
+async function saveDistancia(escola, adreça, distanciaMetres, duracioMinuts) {
+  try {
+    console.log(`[SHEETS] Guardant distància per ${escola}...`);
+
+    const sheets = await getSheetsClient();
+    const dataActualitzacio = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // Verificar si la dirección ya existe (la dirección es única)
+    const distanciesExistents = await getDistanciesCached();
+    const index = distanciesExistents.findIndex(d => d.adreça === adreça);
+
+    if (index >= 0) {
+      // Actualizar fila existente (index + 2 porque header está en fila 1, y arrays empiezan en 0)
+      const rowNumber = index + 2;
+      await updateRange(
+        `Distancies!A${rowNumber}:E${rowNumber}`,
+        [[escola, adreça, distanciaMetres, duracioMinuts, dataActualitzacio]]
+      );
+      console.log(`[SHEETS] ✓ Distància actualitzada per ${escola} (fila ${rowNumber})`);
+    } else {
+      // Añadir nueva fila
+      await appendRow('Distancies', [escola, adreça, distanciaMetres, duracioMinuts, dataActualitzacio]);
+      console.log(`[SHEETS] ✓ Nova distància guardada per ${escola}`);
+    }
+
+    return { success: true, message: 'Distància guardada correctament' };
+  } catch (error) {
+    console.error('[SHEETS] Error guardant distància:', error.message);
+    return { success: false, message: error.message };
+  }
+}
+
 module.exports = {
   auth,
   getSheetsClient,
@@ -279,5 +354,7 @@ module.exports = {
   appendRow,
   updateRange,
   deleteRows,
-  batchGet
+  batchGet,
+  getDistanciesCached,
+  saveDistancia
 };
