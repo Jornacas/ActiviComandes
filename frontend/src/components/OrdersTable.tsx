@@ -993,6 +993,7 @@ ${materialsText}
         const normalized = formatSentenceCase(params.value as string);
         const order = params.row;
         const hasNotes = order.notesInternes && order.notesInternes.trim() !== '';
+        const hasComments = order.comentarisGenerals && order.comentarisGenerals.trim() !== '';
         const isEnProces = normalized === 'En proces';
         const isAssignatOrLliurat = normalized === 'Assignat' || normalized === 'Lliurat';
 
@@ -1070,9 +1071,28 @@ ${materialsText}
               clickable={!!(isEnProces && hasNotes)}
             />
             {isEnProces && hasNotes && (
-              <Tooltip title="Veure notes" placement="top">
+              <Tooltip title="Veure notes internes" placement="top">
                 <span style={{ fontSize: '1rem', cursor: 'pointer' }} onClick={() => handleOpenNotesFromChip(order)}>
                   📝
+                </span>
+              </Tooltip>
+            )}
+            {hasComments && (
+              <Tooltip
+                title={
+                  <Box sx={{ maxWidth: 300 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+                      💬 Comentaris:
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
+                      {order.comentarisGenerals}
+                    </Typography>
+                  </Box>
+                }
+                placement="top"
+              >
+                <span style={{ fontSize: '1rem', cursor: 'help' }}>
+                  💬
                 </span>
               </Tooltip>
             )}
