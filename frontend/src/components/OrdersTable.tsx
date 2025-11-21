@@ -115,6 +115,16 @@ export default function OrdersTable() {
     return false;
   });
 
+  // Estado global del responsable de preparació
+  const [globalResponsable, setGlobalResponsable] = useState(() => {
+    // Cargar último responsable usado desde localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lastResponsablePreparacio');
+      return saved || '';
+    }
+    return '';
+  });
+
   // Estados para el modal de notificaciones
   const [notificationModalOpen, setNotificationModalOpen] = useState(false);
   const [selectedOrderForNotification, setSelectedOrderForNotification] = useState<any>(null);
@@ -155,6 +165,13 @@ export default function OrdersTable() {
       localStorage.setItem('notificationsEnabled', notificationsEnabled.toString());
     }
   }, [notificationsEnabled]);
+
+  // Guardar el responsable global en localStorage cuando cambie
+  useEffect(() => {
+    if (typeof window !== 'undefined' && globalResponsable.trim()) {
+      localStorage.setItem('lastResponsablePreparacio', globalResponsable);
+    }
+  }, [globalResponsable]);
 
   // Helper: Calculate next occurrence of a weekday from a base date
   const getNextDateForWeekday = (baseDate: string, weekdayName: string): string => {
@@ -1960,16 +1977,46 @@ ${materialsText}
   const updateStatus = async () => {
     if (!newStatus || selectedRows.length === 0) return;
 
-    // Validar que tengan responsable SOLO si se cambia a "En proces" o "Preparat"
+    // Validar responsable SOLO si se cambia a "En proces" o "Preparat"
     if (newStatus === 'En proces' || newStatus === 'Preparat') {
+      // Validar que haya un responsable global definido
+      if (!globalResponsable || globalResponsable.trim() === '') {
+        setError(`⚠️ Cal introduir el nom del responsable de preparació abans de canviar l'estat a "${newStatus}".`);
+        return;
+      }
+
+      // Aplicar el responsable global a todas las filas seleccionadas que no tengan responsable
       const selectedOrders = selectedRows.map(rowId => orders.find(o => o.id === rowId)).filter(Boolean);
-      const ordersWithoutResponsible = selectedOrders.filter(order =>
+      const ordersNeedingResponsible = selectedOrders.filter(order =>
         !order?.responsablePreparacio || order.responsablePreparacio.trim() === ''
       );
 
-      if (ordersWithoutResponsible.length > 0) {
-        setError(`⚠️ Cal assignar un responsable de preparació abans de canviar l'estat a "${newStatus}". Hi ha ${ordersWithoutResponsible.length} comanda${ordersWithoutResponsible.length > 1 ? 'es' : ''} sense responsable assignat.`);
-        return;
+      // Actualizar responsable en todas las órdenes que lo necesiten
+      if (ordersNeedingResponsible.length > 0) {
+        try {
+          for (const order of ordersNeedingResponsible) {
+            if (order?.idItem) {
+              await apiClient.updateOrderFields(order.idItem, {
+                responsable_preparacio: globalResponsable
+              });
+            }
+          }
+
+          // Actualizar el estado local
+          setOrders(prevOrders =>
+            prevOrders.map(o =>
+              ordersNeedingResponsible.some(needOrder => needOrder?.id === o.id)
+                ? { ...o, responsablePreparacio: globalResponsable }
+                : o
+            )
+          );
+
+          console.log(`✓ Responsable "${globalResponsable}" aplicat a ${ordersNeedingResponsible.length} comandes`);
+        } catch (error) {
+          console.error('Error aplicant responsable:', error);
+          setError('Error assignant el responsable de preparació');
+          return;
+        }
       }
     }
 
@@ -2281,7 +2328,20 @@ ${materialsText}
       {/* Toolbar de Acciones */}
       {selectedRows.length > 0 && (
         <Card sx={{ mb: 3 }}>
-          <Stack direction="row" spacing={2} sx={{ p: 2 }}>
+          <Stack direction="row" spacing={2} sx={{ p: 2, alignItems: 'center' }}>
+            <TextField
+              size="small"
+              label="Responsable Preparació"
+              value={globalResponsable}
+              onChange={(e) => setGlobalResponsable(e.target.value)}
+              placeholder="Nom del responsable"
+              sx={{ minWidth: 200 }}
+              InputProps={{
+                startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />
+              }}
+              helperText={globalResponsable ? "S'aplicarà a totes les files" : "Obligatori per 'En procés' i 'Preparat'"}
+            />
+
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel>Nou Estat</InputLabel>
               <Select
