@@ -2113,13 +2113,33 @@ ${materialsText}
 
     setDeleting(true);
     try {
-      // Get UUIDs of selected orders
-      const selectedUuids = selectedRows.map(rowId => {
-        const order = orders.find(o => o.id === rowId);
-        return order?.idPedido || order?.idItem || order?.uuid || '';
-      }).filter(uuid => uuid);
+      // DEBUG: Log selected rows and orders structure
+      console.log('🔍 DEBUG deleteSelectedOrders:');
+      console.log('  - selectedRows:', selectedRows);
+      console.log('  - selectedRows types:', selectedRows.map(r => typeof r));
+      console.log('  - First order sample:', orders[0]);
+      console.log('  - All order IDs:', orders.slice(0, 5).map(o => ({ id: o.id, idItem: o.idItem, idPedido: o.idPedido })));
 
+      // Get UUIDs of selected orders - use String() to ensure type consistency
+      const selectedUuids = selectedRows.map(rowId => {
+        const order = orders.find(o => String(o.id) === String(rowId));
+        console.log(`  - Looking for rowId "${rowId}" (type: ${typeof rowId}), found:`, order ? { id: order.id, idItem: order.idItem, idPedido: order.idPedido } : 'NOT FOUND');
+        // Use idItem first (most reliable), then idPedido, then the id field itself
+        return order?.idItem || order?.idPedido || order?.id || '';
+      }).filter(uuid => uuid && !uuid.startsWith('row-'));
+
+      console.log('  - Final selectedUuids:', selectedUuids);
+
+      // Validate that we have valid UUIDs to delete
+      if (selectedUuids.length === 0) {
+        setError('No s\'han pogut obtenir els identificadors de les sol·licituds seleccionades. Si us plau, recarrega la pàgina i torna-ho a intentar.');
+        setDeleting(false);
+        return;
+      }
+
+      console.log('🗑️ Deleting orders with UUIDs:', selectedUuids);
       const response = await apiClient.deleteOrders(selectedUuids);
+      console.log('🗑️ Delete response:', response);
       if (response.success) {
         // Use fast reload for better performance after deletion
         try {

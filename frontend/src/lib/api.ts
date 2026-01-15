@@ -112,6 +112,12 @@ class ApiClient {
     }
 
     try {
+      // DEBUG: Log request details
+      console.log(`🌐 API Request [${method}] ${action}:`, {
+        url: url.toString(),
+        body: config.body ? JSON.parse(config.body) : null
+      });
+
       const response = await fetch(url.toString(), config);
 
       if (!response.ok) {
@@ -119,6 +125,7 @@ class ApiClient {
       }
 
       const result = await response.json();
+      console.log(`🌐 API Response [${action}]:`, result);
       return result;
     } catch (error) {
       console.error('API request failed:', error);
@@ -189,7 +196,8 @@ class ApiClient {
   }
 
   async deleteOrders(uuids: string[]): Promise<ApiResponse<{ deletedCount: number }>> {
-    return this.request('deleteOrders', { uuids: uuids.join(',') }, 'GET');
+    // Use POST method (more reliable) and send uuids as array
+    return this.request('deleteOrders', { uuids }, 'POST');
   }
 
   async updateDeliveryInfo(): Promise<ApiResponse<{ cambiosAplicados: number }>> {

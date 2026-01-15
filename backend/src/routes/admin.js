@@ -680,26 +680,36 @@ router.post('/orders/delete', async (req, res) => {
     }
 
     const headers = data[0];
-    const possibleUuidColumns = ['ID_Pedido', 'ID_Item', 'UUID', 'uuid', 'id', 'Id', 'ID Pedido', 'ID Item'];
 
-    let uuidColumnIndex = -1;
-    for (const colName of possibleUuidColumns) {
-      uuidColumnIndex = headers.findIndex(h => h === colName);
-      if (uuidColumnIndex !== -1) break;
-    }
+    // Buscar columnas de ID (priorizar ID_Item que es más específico)
+    const idItemIndex = headers.findIndex(h => h === 'ID_Item');
+    const idPedidoIndex = headers.findIndex(h => h === 'ID_Pedido');
 
-    if (uuidColumnIndex === -1) {
+    if (idItemIndex === -1 && idPedidoIndex === -1) {
       return res.json({
         success: false,
-        error: "No s'ha trobat la columna d'identificador"
+        error: "No s'ha trobat la columna d'identificador (ID_Item o ID_Pedido)"
       });
     }
 
+    console.log('🗑️ Column indices - ID_Item:', idItemIndex, 'ID_Pedido:', idPedidoIndex);
+
     // Encontrar filas a eliminar (de abajo hacia arriba)
+    // Buscar coincidencias tanto en ID_Item como en ID_Pedido
     const rowsToDelete = [];
     for (let i = data.length - 1; i >= 1; i--) {
-      const rowUuid = data[i][uuidColumnIndex];
-      if (uuids.includes(String(rowUuid))) {
+      const rowIdItem = idItemIndex !== -1 ? String(data[i][idItemIndex] || '') : '';
+      const rowIdPedido = idPedidoIndex !== -1 ? String(data[i][idPedidoIndex] || '') : '';
+
+      // Comprobar si alguno de los UUIDs coincide con ID_Item o ID_Pedido
+      const matches = uuids.some(uuid =>
+        uuid === rowIdItem || uuid === rowIdPedido ||
+        rowIdItem.startsWith(uuid) || rowIdPedido.startsWith(uuid) ||
+        uuid.startsWith(rowIdItem) || uuid.startsWith(rowIdPedido)
+      );
+
+      if (matches) {
+        console.log(`🗑️ Match found at row ${i}: ID_Item="${rowIdItem}", ID_Pedido="${rowIdPedido}"`);
         rowsToDelete.push(i);
       }
     }
