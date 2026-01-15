@@ -115,7 +115,7 @@ class ApiClient {
       // DEBUG: Log request details
       console.log(`🌐 API Request [${method}] ${action}:`, {
         url: url.toString(),
-        body: config.body ? JSON.parse(config.body) : null
+        body: config.body && typeof config.body === 'string' ? JSON.parse(config.body) : null
       });
 
       const response = await fetch(url.toString(), config);
