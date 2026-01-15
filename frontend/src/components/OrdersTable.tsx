@@ -584,18 +584,19 @@ ${materialsText}
         throw new Error('API_BASE_URL no está configurada');
       }
       
-      const url = new URL(API_BASE_URL);
-      url.searchParams.append('action', 'getMultipleNotificationStatuses');
-      url.searchParams.append('token', API_TOKEN);
-      url.searchParams.append('orderIds', JSON.stringify(allIds));
-      
       console.log('🌐 Consultando backend para múltiples IDs:', allIds.length);
-      
-      // Agregar timeout de 30 segundos
+
+      // Usar POST para evitar error 431 (URL demasiado larga)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
-      const response = await fetch(url.toString(), {
+
+      const response = await fetch(`${API_BASE_URL}/api/admin/notifications/statuses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${API_TOKEN}`
+        },
+        body: JSON.stringify({ orderIds: allIds }),
         signal: controller.signal
       });
       clearTimeout(timeoutId);
