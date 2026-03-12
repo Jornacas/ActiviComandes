@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateRequest } = require('../middleware/auth');
 const sheets = require('../services/sheets');
+const { generateUUID } = require('../utils/helpers');
 
 // Aplicar autenticación a todas las rutas
 router.use(authenticateRequest);
@@ -476,14 +477,6 @@ function getSheetConfigForActivity(baseActivity) {
   };
 
   return config[baseActivity] || null;
-}
-
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
 }
 
 module.exports = router;

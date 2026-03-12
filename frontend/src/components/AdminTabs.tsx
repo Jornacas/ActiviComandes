@@ -22,6 +22,7 @@ import OrdersTable from './OrdersTable';
 import DeliveryManager from './DeliveryManager';
 import HelpSection from './HelpSection';
 import MobileAppWindow from './MobileAppWindow';
+import CopilotChat from './CopilotChat';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -190,6 +191,9 @@ export default function AdminTabs() {
         onClose={() => setMobileAppOpen(false)}
         url="https://activicomandes-mobil.vercel.app"
       />
+
+      {/* Assistent IA Copilot */}
+      <CopilotChat />
     </Box>
   );
 }

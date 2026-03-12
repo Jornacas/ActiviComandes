@@ -3,7 +3,11 @@
  * Verifica el token de autenticación en requests
  */
 
-const AUTH_TOKEN = process.env.AUTH_TOKEN || 'comanda_materials_2024';
+const AUTH_TOKEN = process.env.AUTH_TOKEN;
+
+if (!AUTH_TOKEN) {
+  console.warn('WARNING: AUTH_TOKEN environment variable is not set. All authenticated requests will be rejected.');
+}
 
 function authenticateRequest(req, res, next) {
   // El token puede venir en:
