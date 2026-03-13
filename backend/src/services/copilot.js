@@ -7,6 +7,7 @@ const sheets = require('./sheets');
 const cache = require('./cache');
 const maps = require('./maps');
 const chat = require('./chat');
+const delivery = require('./delivery');
 
 const AI_PROVIDER = process.env.AI_PROVIDER || 'gemini';
 
@@ -194,10 +195,6 @@ async function deleteOrders(uuids) {
 }
 
 async function getDeliveryOptions(orderIds) {
-  const axios = require('axios');
-  const PORT = process.env.PORT || 3010;
-  const AUTH_TOKEN = process.env.AUTH_TOKEN || 'comanda_materials_2024';
-
   const { orders } = await getOrders({ estat: 'Preparat' });
   let targetOrders = orders;
   if (orderIds && orderIds.length > 0) {
@@ -216,20 +213,17 @@ async function getDeliveryOptions(orderIds) {
   }
 
   try {
-    const response = await axios.post(
-      `http://localhost:${PORT}/api/admin/delivery/options`,
-      { orders: targetOrders },
-      { headers: { 'Authorization': `Bearer ${AUTH_TOKEN}`, 'Content-Type': 'application/json' }, timeout: 90000 }
-    );
+    // Llamada directa al servicio (no HTTP, compatible con Vercel serverless)
+    const result = await delivery.getDeliveryOptions(targetOrders);
 
-    if (response.data.success) {
+    if (result.success) {
       const now = new Date();
       const dies = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
       const avuiIdx = now.getDay();
       const minutsActuals = now.getHours() * 60 + now.getMinutes();
 
       // Filtrar: solo las 12 mejores opciones por prioridad (ya vienen ordenadas por prioritat)
-      const allOptions = response.data.data;
+      const allOptions = result.data;
       allOptions.sort((a, b) => a.prioritat - b.prioritat);
       const topOptions = allOptions.slice(0, 12);
       console.log(`[COPILOT] Filtrat ${allOptions.length} opcions → top ${topOptions.length}`);
@@ -335,7 +329,7 @@ async function getDeliveryOptions(orderIds) {
         instruccions: 'Presenta les opcions de forma conversacional. La opció marcada amb ⭐ RECOMANADA és la millor. NO inventis desplaçaments ni lògica addicional.',
       };
     }
-    return { success: false, error: response.data.error };
+    return { success: false, error: result.error || 'Error desconegut' };
   } catch (error) {
     console.error('Error cridant delivery options:', error.message);
     return { success: false, error: 'Error calculant opcions: ' + error.message };
