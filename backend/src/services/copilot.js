@@ -243,28 +243,11 @@ async function getDeliveryOptions(orderIds) {
         let bestOption = null;
         let bestScore = -1;
 
-        data.options.forEach(opt => {
+        data.options.forEach((opt, optIdx) => {
           const monitor = opt.monitorsDisponibles?.[0];
           const diesMonitor = monitor?.dies || [];
           const distancia = opt.distanciaAcademia || 'N/A';
           const temps = opt.tempsAcademia || 'N/A';
-
-          const diesFuturs = diesMonitor.filter(d => {
-            const idx = dies.indexOf(d.toLowerCase());
-            if (idx < 1 || idx > 5) return false;
-            if (idx > avuiIdx) return true;
-            if (idx === avuiIdx) {
-              if (minutsActuals >= 18 * 60) return false;
-              const horari = horariMap[`${monitor?.nom}|${opt.escola}`];
-              if (horari?.horaInici) {
-                const parts = horari.horaInici.split(':');
-                const minutsActivitat = parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
-                return (minutsActivitat - minutsActuals) >= 30;
-              }
-              return minutsActuals < 14 * 60;
-            }
-            return false;
-          });
 
           if (opt.tipus === 'Recollida a Eixos Creativa') {
             optionTexts.push(`RECOLLIDA: ${destinatari} pot passar per Eixos Creativa (Ramon Turró 73) a recollir el material qualsevol dia laborable en horari d'oficina (9h-18h).`);
@@ -273,41 +256,23 @@ async function getDeliveryOptions(orderIds) {
             optionTexts.push(`ENTREGA DIRECTA: Algú d'Eixos porta el material a ${opt.escola} (${distancia}, ${temps}). Disponible qualsevol dia laborable.`);
           }
           else if ((opt.tipus === 'Lliurament amb Intermediari' || opt.tipus === 'Lliurament amb Coincidència') && monitor) {
-            if (diesFuturs.length === 0) return;
-
             const escolaRecollida = opt.escola;
             const escolaEntrega = opt.escolaDestino || opt.escolaCoincidencia || '?';
-            const properDiaRecollida = diesFuturs[0];
+            const diesRecollida = diesMonitor.map(d => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()).join(', ') || '?';
 
             const diesDesti = monitor.destinoFinal?.dies || [];
-            const idxRecollida = dies.indexOf(properDiaRecollida.toLowerCase());
-            const diesDestiFuturs = diesDesti.filter(d => {
-              const idx = dies.indexOf(d.toLowerCase());
-              return idx >= idxRecollida && idx >= 1 && idx <= 5;
-            });
-            const properDiaEntrega = diesDestiFuturs.length > 0
-              ? diesDestiFuturs[0]
-              : (diesDesti.length > 0 ? `${diesDesti[0]} (setmana vinent)` : 'no especificat');
-
-            const mateixDia = properDiaRecollida.toLowerCase() === String(properDiaEntrega).toLowerCase();
+            const diesEntrega = diesDesti.map(d => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()).join(', ') || diesRecollida;
 
             const horariRecollida = horariMap[`${monitor.nom}|${escolaRecollida}`];
             const horariEntrega = horariMap[`${monitor.nom}|${escolaEntrega}`];
-            const horaRecStr = horariRecollida?.horaInici ? `, activitat a les ${horariRecollida.horaInici.substring(0,5)} (${horariRecollida.torn || ''})` : '';
-            const horaEntStr = horariEntrega?.horaInici ? `. ${monitor.nom} té activitat a ${escolaEntrega} a les ${horariEntrega.horaInici.substring(0,5)} (${horariEntrega.torn || ''})` : '';
-            const horariDestinatari = horariMap[`${destinatari}|${escolaEntrega}`];
-            const horaDestStr = horariDestinatari?.horaInici ? `. ${destinatari} té activitat a ${escolaEntrega} a les ${horariDestinatari.horaInici.substring(0,5)} (${horariDestinatari.torn || ''})` : '';
+            const horaRecStr = horariRecollida?.horaInici ? ` (${horariRecollida.horaInici.substring(0,5)}, ${horariRecollida.torn || ''})` : '';
+            const horaEntStr = horariEntrega?.horaInici ? ` (${horariEntrega.horaInici.substring(0,5)}, ${horariEntrega.torn || ''})` : '';
 
-            let text;
-            if (mateixDia) {
-              text = `INTERMEDIARI: Eixos deixa el material a **${escolaRecollida}** (${distancia} des d'Eixos${horaRecStr}). **${monitor.nom}** el recull i el porta a **${escolaEntrega}** el mateix **${properDiaRecollida}**, on coincideix amb **${destinatari}**${horaEntStr}${horaDestStr}.`;
-            } else {
-              text = `INTERMEDIARI: Eixos deixa el material a **${escolaRecollida}** (${distancia} des d'Eixos). **${monitor.nom}** el recull el **${properDiaRecollida}** (dia que va a ${escolaRecollida}${horaRecStr}). Després el porta a **${escolaEntrega}** el **${properDiaEntrega}** (dia que va a ${escolaEntrega}${horaEntStr}), on **${destinatari}** el pot recollir${horaDestStr}.`;
-            }
+            const text = `INTERMEDIARI: Eixos deixa a **${escolaRecollida}** (${distancia} des d'Eixos). **${monitor.nom}** recull [${diesRecollida}]${horaRecStr} i porta a **${escolaEntrega}** [${diesEntrega}]${horaEntStr}, on coincideix amb **${destinatari}**.`;
             optionTexts.push(text);
 
-            const daysUntil = idxRecollida - avuiIdx;
-            const score = 100 - (daysUntil * 10) - (opt.prioritat / 1000);
+            // Mejor score = menor prioritat (más negativo = mejor)
+            const score = -opt.prioritat;
             if (score > bestScore) { bestScore = score; bestOption = optionTexts.length - 1; }
           }
         });
