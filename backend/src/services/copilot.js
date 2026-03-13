@@ -235,63 +235,71 @@ async function getDeliveryOptions(orderIds) {
         byDestinatari[dest].options.push(opt);
       });
 
+      // Simplificar: pasar las opciones en formato estructurado para que el modelo las presente
       const summaries = [];
 
       for (const [destinatari, data] of Object.entries(byDestinatari)) {
-        const materials = data.orders.map(o => `${o.material} (${o.unitats} ud.) per ${o.escola}`).join(', ');
-        const optionTexts = [];
-        let bestOption = null;
-        let bestScore = -1;
+        const escolaFinal = data.orders[0]?.escola || '?';
+        const dataNecessitat = data.orders[0]?.dataNecessitat || '?';
+        const materials = data.orders.map(o => `${o.material} (${o.unitats} ud.)`).join(', ');
 
-        data.options.forEach((opt, optIdx) => {
+        const opcions = [];
+        data.options.forEach(opt => {
           const monitor = opt.monitorsDisponibles?.[0];
-          const diesMonitor = monitor?.dies || [];
           const distancia = opt.distanciaAcademia || 'N/A';
-          const temps = opt.tempsAcademia || 'N/A';
 
           if (opt.tipus === 'Recollida a Eixos Creativa') {
-            optionTexts.push(`RECOLLIDA: ${destinatari} pot passar per Eixos Creativa (Ramon Turró 73) a recollir el material qualsevol dia laborable en horari d'oficina (9h-18h).`);
+            opcions.push({
+              tipus: 'Recollida',
+              descripcio: `${destinatari} passa per Eixos (Ramon Turró 73) a recollir. Horari: dilluns-divendres 9h-18h.`,
+              prioritat: opt.prioritat,
+            });
           }
           else if (opt.tipus === 'Entrega Directa des d\'Eixos') {
-            optionTexts.push(`ENTREGA DIRECTA: Algú d'Eixos porta el material a ${opt.escola} (${distancia}, ${temps}). Disponible qualsevol dia laborable.`);
+            opcions.push({
+              tipus: 'Entrega Directa',
+              descripcio: `Eixos porta el material directament a ${escolaFinal}. Distància: ${distancia}.`,
+              prioritat: opt.prioritat,
+            });
           }
-          else if ((opt.tipus === 'Lliurament amb Intermediari' || opt.tipus === 'Lliurament amb Coincidència') && monitor) {
+          else if (monitor) {
             const escolaRecollida = opt.escola;
-            const escolaEntrega = opt.escolaDestino || opt.escolaCoincidencia || '?';
-            const diesRecollida = diesMonitor.map(d => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()).join(', ') || '?';
+            const escolaPuntTrobada = opt.escolaDestino || opt.escolaCoincidencia || '?';
+            const diesRecollida = (monitor.dies || []).join(', ');
+            const diesPuntTrobada = (monitor.destinoFinal?.dies || []).join(', ');
 
-            const diesDesti = monitor.destinoFinal?.dies || [];
-            const diesEntrega = diesDesti.map(d => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()).join(', ') || diesRecollida;
-
-            const horariRecollida = horariMap[`${monitor.nom}|${escolaRecollida}`];
-            const horariEntrega = horariMap[`${monitor.nom}|${escolaEntrega}`];
-            const horaRecStr = horariRecollida?.horaInici ? ` (${horariRecollida.horaInici.substring(0,5)}, ${horariRecollida.torn || ''})` : '';
-            const horaEntStr = horariEntrega?.horaInici ? ` (${horariEntrega.horaInici.substring(0,5)}, ${horariEntrega.torn || ''})` : '';
-
-            const text = `INTERMEDIARI: Eixos deixa a **${escolaRecollida}** (${distancia} des d'Eixos). **${monitor.nom}** recull [${diesRecollida}]${horaRecStr} i porta a **${escolaEntrega}** [${diesEntrega}]${horaEntStr}, on coincideix amb **${destinatari}**.`;
-            optionTexts.push(text);
-
-            // Mejor score = menor prioritat (más negativo = mejor)
-            const score = -opt.prioritat;
-            if (score > bestScore) { bestScore = score; bestOption = optionTexts.length - 1; }
+            opcions.push({
+              tipus: opt.tipus === 'Lliurament amb Coincidència' ? 'Coincidència' : 'Intermediari',
+              intermediari: monitor.nom,
+              pas1_eixos_deixa: escolaRecollida,
+              pas1_distancia: distancia,
+              pas2_intermediari_recull: `${monitor.nom} va a ${escolaRecollida} els: ${diesRecollida}`,
+              pas3_intermediari_porta: `${monitor.nom} va a ${escolaPuntTrobada} els: ${diesPuntTrobada}`,
+              pas4_destinatari_recull: escolaPuntTrobada === escolaFinal
+                ? `${destinatari} rep el material a ${escolaFinal} (escola destí)`
+                : `${destinatari} recull a ${escolaPuntTrobada} (punt de trobada) i porta a ${escolaFinal} (escola destí)`,
+              prioritat: opt.prioritat,
+            });
           }
         });
 
-        if (bestOption !== null && optionTexts[bestOption]) {
-          optionTexts[bestOption] = '⭐ RECOMANADA — ' + optionTexts[bestOption];
-        }
+        // Ordenar por prioridad (más negativo = mejor)
+        opcions.sort((a, b) => a.prioritat - b.prioritat);
 
         summaries.push({
-          destinatari, materials,
-          escola: data.orders[0]?.escola || '?',
-          opcions: optionTexts,
-          recomanacioBreu: bestOption !== null ? optionTexts[bestOption] : 'Recollida a Eixos Creativa és sempre disponible.',
+          destinatari,
+          escolaFinal,
+          dataNecessitat,
+          materials,
+          opcions: opcions.slice(0, 5), // máx 5 opciones
         });
       }
 
       return {
-        success: true, totalPreparats: targetOrders.length, resum: summaries,
-        instruccions: 'Presenta les opcions de forma conversacional. La opció marcada amb ⭐ RECOMANADA és la millor. NO inventis desplaçaments ni lògica addicional.',
+        success: true,
+        totalPreparats: targetOrders.length,
+        resum: summaries,
+        instruccions: `Presenta les opcions al usuari de forma clara i conversacional. Cada opció té passos numerats. La primera opció (menor prioritat) és la millor. La dataNecessitat indica quan el material HA d'estar a l'escola final. NO inventis res que no surti aquí.`,
       };
     }
     return { success: false, error: result.error || 'Error desconegut' };
