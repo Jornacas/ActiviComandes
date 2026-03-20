@@ -340,6 +340,57 @@ async function getDeliveryOptions(orders) {
         deliveryOptions.push(directDeliveryOption);
       }
 
+      // OPCIÓN 2b: AUTORECOLLIDA — Eixos deixa a una altra escola del destinatari
+      // El destinatari recull allà i ho porta ell mateix a l'escola final
+      if (schoolData.data.monitors) {
+        const destinatarioMonitor = schoolData.data.monitors.find(m =>
+          m.nom.toLowerCase().includes(group.nomCognoms.toLowerCase()) ||
+          group.nomCognoms.toLowerCase().includes(m.nom.toLowerCase())
+        );
+
+        if (destinatarioMonitor && destinatarioMonitor.escoles?.length > 1) {
+          destinatarioMonitor.escoles.forEach(escolaInfo => {
+            // Excluir las escuelas del pedido (ya tienen Entrega Directa)
+            if (group.escoles.includes(escolaInfo.escola)) return;
+            // Excluir Academia (ya tiene Recollida a Eixos)
+            if (escolaInfo.escola === 'Academia' || escolaInfo.escola === 'Eixos Creativa') return;
+
+            const autoPickupOption = {
+              tipus: "Entrega Directa des d'Eixos",
+              escola: escolaInfo.escola,
+              escoles: group.escoles,
+              adreça: escolaInfo.adreça || "Adreça no disponible",
+              eficiencia: "Calculant...",
+              prioritat: 2,
+              nomCognoms: group.nomCognoms,
+              dataNecessitat: group.dataNecessitat,
+              monitorsDisponibles: [{
+                nom: group.nomCognoms,
+                dies: escolaInfo.dies || [],
+                tipus: "autorecollida",
+                activitat: escolaInfo.activitat || 'N/A',
+                destinoFinal: {
+                  escola: group.escoles[0],
+                  dies: escolaInfo.dies || [],
+                  destinatari: group.nomCognoms
+                }
+              }],
+              descripció: `Eixos deixa a ${escolaInfo.escola} → ${group.nomCognoms} recull i porta a ${group.escoles[0]}`,
+              distanciaAcademia: "Calculant...",
+              tempsAcademia: "Calculant...",
+              notes: `Autorecollida: ${group.nomCognoms} va a ${escolaInfo.escola} els ${(escolaInfo.dies || []).join(', ')}`,
+              comandes: group.orders,
+              destinatari: {
+                nom: group.nomCognoms,
+                activitat: group.orders[0]?.activitat || 'N/A'
+              }
+            };
+
+            deliveryOptions.push(autoPickupOption);
+          });
+        }
+      }
+
       // OPCIÓN 3: Entrega con INTERMEDIARIO
       // Buscar monitores que coincidan con el destinatario en AL MENOS UNA de las escoles
       if (schoolData.data.monitors) {
