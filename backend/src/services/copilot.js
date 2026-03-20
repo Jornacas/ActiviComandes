@@ -421,16 +421,16 @@ const toolDefinitions = [
   },
   {
     name: 'assignDelivery',
-    description: "Assigna una entrega amb intermediari, coincidència o directa. Actualitza l'estat a 'Assignat', registra el monitor intermediari, escola de recollida i escola destí al Google Sheet.",
+    description: "Assigna una entrega. IMPORTANT: Si hi ha un monitor intermediari (coincidència o intermediari), la modalitat SEMPRE ha de ser 'Intermediari'. Només usa 'Directa' si Eixos porta directament el material sense cap intermediari.",
     parameters: {
       type: 'object',
       properties: {
-        orderIds: { type: 'array', items: { type: 'string' }, description: "IDs de les comandes a assignar" },
-        modalitat: { type: 'string', description: "Tipus: 'Intermediari', 'Coincidencia', 'Directa' o 'Recollida'" },
-        monitorIntermediaria: { type: 'string', description: "Nom del monitor intermediari (null si és directa o recollida)" },
-        escolaRecollida: { type: 'string', description: "Escola on Eixos deixa el material (on recull l'intermediari)" },
-        escolaDestino: { type: 'string', description: "Escola on l'intermediari entrega (punt de trobada o escola destí)" },
-        dataEntrega: { type: 'string', description: "Data prevista d'entrega (YYYY-MM-DD)" },
+        orderIds: { type: 'array', items: { type: 'string' }, description: "IDs de les comandes (camp idItem)" },
+        modalitat: { type: 'string', enum: ['Intermediari', 'Directa'], description: "'Intermediari' si un monitor fa d'intermediari o coincidència. 'Directa' NOMÉS si Eixos porta directament." },
+        monitorIntermediaria: { type: 'string', description: "Nom EXACTE del monitor intermediari. OBLIGATORI si modalitat és 'Intermediari'." },
+        escolaRecollida: { type: 'string', description: "Escola on Eixos deixa el material i l'intermediari el recull." },
+        escolaDestino: { type: 'string', description: "Escola on l'intermediari entrega al destinatari (punt de trobada o escola final)." },
+        dataEntrega: { type: 'string', description: "Data prevista d'entrega al destinatari (YYYY-MM-DD)." },
       },
       required: ['orderIds', 'modalitat'],
     },
