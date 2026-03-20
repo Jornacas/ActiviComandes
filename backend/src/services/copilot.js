@@ -602,6 +602,7 @@ async function processWithClaude(sessionId, userMessage) {
   // Afegir missatge de l'usuari
   session.messages.push({ role: 'user', content: userMessage });
 
+  const executedActions = [];
   let maxIterations = 10;
   while (maxIterations > 0) {
     const response = await anthropic.messages.create({
@@ -621,7 +622,7 @@ async function processWithClaude(sessionId, userMessage) {
       // Extreure text de la resposta
       const textParts = response.content.filter(c => c.type === 'text');
       const text = textParts.map(t => t.text).join('\n');
-      return { success: true, message: text, sessionId };
+      return { success: true, message: text, sessionId, actionsPerformed: executedActions };
     }
 
     // Executar tools
@@ -634,6 +635,10 @@ async function processWithClaude(sessionId, userMessage) {
         result = fn ? await fn(toolUse.input || {}) : { error: `Funció "${toolUse.name}" no trobada` };
       } catch (error) {
         result = { error: error.message };
+      }
+      // Registrar accions que modifiquen dades
+      if (['assignDelivery', 'updateOrderStatus', 'deleteOrders', 'updateNotes'].includes(toolUse.name)) {
+        executedActions.push({ tool: toolUse.name, input: toolUse.input, success: !result.error });
       }
       toolResults.push({
         type: 'tool_result',

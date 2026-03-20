@@ -83,6 +83,13 @@ export default function CopilotChat() {
           timestamp: new Date(),
         };
         setMessages(prev => [...prev, assistantMessage]);
+
+        // Si el copilot ha executat accions que modifiquen dades, notificar
+        if (data.actionsPerformed && data.actionsPerformed.length > 0) {
+          window.dispatchEvent(new CustomEvent('copilot-data-changed', {
+            detail: { actions: data.actionsPerformed }
+          }));
+        }
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',

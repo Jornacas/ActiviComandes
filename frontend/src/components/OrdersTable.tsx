@@ -90,6 +90,17 @@ export default function OrdersTable() {
     }
   }, [globalResponsable]);
 
+  // Escoltar events del copilot per refrescar dades automàticament
+  const loadDataRef = useRef<(() => Promise<void>) | null>(null);
+  useEffect(() => {
+    const handleCopilotAction = () => {
+      console.log('🤖 Copilot ha modificat dades, refrescant...');
+      setTimeout(() => { loadDataRef.current?.(); }, 1000);
+    };
+    window.addEventListener('copilot-data-changed', handleCopilotAction);
+    return () => window.removeEventListener('copilot-data-changed', handleCopilotAction);
+  }, []);
+
   // Función para actualizar las notas internas
   const updateInternalNotes = async (orderId: string, notes: string) => {
     try {
@@ -953,6 +964,7 @@ export default function OrdersTable() {
   };
 
   const loadData = async () => {
+    loadDataRef.current = loadData; // Mantenir ref actualitzada
     setLoading(true);
     setError(null);
 
