@@ -238,9 +238,20 @@ async function getDeliveryOptions(orderIds) {
       // Simplificar: pasar las opciones en formato estructurado para que el modelo las presente
       const summaries = [];
 
+      // Helper per formatar dates ISO a català
+      const formatDataCat = (isoDate) => {
+        if (!isoDate) return '?';
+        const [y, m, d] = isoDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        const diesNom = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+        const mesosNom = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+        return `${diesNom[date.getDay()]} ${d} de ${mesosNom[date.getMonth()]}`;
+      };
+
       for (const [destinatari, data] of Object.entries(byDestinatari)) {
         const escolaFinal = data.orders[0]?.escola || '?';
-        const dataNecessitat = data.orders[0]?.dataNecessitat || '?';
+        const dataNecessitatISO = data.orders[0]?.dataNecessitat || '?';
+        const dataNecessitat = formatDataCat(dataNecessitatISO);
         const materials = data.orders.map(o => `${o.material} (${o.unitats} ud.)`).join(', ');
 
         const opcions = [];
@@ -266,9 +277,8 @@ async function getDeliveryOptions(orderIds) {
             const escolaRecollida = opt.escola;
             const escolaPuntTrobada = opt.escolaDestino || opt.escolaCoincidencia || '?';
 
-            // Usar fechas concretas si están disponibles, sino días genéricos
-            const dataRecollida = opt.dataRecollidaPrevista || null;
-            const dataEntrega = opt.dataEntregaPrevista || null;
+            const dataRecollida = formatDataCat(opt.dataRecollidaPrevista);
+            const dataEntrega = formatDataCat(opt.dataEntregaPrevista);
             const diesRecollida = (monitor.dies || []).join(', ');
             const diesPuntTrobada = (monitor.destinoFinal?.dies || []).join(', ');
 
