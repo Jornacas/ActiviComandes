@@ -595,90 +595,53 @@ async function getDeliveryOptions(orders) {
           let eficienciaScore = 0;
           let tipusModifier = 0;
 
-          // Modificador por tipo de entrega
-          if (option.tipus === "Recollida a Eixos Creativa") {
+          // Modificador per tipus d'entrega (4 tipus + fallback)
+          if (option.tipus === "Entrega Directa des d'Eixos" && option.esDestiDirecte) {
+            // 1. ENTREGA A ESCOLA DESTÍ — El destinatari JA hi va per activitat
+            tipusModifier = -7000;
+            if (km < 2) { option.eficiencia = "Màxima"; eficienciaScore = 98; }
+            else if (km < 4) { option.eficiencia = "Alta"; eficienciaScore = 85; }
+            else { option.eficiencia = "Mitjana"; eficienciaScore = 65; }
+          }
+          else if (option.tipus === "Autorecollida") {
+            // 1. AUTORECOLLIDA — Eixos deixa a altra escola del monitor (més propera)
+            tipusModifier = -7000;
+            if (km < 2) { option.eficiencia = "Màxima"; eficienciaScore = 95; }
+            else if (km < 4) { option.eficiencia = "Alta"; eficienciaScore = 80; }
+            else { option.eficiencia = "Mitjana"; eficienciaScore = 60; }
+          }
+          else if (option.tipus === "Recollida a Eixos Creativa") {
             if (option.destinatariVaAcademia) {
-              // El destinatario YA va a Academia → recollida natural, sin viaje extra
-              tipusModifier = -10000;
+              // 1. RECOLLIDA ACADEMIA — El monitor va a Academia (distància 0), és autorecollida
+              tipusModifier = -7000;
               option.eficiencia = "Màxima";
-              eficienciaScore = 100;
+              eficienciaScore = 98;
             } else {
-              // El destinatario NO va a Academia → requiere viaje extra, peor que intermediari
+              // 4. ÚLTIMA OPCIÓ — Viatge extra a l'oficina
               tipusModifier = 2000;
               option.eficiencia = "Baixa (viatge extra)";
               eficienciaScore = 30;
             }
           }
-          else if (option.tipus === "Autorecollida") {
-            // El destinatari recull ell mateix en una altra escola seva
-            // Molt fiable (no depèn de ningú), prioritat alta
-            tipusModifier = -7000;
-            option.eficiencia = "Màxima (sense dependències)";
-            eficienciaScore = 95;
-          }
           else if (option.tipus === "Lliurament amb Coincidència") {
-            // Opciones con escuelas compartidas tienen ALTA prioridad
+            // 2. COINCIDÈNCIA — Altre monitor transporta via escola compartida
             tipusModifier = -5000;
-
-            // Calcular eficiencia considerando que hay intermediario
-            if (km < 3) {
-              option.eficiencia = "Màxima";
-              eficienciaScore = 95;
-            } else if (km < 5) {
-              option.eficiencia = "Alta";
-              eficienciaScore = 85;
-            } else {
-              option.eficiencia = "Mitjana";
-              eficienciaScore = 70;
-            }
+            if (km < 3) { option.eficiencia = "Màxima"; eficienciaScore = 95; }
+            else if (km < 5) { option.eficiencia = "Alta"; eficienciaScore = 85; }
+            else { option.eficiencia = "Mitjana"; eficienciaScore = 70; }
           }
           else if (option.tipus === "Lliurament amb Intermediari") {
-            // Intermediario normal: mejor que directa lejana
+            // 2. INTERMEDIARI — Altre monitor transporta
             tipusModifier = -3000;
-
-            if (km < 3) {
-              option.eficiencia = "Alta";
-              eficienciaScore = 80;
-            } else if (km < 6) {
-              option.eficiencia = "Mitjana";
-              eficienciaScore = 65;
-            } else {
-              option.eficiencia = "Baixa";
-              eficienciaScore = 50;
-            }
+            if (km < 3) { option.eficiencia = "Alta"; eficienciaScore = 80; }
+            else if (km < 6) { option.eficiencia = "Mitjana"; eficienciaScore = 65; }
+            else { option.eficiencia = "Baixa"; eficienciaScore = 50; }
           }
           else if (option.tipus === "Entrega Directa des d'Eixos") {
-            if (option.esDestiDirecte) {
-              // Entrega directa a l'escola DESTÍ del pedido — el destinatari JA hi va
-              // Equivalent a autorecollida però a l'escola final (la més lògica)
-              tipusModifier = -7000;
-              if (km < 2) {
-                option.eficiencia = "Màxima (escola destí propera)";
-                eficienciaScore = 98;
-              } else if (km < 4) {
-                option.eficiencia = "Alta (escola destí)";
-                eficienciaScore = 85;
-              } else {
-                option.eficiencia = "Mitjana (escola destí lluny)";
-                eficienciaScore = 65;
-              }
-            } else {
-              // Directa a una escola que NO és la del pedido
-              tipusModifier = 0;
-              if (km < 2) {
-                option.eficiencia = "Alta";
-                eficienciaScore = 75;
-              } else if (km < 4) {
-                option.eficiencia = "Mitjana";
-                eficienciaScore = 60;
-              } else if (km < 7) {
-                option.eficiencia = "Baixa";
-                eficienciaScore = 45;
-              } else {
-                option.eficiencia = "Molt Baixa";
-                eficienciaScore = 30;
-              }
-            }
+            // Descartada — no té sentit portar a una escola que no és la del pedido
+            option.prioritat = 99999;
+            option.eficiencia = "Descartada";
+            eficienciaScore = 0;
           }
 
           // 🆕 BONUS/PENALITZACIÓ TEMPORAL
