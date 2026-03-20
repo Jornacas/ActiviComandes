@@ -223,25 +223,47 @@ async function getDeliveryOptions(orders) {
       console.log(`   📋 Orders in group: ${group.orders.length}`);
       console.log(`   🏫 Schools in group: ${group.escoles.length}`);
 
-      // OPCIÓN 1: RECOLLIDA A EIXOS CREATIVA (el destinatario recoge en la oficina)
-      // Esta opción SIEMPRE está disponible independientemente de las escuelas
+      // OPCIÓN 1: RECOLLIDA A EIXOS CREATIVA / ACADEMIA
+      // Verificar si el destinatario tiene actividad en Academia (= Eixos, Ramon Turró 73)
+      let destinatariVaAcademia = false;
+      let diesAcademia = [];
+      if (schoolData.data.monitors) {
+        const destinatarioMonitor = schoolData.data.monitors.find(m =>
+          m.nom.toLowerCase().includes(group.nomCognoms.toLowerCase()) ||
+          group.nomCognoms.toLowerCase().includes(m.nom.toLowerCase())
+        );
+        if (destinatarioMonitor) {
+          const acadInfo = destinatarioMonitor.escoles?.find(e =>
+            e.escola === 'Academia' || e.escola === 'Eixos Creativa'
+          );
+          if (acadInfo) {
+            destinatariVaAcademia = true;
+            diesAcademia = acadInfo.dies || [];
+          }
+        }
+      }
+
       const pickupOption = {
         tipus: "Recollida a Eixos Creativa",
-        escola: "Eixos Creativa", // Recoge en la oficina de Eixos
-        escoles: group.escoles, // Pero los materiales son para múltiples escoles
-        adreça: "Carrer Ramon Turró 73, 08005 Barcelona", // Dirección de Eixos Creativa
-        eficiencia: "Màxima", // Recogida en oficina es siempre máxima eficiencia
-        prioritat: 1, // Máxima prioridad
+        escola: "Eixos Creativa",
+        escoles: group.escoles,
+        adreça: "Carrer Ramon Turró 73, 08005 Barcelona",
+        eficiencia: destinatariVaAcademia ? "Màxima" : "Baixa",
+        prioritat: 1, // Se recalculará después
         nomCognoms: group.nomCognoms,
         dataNecessitat: group.dataNecessitat,
+        destinatariVaAcademia,
+        diesAcademia,
         monitorsDisponibles: [{
           nom: "Recollida a oficina",
-          dies: ["dilluns", "dimarts", "dimecres", "dijous", "divendres"],
+          dies: destinatariVaAcademia ? diesAcademia : ["dilluns", "dimarts", "dimecres", "dijous", "divendres"],
           tipus: "recollida",
           activitat: 'N/A'
         }],
-        descripció: `${group.nomCognoms} recull el material a Eixos Creativa (Ramon Turró 73)`,
-        distanciaAcademia: "Ubicació: Eixos Creativa",
+        descripció: destinatariVaAcademia
+          ? `${group.nomCognoms} recull a Academia (on ja té activitat els ${diesAcademia.join(', ')})`
+          : `${group.nomCognoms} recull a Eixos Creativa (viatge extra, no té activitat a Academia)`,
+        distanciaAcademia: "0 km",
         tempsAcademia: "Horari: 9h-18h",
         comandes: group.orders,
         destinatari: {
@@ -523,9 +545,17 @@ async function getDeliveryOptions(orders) {
 
           // Modificador por tipo de entrega
           if (option.tipus === "Recollida a Eixos Creativa") {
-            tipusModifier = -10000; // Máxima prioridad (siempre primera)
-            option.eficiencia = "Màxima";
-            eficienciaScore = 100;
+            if (option.destinatariVaAcademia) {
+              // El destinatario YA va a Academia → recollida natural, sin viaje extra
+              tipusModifier = -10000;
+              option.eficiencia = "Màxima";
+              eficienciaScore = 100;
+            } else {
+              // El destinatario NO va a Academia → requiere viaje extra, peor que intermediari
+              tipusModifier = 2000;
+              option.eficiencia = "Baixa (viatge extra)";
+              eficienciaScore = 30;
+            }
           }
           else if (option.tipus === "Lliurament amb Coincidència") {
             // 🆕 FASE 2: Opciones con escuelas compartidas tienen ALTA prioridad
@@ -583,8 +613,9 @@ async function getDeliveryOptions(orders) {
           let temporalModifier = 0;
           const monitor = option.monitorsDisponibles?.[0];
 
+          const esRecollidaAcademia = option.tipus === "Recollida a Eixos Creativa" && option.destinatariVaAcademia;
           if (monitor && option.dataNecessitat &&
-              (option.tipus === "Lliurament amb Coincidència" || option.tipus === "Lliurament amb Intermediari")) {
+              (option.tipus === "Lliurament amb Coincidència" || option.tipus === "Lliurament amb Intermediari" || esRecollidaAcademia)) {
             const diesSetmana = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
             const avui = new Date();
             avui.setHours(0, 0, 0, 0);
@@ -596,10 +627,34 @@ async function getDeliveryOptions(orders) {
             // Trobar el proper dia d'entrega (monitor va a escola destí)
             const diesEntrega = (monitor.destinoFinal?.dies || []).map(d => diesSetmana.indexOf(d.toLowerCase()));
 
-            if (diesRecollida.length > 0 && diesEntrega.length > 0) {
-              // Calcular la primera data de recollida viable (>= avui)
+            // Per a Recollida a Academia: el destinatari recull ell mateix (no hi ha cadena)
+            // El "dia d'entrega" és el proper dia que va a Academia
+            if (esRecollidaAcademia) {
+              const diesAcad = (option.diesAcademia || []).map(d => diesSetmana.indexOf(d.toLowerCase()));
+              let primeraVisita = null;
+              for (let i = 0; i <= 14; i++) {
+                const data = new Date(avui);
+                data.setDate(avui.getDate() + i);
+                if (diesAcad.includes(data.getDay())) {
+                  primeraVisita = data;
+                  break;
+                }
+              }
+              if (primeraVisita) {
+                const diesFins = Math.round((primeraVisita - avui) / (1000 * 60 * 60 * 24));
+                const aTemps = primeraVisita <= dataNec;
+                option.diesCadena = diesFins;
+                option.arribaATemps = aTemps;
+                option.dataEntregaPrevista = primeraVisita.toISOString().split('T')[0];
+                if (!aTemps) temporalModifier = 5000;
+                else if (diesFins <= 1) temporalModifier = -2000;
+                else if (diesFins <= 3) temporalModifier = -1000;
+              }
+            }
+            // Per a intermediaris: cadena recollida → entrega
+            else if (diesRecollida.length > 0 && diesEntrega.length > 0) {
               let primeraRecollida = null;
-              for (let i = 0; i <= 14; i++) { // buscar fins a 2 setmanes
+              for (let i = 0; i <= 14; i++) {
                 const data = new Date(avui);
                 data.setDate(avui.getDate() + i);
                 if (diesRecollida.includes(data.getDay())) {
@@ -608,7 +663,6 @@ async function getDeliveryOptions(orders) {
                 }
               }
 
-              // Calcular la primera data d'entrega viable (> recollida)
               let primeraEntrega = null;
               if (primeraRecollida) {
                 for (let i = 1; i <= 14; i++) {
