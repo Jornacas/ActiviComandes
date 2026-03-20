@@ -266,24 +266,22 @@ async function getDeliveryOptions(orderIds) {
               prioritat: opt.prioritat,
             });
           }
+          else if (opt.tipus === 'Autorecollida') {
+            const dataRecollida = formatDataCat(opt.dataRecollidaPrevista || opt.dataEntregaPrevista);
+            opcions.push({
+              tipus: 'Autorecollida',
+              descripcio: `Eixos deixa a ${opt.escola} (${distancia}). ${destinatari} recull allà${dataRecollida ? ' el ' + dataRecollida : ''} i porta a ${escolaFinal}.`,
+              escola: opt.escola,
+              prioritat: opt.prioritat,
+              arribaATemps: opt.arribaATemps !== undefined ? opt.arribaATemps : null,
+            });
+          }
           else if (opt.tipus === 'Entrega Directa des d\'Eixos') {
-            const esAutorecollida = monitor && monitor.tipus === 'autorecollida';
-            if (esAutorecollida) {
-              const dataRecollida = formatDataCat(opt.dataRecollidaPrevista || opt.dataEntregaPrevista);
-              opcions.push({
-                tipus: 'Autorecollida',
-                descripcio: `Eixos deixa a ${opt.escola} (${distancia}). ${destinatari} recull allà${dataRecollida ? ' el ' + dataRecollida : ''} i porta a ${escolaFinal}.`,
-                escola: opt.escola,
-                prioritat: opt.prioritat,
-                arribaATemps: opt.arribaATemps !== undefined ? opt.arribaATemps : null,
-              });
-            } else {
-              opcions.push({
-                tipus: 'Entrega Directa',
-                descripcio: `Eixos porta el material directament a ${opt.escola || escolaFinal}. Distància: ${distancia}.`,
-                prioritat: opt.prioritat,
-              });
-            }
+            opcions.push({
+              tipus: 'Entrega Directa',
+              descripcio: `Eixos porta el material directament a ${opt.escola || escolaFinal}. Distància: ${distancia}.`,
+              prioritat: opt.prioritat,
+            });
           }
           else if (monitor) {
             // Detectar si el intermediari és el propi destinatari (autorecollida)

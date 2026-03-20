@@ -356,7 +356,7 @@ async function getDeliveryOptions(orders) {
             if (escolaInfo.escola === 'Academia' || escolaInfo.escola === 'Eixos Creativa') return;
 
             const autoPickupOption = {
-              tipus: "Entrega Directa des d'Eixos",
+              tipus: "Autorecollida",
               escola: escolaInfo.escola,
               escoles: group.escoles,
               adreça: escolaInfo.adreça || "Adreça no disponible",
@@ -608,10 +608,16 @@ async function getDeliveryOptions(orders) {
               eficienciaScore = 30;
             }
           }
+          else if (option.tipus === "Autorecollida") {
+            // El destinatari recull ell mateix en una altra escola seva
+            // Molt fiable (no depèn de ningú), prioritat alta
+            tipusModifier = -7000;
+            option.eficiencia = "Màxima (sense dependències)";
+            eficienciaScore = 95;
+          }
           else if (option.tipus === "Lliurament amb Coincidència") {
-            // 🆕 FASE 2: Opciones con escuelas compartidas tienen ALTA prioridad
-            // Mejor que entrega directa pero después de recollida
-            tipusModifier = -5000; // Alta prioridad
+            // Opciones con escuelas compartidas tienen ALTA prioridad
+            tipusModifier = -5000;
 
             // Calcular eficiencia considerando que hay intermediario
             if (km < 3) {
@@ -665,8 +671,9 @@ async function getDeliveryOptions(orders) {
           const monitor = option.monitorsDisponibles?.[0];
 
           const esRecollidaAcademia = option.tipus === "Recollida a Eixos Creativa" && option.destinatariVaAcademia;
+          const esAutorecollida = option.tipus === "Autorecollida";
           if (monitor && option.dataNecessitat &&
-              (option.tipus === "Lliurament amb Coincidència" || option.tipus === "Lliurament amb Intermediari" || esRecollidaAcademia)) {
+              (option.tipus === "Lliurament amb Coincidència" || option.tipus === "Lliurament amb Intermediari" || esRecollidaAcademia || esAutorecollida)) {
             const diesSetmana = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
             const avui = new Date();
             avui.setHours(0, 0, 0, 0);
@@ -678,9 +685,32 @@ async function getDeliveryOptions(orders) {
             // Trobar el proper dia d'entrega (monitor va a escola destí)
             const diesEntrega = (monitor.destinoFinal?.dies || []).map(d => diesSetmana.indexOf(d.toLowerCase()));
 
-            // Per a Recollida a Academia: el destinatari recull ell mateix (no hi ha cadena)
-            // El "dia d'entrega" és el proper dia que va a Academia
-            if (esRecollidaAcademia) {
+            // Per a Autorecollida o Recollida a Academia: el destinatari recull ell mateix
+            if (esAutorecollida) {
+              // El dia d'entrega és quan el destinatari va a l'escola de recollida
+              const diesAutoRec = (monitor.dies || []).map(d => diesSetmana.indexOf(d.toLowerCase()));
+              let primeraVisita = null;
+              for (let i = 0; i <= 14; i++) {
+                const data = new Date(avui);
+                data.setDate(avui.getDate() + i);
+                if (diesAutoRec.includes(data.getDay())) {
+                  primeraVisita = data;
+                  break;
+                }
+              }
+              if (primeraVisita) {
+                const diesFins = Math.round((primeraVisita - avui) / (1000 * 60 * 60 * 24));
+                const aTemps = primeraVisita <= dataNec;
+                option.diesCadena = diesFins;
+                option.arribaATemps = aTemps;
+                option.dataRecollidaPrevista = primeraVisita.toLocaleDateString('sv-SE');
+                option.dataEntregaPrevista = primeraVisita.toLocaleDateString('sv-SE');
+                if (!aTemps) temporalModifier = 5000;
+                else if (diesFins <= 1) temporalModifier = -2000;
+                else if (diesFins <= 3) temporalModifier = -1000;
+              }
+            }
+            else if (esRecollidaAcademia) {
               const diesAcad = (option.diesAcademia || []).map(d => diesSetmana.indexOf(d.toLowerCase()));
               let primeraVisita = null;
               for (let i = 0; i <= 14; i++) {
