@@ -525,7 +525,9 @@ INSTRUCCIONS DE RESPOSTA:
 7. IDs només si cal per executar accions
 8. BREU. 2-3 opcions màxim
 9. **Negreta** per monitors, escoles i dies
-10. RESPON DIRECTAMENT amb la informació. No facis preguntes innecessàries si ja tens les dades.`;
+10. RESPON DIRECTAMENT amb la informació. No facis preguntes innecessàries si ja tens les dades.
+11. Quan l'usuari confirmi una opció o digui "fes-ho", "assigna", "porta-ho a X", EXECUTA assignDelivery immediatament. Ja tens els orderIds, la modalitat, el monitor i les escoles de la conversa anterior. NO demanis confirmació extra ni preguntes sobre dates o horaris — usa la dataNecessitat com a referència.
+12. Si l'usuari diu "portarem directament a [escola]" o "entrega directa a [escola]", assigna com a Directa a aquesta escola. Si diu "amb [nom monitor]", assigna com a Intermediari amb aquest monitor.`;
 }
 
 // ======================================================
