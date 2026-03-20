@@ -681,6 +681,7 @@ async function getDeliveryOptions(orders) {
 
                 option.diesCadena = diesFinsDesti;
                 option.arribaATemps = arribaATemps;
+                option.dataRecollidaPrevista = primeraRecollida.toISOString().split('T')[0];
                 option.dataEntregaPrevista = primeraEntrega.toISOString().split('T')[0];
 
                 if (!arribaATemps) {

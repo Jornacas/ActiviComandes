@@ -265,21 +265,30 @@ async function getDeliveryOptions(orderIds) {
           else if (monitor) {
             const escolaRecollida = opt.escola;
             const escolaPuntTrobada = opt.escolaDestino || opt.escolaCoincidencia || '?';
+
+            // Usar fechas concretas si están disponibles, sino días genéricos
+            const dataRecollida = opt.dataRecollidaPrevista || null;
+            const dataEntrega = opt.dataEntregaPrevista || null;
             const diesRecollida = (monitor.dies || []).join(', ');
             const diesPuntTrobada = (monitor.destinoFinal?.dies || []).join(', ');
+
+            const recollidaStr = dataRecollida
+              ? `${monitor.nom} recull a ${escolaRecollida} el ${dataRecollida}`
+              : `${monitor.nom} va a ${escolaRecollida} els: ${diesRecollida}`;
+            const entregaStr = dataEntrega
+              ? `${monitor.nom} porta a ${escolaPuntTrobada} el ${dataEntrega}`
+              : `${monitor.nom} va a ${escolaPuntTrobada} els: ${diesPuntTrobada}`;
 
             opcions.push({
               tipus: opt.tipus === 'Lliurament amb Coincidència' ? 'Coincidència' : 'Intermediari',
               intermediari: monitor.nom,
-              pas1_eixos_deixa: escolaRecollida,
-              pas1_distancia: distancia,
-              pas2_intermediari_recull: `${monitor.nom} va a ${escolaRecollida} els: ${diesRecollida}`,
-              pas3_intermediari_porta: `${monitor.nom} va a ${escolaPuntTrobada} els: ${diesPuntTrobada}`,
+              pas1_eixos_deixa: `Eixos deixa a ${escolaRecollida} (${distancia})`,
+              pas2_intermediari_recull: recollidaStr,
+              pas3_intermediari_porta: entregaStr,
               pas4_destinatari_recull: escolaPuntTrobada === escolaFinal
                 ? `${destinatari} rep el material a ${escolaFinal} (escola destí)`
                 : `${destinatari} recull a ${escolaPuntTrobada} (punt de trobada) i porta a ${escolaFinal} (escola destí)`,
               prioritat: opt.prioritat,
-              dataEntregaPrevista: opt.dataEntregaPrevista || null,
               arribaATemps: opt.arribaATemps !== undefined ? opt.arribaATemps : null,
               diesCadena: opt.diesCadena || null,
             });
