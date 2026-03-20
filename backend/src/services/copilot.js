@@ -279,19 +279,32 @@ async function getDeliveryOptions(orderIds) {
                 ? `${destinatari} rep el material a ${escolaFinal} (escola destí)`
                 : `${destinatari} recull a ${escolaPuntTrobada} (punt de trobada) i porta a ${escolaFinal} (escola destí)`,
               prioritat: opt.prioritat,
+              dataEntregaPrevista: opt.dataEntregaPrevista || null,
+              arribaATemps: opt.arribaATemps !== undefined ? opt.arribaATemps : null,
+              diesCadena: opt.diesCadena || null,
             });
           }
         });
 
-        // Ordenar por prioridad (más negativo = mejor)
-        opcions.sort((a, b) => a.prioritat - b.prioritat);
+        // Separar intermediarios de recollida/directa
+        const intermediaris = opcions.filter(o => o.tipus === 'Coincidència' || o.tipus === 'Intermediari');
+        const recollida = opcions.find(o => o.tipus === 'Recollida');
+        const directa = opcions.find(o => o.tipus === 'Entrega Directa');
+
+        // Intermediarios primero (ordenados por prioridad), luego directa, recollida como fallback
+        intermediaris.sort((a, b) => a.prioritat - b.prioritat);
+        const opcionsOrdenades = [
+          ...intermediaris.slice(0, 3), // máx 3 intermediarios
+          ...(directa ? [directa] : []),
+          ...(recollida ? [recollida] : []),
+        ];
 
         summaries.push({
           destinatari,
           escolaFinal,
           dataNecessitat,
           materials,
-          opcions: opcions.slice(0, 5), // máx 5 opciones
+          opcions: opcionsOrdenades,
         });
       }
 
@@ -299,7 +312,7 @@ async function getDeliveryOptions(orderIds) {
         success: true,
         totalPreparats: targetOrders.length,
         resum: summaries,
-        instruccions: `Presenta les opcions al usuari de forma clara i conversacional. Cada opció té passos numerats. La primera opció (menor prioritat) és la millor. La dataNecessitat indica quan el material HA d'estar a l'escola final. NO inventis res que no surti aquí.`,
+        instruccions: `Presenta les opcions al usuari. La PRIMERA opció és la RECOMANADA (⭐) — sempre serà un intermediari si n'hi ha. "Recollida a Eixos" és el FALLBACK, no la recomanada. Explica cada opció amb passos clars: 1) On deixa Eixos, 2) Qui recull i quin dia, 3) On porta i quin dia, 4) Com arriba al destinatari. Si una opció té arribaATemps=false, indica que arriba TARD. La dataNecessitat indica quan el material HA d'estar a l'escola final. NO inventis res.`,
       };
     }
     return { success: false, error: result.error || 'Error desconegut' };

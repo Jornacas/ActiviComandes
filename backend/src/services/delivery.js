@@ -578,11 +578,77 @@ async function getDeliveryOptions(orders) {
             }
           }
 
-          // Prioridad final: menor es mejor
-          option.prioritat = basePriority + tipusModifier;
-          option.eficienciaScore = eficienciaScore; // Para debugging
+          // 🆕 BONUS/PENALITZACIÓ TEMPORAL
+          // Calcular quants dies tarda la cadena intermediari→entrega vs dataNecessitat
+          let temporalModifier = 0;
+          const monitor = option.monitorsDisponibles?.[0];
 
-          console.log(`   📊 ${option.tipus} - ${option.escola}: ${km.toFixed(1)}km → Prioridad: ${option.prioritat}, Eficiència: ${option.eficiencia}`);
+          if (monitor && option.dataNecessitat &&
+              (option.tipus === "Lliurament amb Coincidència" || option.tipus === "Lliurament amb Intermediari")) {
+            const diesSetmana = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+            const avui = new Date();
+            avui.setHours(0, 0, 0, 0);
+            const dataNec = new Date(option.dataNecessitat);
+            dataNec.setHours(0, 0, 0, 0);
+
+            // Trobar el proper dia de recollida (monitor va a escola recollida)
+            const diesRecollida = (monitor.dies || []).map(d => diesSetmana.indexOf(d.toLowerCase()));
+            // Trobar el proper dia d'entrega (monitor va a escola destí)
+            const diesEntrega = (monitor.destinoFinal?.dies || []).map(d => diesSetmana.indexOf(d.toLowerCase()));
+
+            if (diesRecollida.length > 0 && diesEntrega.length > 0) {
+              // Calcular la primera data de recollida viable (>= avui)
+              let primeraRecollida = null;
+              for (let i = 0; i <= 14; i++) { // buscar fins a 2 setmanes
+                const data = new Date(avui);
+                data.setDate(avui.getDate() + i);
+                if (diesRecollida.includes(data.getDay())) {
+                  primeraRecollida = data;
+                  break;
+                }
+              }
+
+              // Calcular la primera data d'entrega viable (> recollida)
+              let primeraEntrega = null;
+              if (primeraRecollida) {
+                for (let i = 1; i <= 14; i++) {
+                  const data = new Date(primeraRecollida);
+                  data.setDate(primeraRecollida.getDate() + i);
+                  if (diesEntrega.includes(data.getDay())) {
+                    primeraEntrega = data;
+                    break;
+                  }
+                }
+              }
+
+              if (primeraEntrega) {
+                const diesFinsDesti = Math.round((primeraEntrega - avui) / (1000 * 60 * 60 * 24));
+                const arribaATemps = primeraEntrega <= dataNec;
+
+                option.diesCadena = diesFinsDesti;
+                option.arribaATemps = arribaATemps;
+                option.dataEntregaPrevista = primeraEntrega.toISOString().split('T')[0];
+
+                if (!arribaATemps) {
+                  temporalModifier = 5000; // Penalització forta: arriba tard
+                } else if (diesFinsDesti <= 1) {
+                  temporalModifier = -2000; // Bonus: entrega molt ràpida
+                } else if (diesFinsDesti <= 3) {
+                  temporalModifier = -1000; // Bonus: entrega ràpida
+                } else if (diesFinsDesti <= 5) {
+                  temporalModifier = 0; // Neutral
+                } else {
+                  temporalModifier = 1000; // Penalització: tarda massa
+                }
+              }
+            }
+          }
+
+          // Prioridad final: menor es mejor
+          option.prioritat = basePriority + tipusModifier + temporalModifier;
+          option.eficienciaScore = eficienciaScore;
+
+          console.log(`   📊 ${option.tipus} - ${option.escola}: ${km.toFixed(1)}km, temporal: ${temporalModifier} → Prioridad: ${option.prioritat}, Eficiència: ${option.eficiencia}${option.dataEntregaPrevista ? ', entrega: ' + option.dataEntregaPrevista : ''}${option.arribaATemps === false ? ' ⚠️ TARD' : ''}`);
         }
       });
     } else {
