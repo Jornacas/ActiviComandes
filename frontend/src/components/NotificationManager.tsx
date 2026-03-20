@@ -172,7 +172,9 @@ ${schoolsText}${noteText}
 
         // CASO 4: Intermediario = Destinatario (solo su material)
         if (materialesPropios.length > 0 && materialesOtros.length === 0) {
-          // Agrupar materiales por escuela destino
+          const escolaRecollida = order.pickupSchool || order.escolaDestinoIntermediari || 'N/A';
+
+          // Agrupar per escola i ordenar per data
           const materialsBySchool: { [key: string]: any[] } = {};
           materialesPropios.forEach(item => {
             const school = item.escola || 'N/A';
@@ -180,34 +182,41 @@ ${schoolsText}${noteText}
             materialsBySchool[school].push(item);
           });
 
-          const schoolEntries = Object.entries(materialsBySchool);
-          const escolaRecollida = order.pickupSchool || order.escolaDestinoIntermediari || 'N/A';
+          const schoolEntries = Object.entries(materialsBySchool).sort((a, b) => {
+            const dA = new Date(a[1][0].dataNecessitat || '').getTime() || 0;
+            const dB = new Date(b[1][0].dataNecessitat || '').getTime() || 0;
+            return dA - dB;
+          });
 
           let materialsText;
           if (schoolEntries.length === 1) {
-            // Una sola escuela destino
             materialsText = materialesPropios.map((item: any, index: number) =>
               `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
             ).join('\n');
           } else {
-            // Multiples escuelas destino — agrupar per escola
             materialsText = schoolEntries.map(([school, materials]) => {
               const itemsText = materials.map((item: any, index: number) =>
                 `      ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
               ).join('\n');
-              return `   Per a ${school} (${formatDate(materials[0].dataNecessitat)}):\n${itemsText}`;
+              const isAtPickup = school === escolaRecollida;
+              const label = isAtPickup
+                ? `Per a ${school} (${formatDate(materials[0].dataNecessitat)}) - ja disponible al punt de recollida`
+                : `Per a ${school} (${formatDate(materials[0].dataNecessitat)}) - porta des de ${escolaRecollida}`;
+              return `   ${label}:\n${itemsText}`;
             }).join('\n\n');
           }
 
-          const destText = schoolEntries.length === 1
-            ? `Escola: ${schoolEntries[0][0]}\nData que necessites: ${formatDate(order.dataNecessitat)}`
-            : `Escoles:\n${schoolEntries.map(([school, materials]) =>
-                `   - ${school} (${formatDate(materials[0].dataNecessitat)})`
-              ).join('\n')}`;
-
-          const noteText = schoolEntries.length > 1
-            ? `\nNOTA: Recull tot el material a ${escolaRecollida} i distribueix-lo a les teves escoles.`
-            : `\nNOTA: Recull el material a ${escolaRecollida} i porta'l a ${schoolEntries[0][0]}.`;
+          const schoolsToCarry = schoolEntries.filter(([school]) => school !== escolaRecollida);
+          let noteText;
+          if (schoolEntries.length === 1 && schoolEntries[0][0] === escolaRecollida) {
+            noteText = `\nEl material ja es al teu centre. Nomes cal recollir-lo.`;
+          } else if (schoolEntries.length === 1) {
+            noteText = `\nRecull el material a ${escolaRecollida} i porta'l a ${schoolEntries[0][0]}.`;
+          } else if (schoolsToCarry.length > 0) {
+            noteText = `\nRecull tot el material a ${escolaRecollida}. Distribueix a: ${schoolsToCarry.map(([s]) => s).join(', ')}.`;
+          } else {
+            noteText = `\nRecull el material a ${escolaRecollida}.`;
+          }
 
           return `RECOLLIDA DEL TEU MATERIAL - ${order.monitorIntermediari || 'N/A'}
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -219,9 +228,6 @@ Ubicacio: Consergeria, AFA o Caixa de Material
 
 EL TEU MATERIAL:
 ${materialsText}
-
-DESTI FINAL:
-${destText}
 ${noteText}
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
         }
