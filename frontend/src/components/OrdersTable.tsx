@@ -37,6 +37,7 @@ import StatusUpdateBar from './StatusUpdateBar';
 import OrderNotesDialog from './OrderNotesDialog';
 import NotificationManager, { type NotificationManagerRef } from './NotificationManager';
 import OrderDetailsDrawer from './OrderDetailsDrawer';
+import MobileOrdersList from './MobileOrdersList';
 
 export default function OrdersTable() {
   const theme = useTheme();
@@ -1310,14 +1311,30 @@ export default function OrdersTable() {
       overflow: 'hidden',
       bgcolor: 'grey.50',
       minHeight: '100vh',
-      p: 3,
+      p: { xs: 1.5, sm: 3 },
       '& .MuiDataGrid-root': {
         border: 'none',
       }
     }}>
 
-      {/* Header Optimitzat */}
-      {stats && (
+      {/* Vista mòbil */}
+      {isMobile && (
+        <MobileOrdersList
+          orders={orders}
+          stats={stats}
+          onOrderClick={(order) => {
+            setSelectedOrderForDrawer(order);
+            setDrawerOpen(true);
+          }}
+          onRefresh={loadData}
+          onSync={syncFormResponses}
+          updating={updating}
+          refreshingSpaces={refreshingSpaces}
+        />
+      )}
+
+      {/* Header Optimitzat - Desktop */}
+      {!isMobile && stats && (
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
@@ -1483,7 +1500,7 @@ export default function OrdersTable() {
       </Stack>
 
       {/* Toolbar de Acciones */}
-      <StatusUpdateBar
+      {!isMobile && <StatusUpdateBar
         selectedCount={selectedRows.length}
         selectedRows={selectedRows as any[]}
         newStatus={newStatus}
@@ -1496,10 +1513,10 @@ export default function OrdersTable() {
         onUpdateStatus={updateStatus}
         onDeleteOrders={deleteSelectedOrders}
         onRemoveIntermediary={handleRemoveIntermediary}
-      />
+      />}
 
-      {/* DataGrid */}
-      <Card>
+      {/* DataGrid - Desktop */}
+      {!isMobile && <Card>
         <Box sx={{ height: { xs: 'calc(100vh - 280px)', sm: 600 }, width: '100%', px: { xs: 0.5, sm: 2 }, pb: 2 }}>
           <DataGrid
             rows={orders}
@@ -1613,7 +1630,7 @@ export default function OrdersTable() {
           }}
           />
         </Box>
-      </Card>
+      </Card>}
 
       {/* NotificationManager - handles modal, snackbar, and notification logic */}
       <NotificationManager
