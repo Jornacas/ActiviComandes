@@ -340,13 +340,24 @@ async function getDeliveryOptions(orderIds) {
         intermediaris.sort((a, b) => a.prioritat - b.prioritat);
         autorecollides.sort((a, b) => a.prioritat - b.prioritat);
 
-        // Autorecollida primer (el destinatari no depèn de ningú), després intermediaris, després fallbacks
+        // Autorecollida primer, després intermediaris, després fallbacks
         const opcionsOrdenades = [
           ...autorecollides.slice(0, 2),
           ...intermediaris.slice(0, 3),
           ...(directa ? [directa] : []),
           ...(recollida ? [recollida] : []),
         ];
+
+        // Marcar la primera opció com a RECOMANADA amb motiu explícit
+        if (opcionsOrdenades.length > 0) {
+          const millor = opcionsOrdenades[0];
+          millor.recomanada = true;
+          if (millor.tipus === 'Autorecollida') {
+            millor.motiu = `ÉS LA MILLOR OPCIÓ perquè ${destinatari} JA VA a ${millor.escola} per la seva activitat. No depèn de cap altra persona. Eixos només ha de deixar el material allà i ${destinatari} el recull quan hi va normalment.`;
+          } else if (millor.tipus === 'Coincidència' || millor.tipus === 'Intermediari') {
+            millor.motiu = `Opció eficient amb intermediari ${millor.intermediari}. Depèn de la disponibilitat de ${millor.intermediari}.`;
+          }
+        }
 
         summaries.push({
           destinatari,
@@ -361,7 +372,7 @@ async function getDeliveryOptions(orderIds) {
         success: true,
         totalPreparats: targetOrders.length,
         resum: summaries,
-        instruccions: `Presenta les opcions al usuari. La PRIMERA opció és la RECOMANADA (⭐) — sempre serà un intermediari si n'hi ha. "Recollida a Eixos" és el FALLBACK, no la recomanada. Explica cada opció amb passos clars: 1) On deixa Eixos, 2) Qui recull i quin dia, 3) On porta i quin dia, 4) Com arriba al destinatari. Si una opció té arribaATemps=false, indica que arriba TARD. La dataNecessitat indica quan el material HA d'estar a l'escola final. NO inventis res.`,
+        instruccions: `REGLA ABSOLUTA: L'opció amb recomanada=true és la MILLOR. Presenta-la PRIMERA amb ⭐ i el motiu. NO canviïs l'ordre de les opcions. NO reordenis segons el teu criteri. L'ordre que reps és l'ordre correcte. Autorecollida > Intermediari > Directa > Recollida. Si una opció té arribaATemps=false, indica que arriba TARD. NO inventis res.`,
       };
     }
     return { success: false, error: result.error || 'Error desconegut' };
