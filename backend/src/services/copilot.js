@@ -420,6 +420,22 @@ const toolDefinitions = [
     },
   },
   {
+    name: 'assignDelivery',
+    description: "Assigna una entrega amb intermediari, coincidència o directa. Actualitza l'estat a 'Assignat', registra el monitor intermediari, escola de recollida i escola destí al Google Sheet.",
+    parameters: {
+      type: 'object',
+      properties: {
+        orderIds: { type: 'array', items: { type: 'string' }, description: "IDs de les comandes a assignar" },
+        modalitat: { type: 'string', description: "Tipus: 'Intermediari', 'Coincidencia', 'Directa' o 'Recollida'" },
+        monitorIntermediaria: { type: 'string', description: "Nom del monitor intermediari (null si és directa o recollida)" },
+        escolaRecollida: { type: 'string', description: "Escola on Eixos deixa el material (on recull l'intermediari)" },
+        escolaDestino: { type: 'string', description: "Escola on l'intermediari entrega (punt de trobada o escola destí)" },
+        dataEntrega: { type: 'string', description: "Data prevista d'entrega (YYYY-MM-DD)" },
+      },
+      required: ['orderIds', 'modalitat'],
+    },
+  },
+  {
     name: 'sendNotification',
     description: "Envia notificació per Google Chat.",
     parameters: {
@@ -440,6 +456,14 @@ const functionMap = {
   updateNotes: (args) => updateNotes(args.orderId, args.notes),
   deleteOrders: (args) => deleteOrders(args.uuids),
   getDeliveryOptions: (args) => getDeliveryOptions(args.orderIds),
+  assignDelivery: (args) => delivery.createDelivery({
+    orderIds: args.orderIds,
+    modalitat: args.modalitat,
+    monitorIntermediaria: args.monitorIntermediaria || null,
+    escolaDestino: args.escolaDestino || null,
+    escolaRecollida: args.escolaRecollida || null,
+    dataEntrega: args.dataEntrega || null,
+  }),
   sendNotification: (args) => sendNotification(args.spaceName, args.message),
 };
 
@@ -486,6 +510,7 @@ REGLA CRÍTICA - ÚS DE TOOLS:
 - Quan l'usuari demani informació de comandes: CRIDA SEMPRE getOrders amb els filtres adequats. NO diguis "no trobo" sense haver cridat la funció.
 - Si getDeliveryOptions no troba la comanda com a "Preparat", prova sense filtre d'estat i informa l'usuari de l'estat actual.
 - MAI demanis l'ID de la comanda a l'usuari. Busca-la tu amb getOrders filtrant per nom del monitor.
+- Quan l'usuari confirmi una opció d'entrega, CRIDA assignDelivery amb els orderIds, modalitat, monitorIntermediaria, escolaRecollida, escolaDestino i dataEntrega. Això registra l'intermediari al sistema i canvia l'estat a Assignat automàticament. NO facis servir updateOrderStatus per a assignacions — usa assignDelivery.
 - Per a PLANS D'ENTREGA MÚLTIPLES (vàries comandes): 1) Crida getOrders per obtenir les comandes pendents. 2) Crida getDeliveryOptions per CADA comanda o grup. 3) Combina els resultats reals en un pla. MAI inventes plans basant-te en getMasterData o en el teu raonament.
 - MAI inventes a quina escola va un monitor, ni quin dia, ni quina hora. Aquesta informació NOMÉS la pots obtenir cridant getDeliveryOptions (que consulta les dades reals).
 - getMasterData serveix per respondre preguntes informatives (horaris, escoles d'un monitor). NO serveix per planificar entregues — per això existeix getDeliveryOptions.
