@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Tabs,
@@ -11,6 +11,7 @@ import {
   Tooltip,
   useMediaQuery,
   useTheme,
+  IconButton,
 } from '@mui/material';
 import {
   TableChart,
@@ -18,6 +19,7 @@ import {
   PhoneAndroid,
   OpenInNew,
   Help,
+  GetApp,
 } from '@mui/icons-material';
 
 import OrdersTable from './OrdersTable';
@@ -60,6 +62,23 @@ export default function AdminTabs() {
   const [mobileAppOpen, setMobileAppOpen] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const result = await installPrompt.userChoice;
+    if (result.outcome === 'accepted') setInstallPrompt(null);
+  };
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -88,6 +107,22 @@ export default function AdminTabs() {
             }}
           />
         </Box>
+        {installPrompt && (
+          <Tooltip title="Instal·lar app">
+            <IconButton
+              onClick={handleInstall}
+              sx={{
+                bgcolor: 'primary.main',
+                color: 'white',
+                '&:hover': { bgcolor: 'primary.dark' },
+                flexShrink: 0,
+              }}
+              size={isMobile ? 'small' : 'medium'}
+            >
+              <GetApp />
+            </IconButton>
+          </Tooltip>
+        )}
         <Box sx={{ flex: 1, textAlign: 'center' }}>
           <Typography
             variant={isMobile ? 'h6' : 'h4'}
