@@ -20,6 +20,8 @@ import {
   Tooltip,
   IconButton,
   Collapse,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Sync,
@@ -37,6 +39,9 @@ import NotificationManager, { type NotificationManagerRef } from './Notification
 import OrderDetailsDrawer from './OrderDetailsDrawer';
 
 export default function OrdersTable() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   // Core data state
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1315,7 +1320,7 @@ export default function OrdersTable() {
       {stats && (
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
               {/* Título + Stats en línea */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1495,12 +1500,13 @@ export default function OrdersTable() {
 
       {/* DataGrid */}
       <Card>
-        <Box sx={{ height: 600, width: '100%', px: 2, pb: 2 }}>
+        <Box sx={{ height: { xs: 'calc(100vh - 280px)', sm: 600 }, width: '100%', px: { xs: 0.5, sm: 2 }, pb: 2 }}>
           <DataGrid
             rows={orders}
           columns={columns}
           checkboxSelection
           disableRowSelectionOnClick
+          density={isMobile ? 'compact' : 'standard'}
           onRowSelectionModelChange={setSelectedRows}
           rowSelectionModel={selectedRows}
           processRowUpdate={async (newRow, oldRow) => {
@@ -1535,7 +1541,30 @@ export default function OrdersTable() {
             console.error('Error processing row update:', error);
             setError('Error processant l\'actualització');
           }}
-          columnVisibilityModel={{
+          columnVisibilityModel={isMobile ? {
+            actions: true,
+            nomCognoms: true,
+            escola: true,
+            estat: true,
+            timestamp: false,
+            dataNecessitat: false,
+            activitat: false,
+            material: false,
+            esMaterialPersonalitzat: false,
+            unitats: false,
+            comentarisGenerals: false,
+            modalitatEntrega: false,
+            responsablePreparacio: false,
+            monitorIntermediari: false,
+            escolaDestinoIntermediari: false,
+            dataLliuramentPrevista: false,
+            escolaRecollida: false,
+            escolesDestiFinal: false,
+            distanciaAcademia: false,
+            notesEntrega: false,
+            notifIntermediario: false,
+            notifDestinatario: false,
+          } : {
             esMaterialPersonalitzat: false,
             distanciaAcademia: false,
             comentarisGenerals: false,

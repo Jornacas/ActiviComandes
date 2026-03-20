@@ -14,6 +14,7 @@ import {
   TextField,
   Snackbar,
 } from '@mui/material';
+import { useMediaQuery, useTheme } from '@mui/material';
 import { API_BASE_URL, API_TOKEN } from '../lib/api';
 import { formatDateCatalan } from '../utils/orderUtils';
 
@@ -33,6 +34,9 @@ export interface NotificationManagerRef {
 
 const NotificationManager = forwardRef<NotificationManagerRef, NotificationManagerProps>(
   ({ orders, notificationStatuses, loadingNotificationStatuses, onNotificationStatusesChange, onLoadingStatusesChange, onRefreshData }, ref) => {
+    const nmTheme = useTheme();
+    const nmIsMobile = useMediaQuery(nmTheme.breakpoints.down('sm'));
+
     // Internal state
     const [notificationModalOpen, setNotificationModalOpen] = useState(false);
     const [selectedOrderForNotification, setSelectedOrderForNotification] = useState<any>(null);
@@ -502,6 +506,7 @@ ${materialsText}
           onClose={() => setNotificationModalOpen(false)}
           maxWidth="md"
           fullWidth
+          fullScreen={nmIsMobile}
         >
           <DialogTitle>
             {'📤 Enviar Notificació '}{notificationType === 'intermediario' ? "a l'Intermediari" : 'al Destinatari'}

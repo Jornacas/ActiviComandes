@@ -172,11 +172,11 @@ export default function CopilotChat() {
           onClick={() => setOpen(true)}
           sx={{
             position: 'fixed',
-            bottom: 24,
-            right: 24,
+            bottom: { xs: 16, sm: 24 },
+            right: { xs: 16, sm: 24 },
             zIndex: 1000,
-            width: 60,
-            height: 60,
+            width: { xs: 48, sm: 60 },
+            height: { xs: 48, sm: 60 },
             background: 'linear-gradient(135deg, #1976d2 0%, #7c4dff 100%)',
             boxShadow: '0 4px 20px rgba(25, 118, 210, 0.4)',
             '&:hover': {

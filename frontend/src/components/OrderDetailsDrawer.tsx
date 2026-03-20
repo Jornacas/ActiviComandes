@@ -174,7 +174,7 @@ export default function OrderDetailsDrawer({
             </Box>
 
             {/* Content */}
-            <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+            <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 2, sm: 3 } }}>
               <Stack spacing={3}>
                 {/* Estado */}
                 <Box>
