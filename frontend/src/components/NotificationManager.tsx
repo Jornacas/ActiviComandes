@@ -55,7 +55,7 @@ const NotificationManager = forwardRef<NotificationManagerRef, NotificationManag
     // Función para generar el mensaje de notificación MEJORADO
     const generateNotificationMessage = (order: any, type: 'intermediario' | 'destinatario'): string => {
       // Agrupar materiales del mismo lote (ID_Lliurament)
-      const orderMaterials = orders.filter(o =>
+      let orderMaterials = orders.filter(o =>
         o.idLliurament && o.idLliurament === order.idLliurament &&
         o.monitorIntermediari && o.monitorIntermediari.trim() !== ''
       ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
@@ -64,6 +64,38 @@ const NotificationManager = forwardRef<NotificationManagerRef, NotificationManag
       const isDirectDelivery = !order.monitorIntermediari ||
                                order.monitorIntermediari.trim() === '' ||
                                order.monitorIntermediari.toUpperCase() === 'DIRECTA';
+
+      // Si no hay materiales agrupados por lliurament, agrupar por destinatari + escola
+      if (orderMaterials.length === 0 && isDirectDelivery) {
+        orderMaterials = orders.filter(o =>
+          o.nomCognoms === order.nomCognoms &&
+          o.escola === order.escola &&
+          o.dataNecessitat === order.dataNecessitat
+        ).sort((a, b) => (a.idItem || '').localeCompare(b.idItem || ''));
+      }
+
+      // CASO: Sin intermediario, sin lliurament — entrega directa simple
+      if (isDirectDelivery && type === 'destinatario' && orderMaterials.length > 0 && !order.idLliurament) {
+        const materialsText = orderMaterials.map((item: any, index: number) =>
+          `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+        ).join('\n');
+
+        const escola = order.escola || 'N/A';
+        const dataStr = formatDate(order.dataNecessitat);
+
+        return `MATERIAL PREPARAT - ${order.nomCognoms || 'N/A'}
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Destinatari: ${order.nomCognoms || 'N/A'}
+Escola: ${escola}
+Data: ${dataStr}
+
+MATERIALS:
+${materialsText}
+
+El material esta disponible a ${escola}.
+Ubicacio: Consergeria, AFA o Caixa de Material.
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
+      }
 
       // CASO: ENTREGA DIRECTA
       if (isDirectDelivery && type === 'destinatario') {
