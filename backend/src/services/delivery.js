@@ -313,20 +313,21 @@ async function getDeliveryOptions(orders) {
 
         const directDeliveryOption = {
           tipus: "Entrega Directa des d'Eixos",
-          escola: escolaDestino, // Escuela de destino
+          escola: escolaDestino,
           escoles: group.escoles,
           adreça: escolaAddress || "Adreça no disponible",
           eficiencia: "Calculant...",
-          prioritat: 2, // Prioridad media (después de recollida pero antes de intermediari)
+          prioritat: 2,
+          esDestiDirecte: true, // El destinatari JA va a aquesta escola (és l'escola del pedido)
           nomCognoms: group.nomCognoms,
           dataNecessitat: group.dataNecessitat,
           monitorsDisponibles: [{
-            nom: "Equip Eixos Creativa",
+            nom: group.nomCognoms,
             dies: diesDisponibles,
-            tipus: "entrega-directa",
+            tipus: "entrega-directa-desti",
             activitat: 'N/A'
           }],
-          descripció: `Eixos Creativa entrega directament a ${escolaDestino} per ${group.nomCognoms}`,
+          descripció: `Eixos deixa a ${escolaDestino} (escola destí) → ${group.nomCognoms} ja va allà per activitat`,
           distanciaAcademia: "Calculant...",
           tempsAcademia: "Calculant...",
           notes: "Entrega directa per l'equip d'Eixos",
@@ -647,21 +648,36 @@ async function getDeliveryOptions(orders) {
             }
           }
           else if (option.tipus === "Entrega Directa des d'Eixos") {
-            // Directa: solo buena si es cercana
-            tipusModifier = 0;
-
-            if (km < 2) {
-              option.eficiencia = "Alta";
-              eficienciaScore = 75;
-            } else if (km < 4) {
-              option.eficiencia = "Mitjana";
-              eficienciaScore = 60;
-            } else if (km < 7) {
-              option.eficiencia = "Baixa";
-              eficienciaScore = 45;
+            if (option.esDestiDirecte) {
+              // Entrega directa a l'escola DESTÍ del pedido — el destinatari JA hi va
+              // Equivalent a autorecollida però a l'escola final (la més lògica)
+              tipusModifier = -7000;
+              if (km < 2) {
+                option.eficiencia = "Màxima (escola destí propera)";
+                eficienciaScore = 98;
+              } else if (km < 4) {
+                option.eficiencia = "Alta (escola destí)";
+                eficienciaScore = 85;
+              } else {
+                option.eficiencia = "Mitjana (escola destí lluny)";
+                eficienciaScore = 65;
+              }
             } else {
-              option.eficiencia = "Molt Baixa";
-              eficienciaScore = 30;
+              // Directa a una escola que NO és la del pedido
+              tipusModifier = 0;
+              if (km < 2) {
+                option.eficiencia = "Alta";
+                eficienciaScore = 75;
+              } else if (km < 4) {
+                option.eficiencia = "Mitjana";
+                eficienciaScore = 60;
+              } else if (km < 7) {
+                option.eficiencia = "Baixa";
+                eficienciaScore = 45;
+              } else {
+                option.eficiencia = "Molt Baixa";
+                eficienciaScore = 30;
+              }
             }
           }
 

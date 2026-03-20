@@ -277,9 +277,12 @@ async function getDeliveryOptions(orderIds) {
             });
           }
           else if (opt.tipus === 'Entrega Directa des d\'Eixos') {
+            const esDestiDirecte = opt.esDestiDirecte;
             opcions.push({
-              tipus: 'Entrega Directa',
-              descripcio: `Eixos porta el material directament a ${opt.escola || escolaFinal}. Distància: ${distancia}.`,
+              tipus: esDestiDirecte ? 'Entrega a escola destí' : 'Entrega Directa',
+              descripcio: esDestiDirecte
+                ? `Eixos deixa a ${opt.escola} (${distancia}). ${destinatari} ja va allà per activitat — rep el material directament.`
+                : `Eixos porta el material directament a ${opt.escola || escolaFinal}. Distància: ${distancia}.`,
               prioritat: opt.prioritat,
             });
           }
@@ -332,7 +335,7 @@ async function getDeliveryOptions(orderIds) {
 
         // Separar per tipus
         const intermediaris = opcions.filter(o => o.tipus === 'Coincidència' || o.tipus === 'Intermediari');
-        const autorecollides = opcions.filter(o => o.tipus === 'Autorecollida');
+        const autorecollides = opcions.filter(o => o.tipus === 'Autorecollida' || o.tipus === 'Entrega a escola destí');
         const recollida = opcions.find(o => o.tipus === 'Recollida');
         const directa = opcions.find(o => o.tipus === 'Entrega Directa');
 
