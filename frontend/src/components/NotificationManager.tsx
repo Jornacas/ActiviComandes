@@ -172,27 +172,57 @@ ${schoolsText}${noteText}
 
         // CASO 4: Intermediario = Destinatario (solo su material)
         if (materialesPropios.length > 0 && materialesOtros.length === 0) {
-          const materialsText = materialesPropios.map((item: any, index: number) =>
-            `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
-          ).join('\n');
+          // Agrupar materiales por escuela destino
+          const materialsBySchool: { [key: string]: any[] } = {};
+          materialesPropios.forEach(item => {
+            const school = item.escola || 'N/A';
+            if (!materialsBySchool[school]) materialsBySchool[school] = [];
+            materialsBySchool[school].push(item);
+          });
 
-          return `\u{1F4E6} RECOLLIDA DEL TEU MATERIAL - ${order.monitorIntermediari || 'N/A'}
+          const schoolEntries = Object.entries(materialsBySchool);
+          const escolaRecollida = order.pickupSchool || order.escolaDestinoIntermediari || 'N/A';
+
+          let materialsText;
+          if (schoolEntries.length === 1) {
+            // Una sola escuela destino
+            materialsText = materialesPropios.map((item: any, index: number) =>
+              `   ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+            ).join('\n');
+          } else {
+            // Multiples escuelas destino — agrupar per escola
+            materialsText = schoolEntries.map(([school, materials]) => {
+              const itemsText = materials.map((item: any, index: number) =>
+                `      ${index + 1}. ${item.material || 'N/A'} (${item.unitats || 1} unitats)`
+              ).join('\n');
+              return `   Per a ${school} (${formatDate(materials[0].dataNecessitat)}):\n${itemsText}`;
+            }).join('\n\n');
+          }
+
+          const destText = schoolEntries.length === 1
+            ? `Escola: ${schoolEntries[0][0]}\nData que necessites: ${formatDate(order.dataNecessitat)}`
+            : `Escoles:\n${schoolEntries.map(([school, materials]) =>
+                `   - ${school} (${formatDate(materials[0].dataNecessitat)})`
+              ).join('\n')}`;
+
+          const noteText = schoolEntries.length > 1
+            ? `\nNOTA: Recull tot el material a ${escolaRecollida} i distribueix-lo a les teves escoles.`
+            : `\nNOTA: Recull el material a ${escolaRecollida} i porta'l a ${schoolEntries[0][0]}.`;
+
+          return `RECOLLIDA DEL TEU MATERIAL - ${order.monitorIntermediari || 'N/A'}
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
-\u{1F4E5} RECOLLIDA:
-\u{1F3EB} Escola: ${order.pickupSchool || 'N/A'}
-\u{1F4C5} Data: ${formatDate(order.dataLliuramentPrevista)}
-\u{1F4CD} Ubicaci\u00F3: Consergeria, AFA o Caixa de Material
+RECOLLIDA:
+Escola: ${escolaRecollida}
+Data: ${formatDate(order.dataLliuramentPrevista)}
+Ubicacio: Consergeria, AFA o Caixa de Material
 
-\u{1F7E2} EL TEU MATERIAL:
+EL TEU MATERIAL:
 ${materialsText}
 
-\u{1F4E4} DEST\u00CD FINAL:
-\u{1F3EB} Escola: ${order.escola || 'N/A'}
-\u{1F4C5} Data que necessites: ${formatDate(order.dataNecessitat)}
-
-\u2139\uFE0F NOTA: Recollir\u00E0s el teu material a ${order.escolaDestinoIntermediari || 'N/A'}
-i te'l portar\u00E0s a ${order.escola || 'N/A'} per a la teva activitat.
+DESTI FINAL:
+${destText}
+${noteText}
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
         }
 
