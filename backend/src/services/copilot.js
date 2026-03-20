@@ -267,53 +267,85 @@ async function getDeliveryOptions(orderIds) {
             });
           }
           else if (opt.tipus === 'Entrega Directa des d\'Eixos') {
-            opcions.push({
-              tipus: 'Entrega Directa',
-              descripcio: `Eixos porta el material directament a ${escolaFinal}. Distància: ${distancia}.`,
-              prioritat: opt.prioritat,
-            });
+            const esAutorecollida = monitor && monitor.tipus === 'autorecollida';
+            if (esAutorecollida) {
+              const dataRecollida = formatDataCat(opt.dataRecollidaPrevista || opt.dataEntregaPrevista);
+              opcions.push({
+                tipus: 'Autorecollida',
+                descripcio: `Eixos deixa a ${opt.escola} (${distancia}). ${destinatari} recull allà${dataRecollida ? ' el ' + dataRecollida : ''} i porta a ${escolaFinal}.`,
+                escola: opt.escola,
+                prioritat: opt.prioritat,
+                arribaATemps: opt.arribaATemps !== undefined ? opt.arribaATemps : null,
+              });
+            } else {
+              opcions.push({
+                tipus: 'Entrega Directa',
+                descripcio: `Eixos porta el material directament a ${opt.escola || escolaFinal}. Distància: ${distancia}.`,
+                prioritat: opt.prioritat,
+              });
+            }
           }
           else if (monitor) {
-            const escolaRecollida = opt.escola;
-            const escolaPuntTrobada = opt.escolaDestino || opt.escolaCoincidencia || '?';
+            // Detectar si el intermediari és el propi destinatari (autorecollida)
+            const esAutoIntermediari = monitor.nom.toLowerCase().includes(destinatari.toLowerCase()) ||
+              destinatari.toLowerCase().includes(monitor.nom.toLowerCase());
 
-            const dataRecollida = formatDataCat(opt.dataRecollidaPrevista);
-            const dataEntrega = formatDataCat(opt.dataEntregaPrevista);
-            const diesRecollida = (monitor.dies || []).join(', ');
-            const diesPuntTrobada = (monitor.destinoFinal?.dies || []).join(', ');
+            if (esAutoIntermediari) {
+              const dataRecollida = formatDataCat(opt.dataRecollidaPrevista);
+              opcions.push({
+                tipus: 'Autorecollida',
+                descripcio: `Eixos deixa a ${opt.escola} (${distancia}). ${destinatari} recull allà${dataRecollida ? ' el ' + dataRecollida : ''} i porta a ${escolaFinal}.`,
+                escola: opt.escola,
+                prioritat: opt.prioritat,
+                arribaATemps: opt.arribaATemps !== undefined ? opt.arribaATemps : null,
+              });
+            } else {
+              const escolaRecollida = opt.escola;
+              const escolaPuntTrobada = opt.escolaDestino || opt.escolaCoincidencia || '?';
 
-            const recollidaStr = dataRecollida
-              ? `${monitor.nom} recull a ${escolaRecollida} el ${dataRecollida}`
-              : `${monitor.nom} va a ${escolaRecollida} els: ${diesRecollida}`;
-            const entregaStr = dataEntrega
-              ? `${monitor.nom} porta a ${escolaPuntTrobada} el ${dataEntrega}`
-              : `${monitor.nom} va a ${escolaPuntTrobada} els: ${diesPuntTrobada}`;
+              const dataRecollida = formatDataCat(opt.dataRecollidaPrevista);
+              const dataEntrega = formatDataCat(opt.dataEntregaPrevista);
+              const diesRecollida = (monitor.dies || []).join(', ');
+              const diesPuntTrobada = (monitor.destinoFinal?.dies || []).join(', ');
 
-            opcions.push({
-              tipus: opt.tipus === 'Lliurament amb Coincidència' ? 'Coincidència' : 'Intermediari',
-              intermediari: monitor.nom,
-              pas1_eixos_deixa: `Eixos deixa a ${escolaRecollida} (${distancia})`,
-              pas2_intermediari_recull: recollidaStr,
-              pas3_intermediari_porta: entregaStr,
-              pas4_destinatari_recull: escolaPuntTrobada === escolaFinal
-                ? `${destinatari} rep el material a ${escolaFinal} (escola destí)`
-                : `${destinatari} recull a ${escolaPuntTrobada} (punt de trobada) i porta a ${escolaFinal} (escola destí)`,
-              prioritat: opt.prioritat,
-              arribaATemps: opt.arribaATemps !== undefined ? opt.arribaATemps : null,
-              diesCadena: opt.diesCadena || null,
-            });
+              const recollidaStr = dataRecollida
+                ? `${monitor.nom} recull a ${escolaRecollida} el ${dataRecollida}`
+                : `${monitor.nom} va a ${escolaRecollida} els: ${diesRecollida}`;
+              const entregaStr = dataEntrega
+                ? `${monitor.nom} porta a ${escolaPuntTrobada} el ${dataEntrega}`
+                : `${monitor.nom} va a ${escolaPuntTrobada} els: ${diesPuntTrobada}`;
+
+              opcions.push({
+                tipus: opt.tipus === 'Lliurament amb Coincidència' ? 'Coincidència' : 'Intermediari',
+                intermediari: monitor.nom,
+                pas1_eixos_deixa: `Eixos deixa a ${escolaRecollida} (${distancia})`,
+                pas2_intermediari_recull: recollidaStr,
+                pas3_intermediari_porta: entregaStr,
+                pas4_destinatari_recull: escolaPuntTrobada === escolaFinal
+                  ? `${destinatari} rep el material a ${escolaFinal} (escola destí)`
+                  : `${destinatari} recull a ${escolaPuntTrobada} (punt de trobada) i porta a ${escolaFinal} (escola destí)`,
+                prioritat: opt.prioritat,
+                arribaATemps: opt.arribaATemps !== undefined ? opt.arribaATemps : null,
+                diesCadena: opt.diesCadena || null,
+              });
+            }
           }
         });
 
-        // Separar intermediarios de recollida/directa
+        // Separar per tipus
         const intermediaris = opcions.filter(o => o.tipus === 'Coincidència' || o.tipus === 'Intermediari');
+        const autorecollides = opcions.filter(o => o.tipus === 'Autorecollida');
         const recollida = opcions.find(o => o.tipus === 'Recollida');
         const directa = opcions.find(o => o.tipus === 'Entrega Directa');
 
-        // Intermediarios primero (ordenados por prioridad), luego directa, recollida como fallback
+        // Ordenar cada grupo
         intermediaris.sort((a, b) => a.prioritat - b.prioritat);
+        autorecollides.sort((a, b) => a.prioritat - b.prioritat);
+
+        // Autorecollida primer (el destinatari no depèn de ningú), després intermediaris, després fallbacks
         const opcionsOrdenades = [
-          ...intermediaris.slice(0, 3), // máx 3 intermediarios
+          ...autorecollides.slice(0, 2),
+          ...intermediaris.slice(0, 3),
           ...(directa ? [directa] : []),
           ...(recollida ? [recollida] : []),
         ];
