@@ -1719,6 +1719,11 @@ export default function OrdersTable() {
         onNotification={(message, severity) => {
           setSnackbar({ open: true, message, severity });
         }}
+        onStatusChange={async (orderIds: string[], newSt: string) => {
+          const response = await apiClient.updateOrderStatus(orderIds, newSt);
+          if (!response.success) throw new Error(response.error);
+          await loadData();
+        }}
       />
     </Box>
   );

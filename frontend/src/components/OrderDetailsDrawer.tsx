@@ -20,12 +20,20 @@ import {
   List,
   ListItem,
   ListItemText,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Close,
   Info,
   Edit,
   Save,
+  CheckCircle,
+  LocalShipping,
 } from '@mui/icons-material';
 import { apiClient } from '../lib/api';
 import { statusColors, statusIcons, formatSentenceCase, formatDateCatalan } from '../utils/orderUtils';
@@ -41,6 +49,7 @@ interface OrderDetailsDrawerProps {
   onOpenNotificationModal: (order: any, type: string) => void;
   onRefreshData: () => void;
   onNotification: (message: string, severity: 'success' | 'error' | 'info') => void;
+  onStatusChange?: (orderIds: string[], newStatus: string) => Promise<void>;
 }
 
 export default function OrderDetailsDrawer({
@@ -54,7 +63,15 @@ export default function OrderDetailsDrawer({
   onOpenNotificationModal,
   onRefreshData,
   onNotification,
+  onStatusChange,
 }: OrderDetailsDrawerProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // Quick status change state
+  const [quickStatus, setQuickStatus] = useState('');
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
+
   // Internal state
   const [isEditingOrder, setIsEditingOrder] = useState(false);
   const [editedOrderData, setEditedOrderData] = useState({
@@ -517,6 +534,86 @@ export default function OrderDetailsDrawer({
             {/* Actions Footer */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
               <Stack spacing={2}>
+                {/* Accions ràpides */}
+                {onStatusChange && (
+                  <>
+                    <Typography variant="overline" fontWeight="bold" color="text.secondary">
+                      Accions
+                    </Typography>
+
+                    {/* Botons ràpids segons estat actual */}
+                    {(() => {
+                      const estat = formatSentenceCase(selectedOrderForDrawer.estat as string);
+                      const orderId = selectedOrderForDrawer.idItem;
+
+                      const handleQuickStatus = async (newStatus: string) => {
+                        setIsChangingStatus(true);
+                        try {
+                          await onStatusChange([orderId], newStatus);
+                          onNotification(`Estat canviat a ${newStatus}`, 'success');
+                          onRefreshData();
+                        } catch {
+                          onNotification('Error canviant estat', 'error');
+                        } finally {
+                          setIsChangingStatus(false);
+                        }
+                      };
+
+                      return (
+                        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                          {estat === 'Pendent' && (
+                            <Button size="small" variant="outlined" disabled={isChangingStatus}
+                              onClick={() => handleQuickStatus('En proces')}>
+                              En proces
+                            </Button>
+                          )}
+                          {estat === 'En proces' && (
+                            <Button size="small" variant="outlined" color="info" disabled={isChangingStatus}
+                              onClick={() => handleQuickStatus('Preparat')}>
+                              Preparat
+                            </Button>
+                          )}
+                          {estat === 'Preparat' && (
+                            <Button size="small" variant="outlined" color="secondary" disabled={isChangingStatus}
+                              onClick={() => handleQuickStatus('Assignat')}>
+                              Assignar
+                            </Button>
+                          )}
+                          {(estat === 'Assignat' || estat === 'Preparat') && (
+                            <Button size="small" variant="contained" color="success" disabled={isChangingStatus}
+                              startIcon={<CheckCircle />}
+                              onClick={() => handleQuickStatus('Lliurat')}>
+                              Lliurat
+                            </Button>
+                          )}
+                          {/* Selector lliure per qualsevol estat */}
+                          <FormControl size="small" sx={{ minWidth: 110 }}>
+                            <InputLabel>Canviar a</InputLabel>
+                            <Select
+                              value={quickStatus}
+                              label="Canviar a"
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setQuickStatus('');
+                                if (val) handleQuickStatus(val);
+                              }}
+                              disabled={isChangingStatus}
+                            >
+                              <MenuItem value="Pendent">Pendent</MenuItem>
+                              <MenuItem value="En proces">En proces</MenuItem>
+                              <MenuItem value="Preparat">Preparat</MenuItem>
+                              <MenuItem value="Assignat">Assignat</MenuItem>
+                              <MenuItem value="Lliurat">Lliurat</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Stack>
+                      );
+                    })()}
+
+                    <Divider />
+                  </>
+                )}
+
                 {/* Notificaciones - Mostrar siempre si están habilitadas */}
                 {notificationsEnabled && (
                   <>
