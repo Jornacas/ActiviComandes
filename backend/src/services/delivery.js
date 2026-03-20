@@ -645,7 +645,7 @@ async function getDeliveryOptions(orders) {
                 const aTemps = primeraVisita <= dataNec;
                 option.diesCadena = diesFins;
                 option.arribaATemps = aTemps;
-                option.dataEntregaPrevista = primeraVisita.toISOString().split('T')[0];
+                option.dataEntregaPrevista = primeraVisita.toLocaleDateString('sv-SE');
                 if (!aTemps) temporalModifier = 5000;
                 else if (diesFins <= 1) temporalModifier = -2000;
                 else if (diesFins <= 3) temporalModifier = -1000;
@@ -681,8 +681,8 @@ async function getDeliveryOptions(orders) {
 
                 option.diesCadena = diesFinsDesti;
                 option.arribaATemps = arribaATemps;
-                option.dataRecollidaPrevista = primeraRecollida.toISOString().split('T')[0];
-                option.dataEntregaPrevista = primeraEntrega.toISOString().split('T')[0];
+                option.dataRecollidaPrevista = primeraRecollida.toLocaleDateString('sv-SE');
+                option.dataEntregaPrevista = primeraEntrega.toLocaleDateString('sv-SE');
 
                 if (!arribaATemps) {
                   temporalModifier = 5000; // Penalització forta: arriba tard
