@@ -90,11 +90,21 @@ export default function OrdersTable() {
     }
   }, [globalResponsable]);
 
-  // Escoltar events del copilot per refrescar dades automàticament
+  // Escoltar events del copilot per refrescar dades i obrir notificació
   const loadDataRef = useRef<(() => Promise<void>) | null>(null);
+  const pendingNotificationOrderIds = useRef<string[] | null>(null);
   useEffect(() => {
-    const handleCopilotAction = () => {
-      console.log('🤖 Copilot ha modificat dades, refrescant...');
+    const handleCopilotAction = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const actions = detail?.actions || [];
+      console.log('🤖 Copilot ha modificat dades, refrescant...', actions);
+
+      // Si hi ha assignDelivery, guardar orderIds per obrir notificació després del refresh
+      const deliveryAction = actions.find((a: any) => a.tool === 'assignDelivery' && a.success);
+      if (deliveryAction?.input?.orderIds) {
+        pendingNotificationOrderIds.current = deliveryAction.input.orderIds;
+      }
+
       setTimeout(() => { loadDataRef.current?.(); }, 1000);
     };
     window.addEventListener('copilot-data-changed', handleCopilotAction);
@@ -993,6 +1003,24 @@ export default function OrdersTable() {
         setStats(estadisticas);
 
         detectStaleOrders(transformedOrders);
+
+        // Si hi ha notificació pendent del copilot, obrir el modal
+        if (pendingNotificationOrderIds.current) {
+          const targetIds = pendingNotificationOrderIds.current;
+          pendingNotificationOrderIds.current = null;
+          const targetOrder = transformedOrders.find((o: any) => targetIds.includes(o.idItem));
+          if (targetOrder) {
+            console.log('🔔 Obrint notificació per comanda assignada pel copilot:', targetOrder.idItem);
+            // Determinar tipus de notificació segons si té intermediari
+            const hasIntermediari = targetOrder.monitorIntermediari &&
+              targetOrder.monitorIntermediari.trim() !== '' &&
+              targetOrder.monitorIntermediari.toUpperCase() !== 'DIRECTA';
+            const notifType = hasIntermediari ? 'intermediario' : 'destinatario';
+            setTimeout(() => {
+              notificationManagerRef.current?.openModal(targetOrder, notifType);
+            }, 500);
+          }
+        }
       } else {
         setError(response.error || 'Error desconocido al cargar datos');
       }
