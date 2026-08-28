@@ -47,7 +47,7 @@ SPREADSHEET_ID=1ZbhYEXJ4jnRjGhV__KgpLSreGIbbGKaWKNQ6hkHCEFw
 GOOGLE_SERVICE_ACCOUNT_BASE64=[base64 encoded credentials]
 
 # Autenticación
-AUTH_TOKEN=comanda_materials_2024
+AUTH_TOKEN=<TOKEN>
 
 # Node.js
 NODE_ENV=production
@@ -64,7 +64,7 @@ Variables configuradas en: `https://vercel.com/jornacas-gmailcoms-projects/activ
 
 ```env
 NEXT_PUBLIC_API_URL=https://backend-umber-six-64.vercel.app
-NEXT_PUBLIC_API_TOKEN=comanda_materials_2024
+NEXT_PUBLIC_API_TOKEN=<TOKEN>
 ```
 
 ---
@@ -131,7 +131,7 @@ curl https://backend-umber-six-64.vercel.app/debug/env
 curl https://backend-umber-six-64.vercel.app/debug/test-sheets
 
 # Test API con autenticación
-curl "https://backend-umber-six-64.vercel.app/api/admin/orders?token=comanda_materials_2024&limit=5"
+curl "https://backend-umber-six-64.vercel.app/api/admin/orders?token=<TOKEN>&limit=5"
 ```
 
 ### Frontend
@@ -282,7 +282,7 @@ POST /api/admin/notifications/send  # Enviar notificación
 ```
 
 **Autenticación:**
-Todas las APIs admin requieren el parámetro: `?token=comanda_materials_2024`
+Todas las APIs admin requieren el parámetro: `?token=<TOKEN>`
 
 ---
 
@@ -325,7 +325,7 @@ Las notificaciones se envían a través de **Google Chat** usando webhooks confi
 
 1. Verificar que backend responde:
    ```bash
-   curl "https://backend-umber-six-64.vercel.app/api/admin/orders?token=comanda_materials_2024&limit=1"
+   curl "https://backend-umber-six-64.vercel.app/api/admin/orders?token=<TOKEN>&limit=1"
    ```
 
 2. Verificar variables de entorno en frontend (Vercel dashboard)

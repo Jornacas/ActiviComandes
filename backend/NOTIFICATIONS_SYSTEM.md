@@ -136,7 +136,7 @@ Resultado:
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "spaceName": "/LestonnacDX1A",
   "message": "Tens un lliurament assignat per dimarts 22/10",
   "orderId": "abc123",
@@ -180,7 +180,7 @@ Resultado:
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024"
+  "token": "<TOKEN>"
 }
 ```
 

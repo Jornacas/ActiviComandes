@@ -38,7 +38,7 @@ backend/
 Equivalente a `CacheService.getScriptCache()` de Apps Script
 
 ### 4. Autenticación configurada ✅
-Mismo token que Apps Script: `comanda_materials_2024`
+Mismo token que Apps Script: `<TOKEN>`
 
 ---
 
@@ -116,7 +116,7 @@ Deberías ver:
 Abre tu navegador o Postman y prueba:
 
 ```
-http://localhost:3000/api/schools?token=comanda_materials_2024
+http://localhost:3000/api/schools?token=<TOKEN>
 ```
 
 Deberías ver la lista de escuelas desde tu Google Sheet.
@@ -134,17 +134,17 @@ Deberías ver la lista de escuelas desde tu Google Sheet.
 
 2. **Lista de escuelas**:
    ```
-   GET http://localhost:3000/api/schools?token=comanda_materials_2024
+   GET http://localhost:3000/api/schools?token=<TOKEN>
    ```
 
 3. **Lista de monitores**:
    ```
-   GET http://localhost:3000/api/monitors?token=comanda_materials_2024
+   GET http://localhost:3000/api/monitors?token=<TOKEN>
    ```
 
 4. **Crear solicitud** (POST):
    ```bash
-   curl -X POST http://localhost:3000/api/sollicitud?token=comanda_materials_2024 \
+   curl -X POST http://localhost:3000/api/sollicitud?token=<TOKEN> \
      -H "Content-Type: application/json" \
      -d '{
        "nomCognoms": "Test Usuario",
@@ -165,7 +165,7 @@ Deberías ver la lista de escuelas desde tu Google Sheet.
 - ✅ Verifica que el service account tenga permisos en el Sheet
 
 ### Error: "Unauthorized access"
-- ✅ Añade `?token=comanda_materials_2024` a la URL
+- ✅ Añade `?token=<TOKEN>` a la URL
 - ✅ O envía el token en el body del POST
 
 ### El servidor no arranca

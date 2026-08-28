@@ -11,9 +11,9 @@ http://localhost:3000
 
 Todos los endpoints requieren el token de autenticación. Se puede enviar de 3 formas:
 
-1. **Query parameter**: `?token=comanda_materials_2024`
-2. **Body**: `{ "token": "comanda_materials_2024", ... }`
-3. **Header**: `Authorization: Bearer comanda_materials_2024`
+1. **Query parameter**: `?token=<TOKEN>`
+2. **Body**: `{ "token": "<TOKEN>", ... }`
+3. **Header**: `Authorization: Bearer <TOKEN>`
 
 ---
 
@@ -26,7 +26,7 @@ Obtiene lista de escuelas únicas.
 
 **Ejemplo**:
 ```bash
-curl "http://localhost:3000/api/schools?token=comanda_materials_2024"
+curl "http://localhost:3000/api/schools?token=<TOKEN>"
 ```
 
 **Respuesta**:
@@ -44,7 +44,7 @@ Obtiene lista de monitores únicos.
 
 **Ejemplo**:
 ```bash
-curl "http://localhost:3000/api/monitors?token=comanda_materials_2024"
+curl "http://localhost:3000/api/monitors?token=<TOKEN>"
 ```
 
 ---
@@ -69,7 +69,7 @@ Obtiene actividades de una escuela específica.
 
 **Ejemplo**:
 ```bash
-curl "http://localhost:3000/api/activities/by-school?school=Academia&token=comanda_materials_2024"
+curl "http://localhost:3000/api/activities/by-school?school=Academia&token=<TOKEN>"
 ```
 
 ---
@@ -107,7 +107,7 @@ Crea una solicitud individual.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "sollicitud": {
     "nomCognoms": "Nombre Apellido",
     "dataNecessitat": "2025-10-20",
@@ -137,7 +137,7 @@ Crea múltiples solicitudes (carrito de compras).
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "nomCognoms": "Nombre Apellido",
   "dataNecessitat": "2025-10-20",
   "items": [
@@ -172,7 +172,7 @@ Carga todos los pedidos.
 
 **Ejemplo**:
 ```bash
-curl "http://localhost:3000/api/admin/orders?token=comanda_materials_2024&limit=10"
+curl "http://localhost:3000/api/admin/orders?token=<TOKEN>&limit=10"
 ```
 
 **Respuesta**:
@@ -216,7 +216,7 @@ Actualiza el estado de pedidos.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "uuids": ["uuid1", "uuid2", "uuid3"],
   "newStatus": "Preparat"
 }
@@ -241,7 +241,7 @@ Elimina pedidos.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "uuids": ["uuid1", "uuid2"]
 }
 ```
@@ -254,7 +254,7 @@ Crea un nuevo pedido desde el admin.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "orderData": {
     "nomCognoms": "Nombre Apellido",
     "escola": "Academia",
@@ -277,7 +277,7 @@ Obtiene estadísticas del dashboard con filtros opcionales.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "filters": {
     "escola": "Academia",
     "dateFrom": "2025-10-01",
@@ -330,7 +330,7 @@ Obtiene opciones de entrega para pedidos seleccionados.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "orders": [...]
 }
 ```
@@ -345,7 +345,7 @@ Crea una entrega.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "deliveryData": {
     "modalitat": "Directa",
     "orderIds": ["xxx", "yyy"],
@@ -373,7 +373,7 @@ Envía notificación manual.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "spaceName": "NombreDelSpace",
   "message": "Mensaje de notificación",
   "orderId": "xxx",
@@ -405,7 +405,7 @@ Refresca la caché de espacios de chat (5 min TTL).
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024"
+  "token": "<TOKEN>"
 }
 ```
 
@@ -429,7 +429,7 @@ Calcula distancias entre direcciones.
 **Body**:
 ```json
 {
-  "token": "comanda_materials_2024",
+  "token": "<TOKEN>",
   "addresses": ["Dirección 1", "Dirección 2"]
 }
 ```
@@ -447,12 +447,12 @@ curl http://localhost:3000/
 
 ### Mobile App - Escuelas
 ```bash
-curl "http://localhost:3000/api/schools?token=comanda_materials_2024"
+curl "http://localhost:3000/api/schools?token=<TOKEN>"
 ```
 
 ### Admin - Órdenes (primeras 5)
 ```bash
-curl "http://localhost:3000/api/admin/orders?token=comanda_materials_2024&limit=5"
+curl "http://localhost:3000/api/admin/orders?token=<TOKEN>&limit=5"
 ```
 
 ### Mobile - Crear solicitud
@@ -460,7 +460,7 @@ curl "http://localhost:3000/api/admin/orders?token=comanda_materials_2024&limit=
 curl -X POST http://localhost:3000/api/sollicitud \
   -H "Content-Type: application/json" \
   -d '{
-    "token": "comanda_materials_2024",
+    "token": "<TOKEN>",
     "sollicitud": {
       "nomCognoms": "Test User",
       "escola": "Academia",
