@@ -70,6 +70,9 @@ async function main() {
   );
 
   if (result.success) {
+    if (result.usedFallback) {
+      console.log(`· ATENCIÓ: "${espai}" no existeix al full; s'ha enviat a "${result.actualSpace}"`);
+    }
     console.log(`· Enviat OK · space ${result.spaceId} · id ${result.messageId}`);
     console.log('');
     console.log('OK — es pot retirar notificaciones.gs i APPS_SCRIPT_NOTIFICATION_URL.');

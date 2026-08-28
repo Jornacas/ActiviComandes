@@ -78,12 +78,13 @@ async function getSpaceIdByName(spaceName) {
     cache.set('chat_webhooks_data', webhooks, 3600);
   }
 
-  let name = String(spaceName || '').trim();
+  const demanat = String(spaceName || '').trim();
+  let name = demanat;
+
   while (name.length > 1) {
     const spaceId = webhooks.get(name);
     if (spaceId) {
-      if (name !== spaceName) console.log(`[CHAT] ${spaceName} → ${name} (fallback)`);
-      return spaceId;
+      return { spaceId, matchedName: name, usedFallback: name !== demanat };
     }
     name = name.slice(0, -1);
   }
@@ -97,12 +98,21 @@ async function getSpaceIdByName(spaceName) {
  * @param {string} message - Text del missatge
  */
 async function sendChatNotification(spaceName, message) {
-  const spaceId = await getSpaceIdByName(spaceName);
+  const match = await getSpaceIdByName(spaceName);
 
-  if (!spaceId) {
+  if (!match) {
     const error = `No s'ha trobat cap Space ID per a "${spaceName}" al full ChatWebhooks`;
     console.error(`[CHAT] ✗ ${error}`);
     return { success: false, error, requestedSpace: spaceName, actualSpace: null };
+  }
+
+  const { spaceId, matchedName, usedFallback } = match;
+
+  // El fallback pot acabar en un espai molt més ampli que el demanat (per exemple
+  // "**/Staff/GESTIÓ" → "**/Staff", de 3 a 7 persones) si el nom no coincideix
+  // exactament, cosa que passa fàcil amb accents. Que es vegi.
+  if (usedFallback) {
+    console.warn(`[CHAT] ⚠ "${spaceName}" no existeix: s'envia a "${matchedName}" (fallback)`);
   }
 
   try {
@@ -112,19 +122,21 @@ async function sendChatNotification(spaceName, message) {
       requestBody: { text: message }
     });
 
-    console.log(`[CHAT] ✓ Missatge enviat a ${spaceName} (${spaceId})`);
+    console.log(`[CHAT] ✓ Missatge enviat a ${matchedName} (${spaceId})`);
     return {
       success: true,
       requestedSpace: spaceName,
-      actualSpace: spaceName,
+      actualSpace: matchedName,
       spaceId,
       messageId: response.data.name,
-      message: 'Notificació enviada correctament',
-      usedFallback: false
+      message: usedFallback
+        ? `Notificació enviada a "${matchedName}" (l'espai "${spaceName}" no existeix)`
+        : 'Notificació enviada correctament',
+      usedFallback
     };
   } catch (error) {
     const detail = error.errors?.[0]?.message || error.message;
-    console.error(`[CHAT] ✗ Error enviant a ${spaceName} (${spaceId}): ${detail}`);
+    console.error(`[CHAT] ✗ Error enviant a ${matchedName} (${spaceId}): ${detail}`);
     return {
       success: false,
       error: `Chat API: ${detail}`,
