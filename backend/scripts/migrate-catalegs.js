@@ -50,7 +50,7 @@ async function migraMaterials() {
   }
 
   const { error } = await db().from('materials')
-    .upsert(files, { onConflict: 'codi_area,nivell,concepte' });
+    .upsert(files, { onConflict: 'codi_area,nivell,concepte', ignoreDuplicates: false });
   if (error) throw new Error('materials: ' + error.message);
   return files.length;
 }

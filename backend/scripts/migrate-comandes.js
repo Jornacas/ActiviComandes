@@ -45,9 +45,35 @@ const instant = v => {
 
 async function main() {
   const raw = await sheets.getSheetData('Respostes');
+  if (!raw.length) throw new Error('El full "Respostes" no ha retornat cap fila');
+
   const headers = raw[0].map(h => String(h || '').trim());
-  const idx = nom => headers.indexOf(nom);
-  const col = (row, nom) => row[idx(nom)];
+
+  /**
+   * Alguns noms de columna tenen sinònim històric. Sense això, un nom que no
+   * hi és torna índex -1, `row[-1]` és undefined i s'importa NULL en silenci:
+   * perdríem la clau que agrupa els lliuraments amb intermediari.
+   */
+  const SINONIMS = {
+    ID_Lliurament: ['ID_Lliurament', 'Distancia_Academia'],
+    Modalitat_Lliurament: ['Modalitat_Lliurament', 'Modalitat_Entrega'],
+    Data_Lliurament_Prevista: ['Data_Lliurament_Prevista', 'Data_Entrega_Prevista'],
+  };
+
+  const indexs = new Map();
+  const resol = nom => {
+    if (indexs.has(nom)) return indexs.get(nom);
+    const candidats = SINONIMS[nom] || [nom];
+    const i = candidats.map(c => headers.indexOf(c)).find(x => x !== -1);
+    if (i === undefined) {
+      throw new Error(`Falta la columna ${nom} al full (provat: ${candidats.join(', ')})`);
+    }
+    indexs.set(nom, i);
+    return i;
+  };
+
+  const idx = resol;
+  const col = (row, nom) => row[resol(nom)];
 
   const files = raw.slice(1).filter(r => text(r[idx('ID_Item')]));
   console.log(`Full "Respostes": ${files.length} ítems`);

@@ -189,12 +189,17 @@
   }
 }
 
-body {
+/* Mateix problema que la regla `*` de sobre: fora de capa guanya a les
+   utilitats, i el `bg-page text-fg1` del <body> no s'aplicava mai. La pagina es
+   quedava amb els colors antics (#F3F4F6) en lloc dels del redisseny. */
+@layer base {
+  body {
   background: var(--color-background);
   color: var(--color-foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* SPEC-0027 D5: es treu «overscroll-behavior: none» → torna el pull-to-refresh natiu del navegador */
+  }
 }
 
 /* ── Utility classes ── */

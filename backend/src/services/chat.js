@@ -61,7 +61,7 @@ async function getChatClient() {
 }
 
 /**
- * Busca el Space ID pel nom al full ChatWebhooks.
+ * Busca el Space ID pel nom a comandes_app.chat_espais.
  *
  * Manté el fallback seqüencial que feia l'Apps Script: si no troba
  * "/LestonnacDX1A", prova "/LestonnacDX1", "/LestonnacDX"… fins a "/Lestonnac".
@@ -93,7 +93,7 @@ async function sendChatNotification(spaceName, message) {
   const match = await getSpaceIdByName(spaceName);
 
   if (!match) {
-    const error = `No s'ha trobat cap Space ID per a "${spaceName}" al full ChatWebhooks`;
+    const error = `No s'ha trobat cap Space ID per a "${spaceName}" a comandes_app.chat_espais`;
     console.error(`[CHAT] ✗ ${error}`);
     return { success: false, error, requestedSpace: spaceName, actualSpace: null };
   }

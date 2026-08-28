@@ -17,7 +17,20 @@ const activihub = require('./activihub');
 const cache = require('./cache');
 
 const CACHE_KEY = 'cache_respostes_data';
-const CACHE_TTL = 60; // segons; qualsevol escriptura la invalida igualment
+
+/**
+ * Instantània de l'última lectura, per id_item.
+ *
+ * Tots els serveis fan llegir-modificar-desar passant el bloc SENCER. Sense
+ * comparar, desar una comanda escrivia les 718 files: qualsevol canvi que un
+ * altre procés hagués fet mentrestant quedava esborrat sense cap error. A
+ * Vercel hi ha diverses instàncies alhora, així que això no és teòric.
+ *
+ * Comparant contra la instantània que se li va donar al qui crida, s'escriuen
+ * només les files que ell ha tocat. La resta ni es miren, i tant se val si la
+ * seva còpia estava desfasada.
+ */
+let instantania = new Map();
 
 /**
  * Mapa columna del full ↔ columna de la taula.
@@ -113,9 +126,6 @@ function aRegistre(fila) {
  * Ordena per data de creació ascendent, com feia el full.
  */
 async function getSheetData() {
-  const cached = cache.get(CACHE_KEY);
-  if (cached) return cached;
-
   const files = [];
   const MIDA = 1000; // PostgREST no en retorna més, i ho fa en silenci
   let desde = 0;
@@ -135,21 +145,40 @@ async function getSheetData() {
     desde += MIDA;
   }
 
-  const resultat = [CAPCALERES, ...files.map(aFila)];
-  cache.set(CACHE_KEY, resultat, CACHE_TTL);
-  return resultat;
+  const rows = files.map(aFila);
+
+  instantania = new Map(rows.map(fila => [fila[IDX_ID_ITEM], JSON.stringify(fila)]));
+
+  return [CAPCALERES, ...rows];
 }
 
 /**
- * Equivalent a sheets.updateRange('Respostes', 'A1:Z…', dades): desa el bloc
- * sencer. Només fa upsert de les files amb ID_Item; la resta s'ignora.
+ * Rep el bloc sencer, com feia sheets.updateRange('Respostes', 'A1:Z…', dades),
+ * però desa NOMÉS les files que han canviat respecte de l'última lectura.
+ *
+ * El pla de la Fase 2 deia que això havia de matar el patró de reescriure-ho
+ * tot a cada canvi d'estat; la primera versió el reproduïa amb un upsert de les
+ * 718 files.
  */
 async function saveSheetData(dades) {
   if (!Array.isArray(dades) || dades.length < 2) return { updated: 0 };
 
-  const registres = dades.slice(1)
-    .filter(fila => fila && String(fila[IDX_ID_ITEM] || '').trim() !== '')
-    .map(aRegistre);
+  const canviades = dades.slice(1).filter(fila => {
+    if (!fila) return false;
+    const idItem = String(fila[IDX_ID_ITEM] || '').trim();
+    if (!idItem) return false;
+
+    const previa = instantania.get(idItem);
+    // Fila nova, o sense instantània (procés acabat d'arrencar): es desa.
+    return previa === undefined || previa !== JSON.stringify(fila);
+  });
+
+  if (!canviades.length) {
+    console.log('[COMANDES] Res per desar: cap fila ha canviat');
+    return { updated: 0 };
+  }
+
+  const registres = canviades.map(aRegistre);
 
   for (let i = 0; i < registres.length; i += 200) {
     const lot = registres.slice(i, i + 200);
@@ -157,6 +186,12 @@ async function saveSheetData(dades) {
     if (error) throw new Error(`Comandes · error desant: ${error.message}`);
   }
 
+  // La instantània s'actualitza amb el que s'acaba d'escriure
+  for (const fila of canviades) {
+    instantania.set(String(fila[IDX_ID_ITEM]).trim(), JSON.stringify(fila));
+  }
+
+  console.log(`[COMANDES] Desades ${registres.length} de ${dades.length - 1} files`);
   invalidate();
   return { updated: registres.length };
 }
@@ -192,8 +227,15 @@ async function deleteByIdItems(idItems) {
   return count ?? ids.length;
 }
 
+/**
+ * Manté la clau antiga per als serveis que encara la purguen directament.
+ * Ja no hi ha caché de lectura: amb diverses instàncies a Vercel, servir una
+ * còpia desfasada d'una taula que es reescriu sencera era una recepta per
+ * perdre canvis.
+ */
 function invalidate() {
   cache.del(CACHE_KEY);
+  instantania = new Map();
 }
 
 module.exports = {

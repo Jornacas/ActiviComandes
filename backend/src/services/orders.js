@@ -590,10 +590,12 @@ async function deleteOrders(uuids) {
   const idItemIndex = headers.findIndex(h => h === 'ID_Item');
   const idPedidoIndex = headers.findIndex(h => h === 'ID_Pedido');
 
-  if (idItemIndex === -1 && idPedidoIndex === -1) {
+  // L'esborrat va per ID_Item. Amb el guard antic (ID_Item O ID_Pedido) es
+  // podia arribar aquí sense ID_Item i retornar success amb deletedCount 0.
+  if (idItemIndex === -1) {
     return {
       success: false,
-      error: "No s'ha trobat la columna d'identificador (ID_Item o ID_Pedido)"
+      error: "No s'ha trobat la columna ID_Item, necessària per esborrar"
     };
   }
 

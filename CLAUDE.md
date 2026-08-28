@@ -101,6 +101,14 @@ fins al 28-08-2026. Els scripts `backend/scripts/migrate-*.js` el saben rellegir
 - `ChatWebhooks` → `comandes_app.chat_espais` (172)
 - `Dades` i `BaseApp` → morts (`#REF!`), substituïts per ActiviHub
 
+### Com escriu el repositori
+
+`saveSheetData()` rep el bloc sencer (tots els serveis fan llegir-modificar-desar)
+però **desa només les files que han canviat**, comparant contra la instantània de
+l'última lectura. Sense això, canviar l'estat d'una comanda reescrivia les 718 files
+i esborrava en silenci qualsevol canvi fet mentrestant per una altra instància.
+No hi ha caché de lectura, pel mateix motiu.
+
 ### Model de dades
 
 `comandes_app.comandes` és plana: una fila per ítem demanat, igual que el full. No està

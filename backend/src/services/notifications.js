@@ -68,7 +68,8 @@ async function sendNotification(spaceName, message, orderId, notificationType) {
       success: true,
       message: result.message || 'Notificació enviada correctament',
       data: {
-        spaceName: result.spaceName,
+        spaceName: result.actualSpace,
+        usedFallback: result.usedFallback || false,
         spaceId: result.spaceId,
         messageId: result.messageId,
         simulated: result.simulated || false

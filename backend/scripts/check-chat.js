@@ -71,7 +71,7 @@ async function main() {
 
   if (result.success) {
     if (result.usedFallback) {
-      console.log(`· ATENCIÓ: "${espai}" no existeix al full; s'ha enviat a "${result.actualSpace}"`);
+      console.log(`· ATENCIÓ: "${espai}" no existeix a chat_espais; s'ha enviat a "${result.actualSpace}"`);
     }
     console.log(`· Enviat OK · space ${result.spaceId} · id ${result.messageId}`);
     console.log('');
