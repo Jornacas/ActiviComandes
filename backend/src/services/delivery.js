@@ -6,134 +6,37 @@
 const sheets = require('./sheets');
 const cache = require('./cache');
 const maps = require('./maps');
+const activihub = require('./activihub');
 const { getColumnIndices, invalidateOrdersCache } = require('../utils/helpers');
 
 /**
- * Busca la actividad de un monitor en una escola específica desde la hoja Dades
- * @param {string} monitorName - Nombre del monitor
- * @param {string} escolaName - Nombre de la escola
- * @returns {Promise<string|null>} - Actividad del monitor o null si no se encuentra
+ * Activitat d'un monitor en una escola concreta.
+ * Abans llegia el full "Dades"; des del 28-08-2026 ve d'ActiviHub.
  */
 async function getMonitorActivityInSchool(monitorName, escolaName) {
   try {
-    const data = await sheets.getSheetData('Dades');
-
-    if (!data || data.length === 0) {
-      console.error('❌ Hoja Dades vacía');
-      return null;
+    const activitat = await activihub.getMonitorActivityInSchool(monitorName, escolaName);
+    if (activitat) {
+      console.log(`✅ Activitat trobada per ${monitorName} a ${escolaName}: ${activitat}`);
+    } else {
+      console.warn(`⚠️ Cap activitat per ${monitorName} a ${escolaName}`);
     }
-
-    const headers = data[0];
-    const escolaIdx = headers.findIndex(h => h === 'ESCOLA');
-    const monitoraIdx = headers.findIndex(h => h === 'MONITORA');
-    const activitatIdx = headers.findIndex(h => h === 'ACTIVITAT');
-
-    if (escolaIdx === -1 || monitoraIdx === -1 || activitatIdx === -1) {
-      console.error('❌ No se encontraron columnas necesarias en Dades');
-      return null;
-    }
-
-    // Buscar fila que coincida con monitor y escola
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const rowMonitor = row[monitoraIdx]?.toString().trim();
-      const rowEscola = row[escolaIdx]?.toString().trim();
-      const rowActivitat = row[activitatIdx]?.toString().trim();
-
-      if (rowMonitor === monitorName && rowEscola === escolaName && rowActivitat) {
-        console.log(`✅ Actividad encontrada para ${monitorName} en ${escolaName}: ${rowActivitat}`);
-        return rowActivitat;
-      }
-    }
-
-    console.warn(`⚠️ No se encontró actividad para ${monitorName} en ${escolaName}`);
-    return null;
+    return activitat;
   } catch (error) {
-    console.error('Error buscando actividad del monitor:', error);
+    console.error('Error buscant activitat del monitor:', error.message);
     return null;
   }
 }
 
+/**
+ * Escoles i monitors del curs vigent, amb la mateixa forma que retornava la
+ * versió que llegia el full "Dades": el motor d'intermediaris no canvia.
+ */
 async function getSchoolMonitorData() {
   try {
-    const data = await sheets.getSheetData('Dades');
-
-    if (!data || data.length === 0) {
-      return { success: false, error: "La hoja 'Dades' está vacía" };
-    }
-
-    const headers = data[0];
-    const escolaIdx = headers.findIndex(h => h === 'ESCOLA');
-    const monitoraIdx = headers.findIndex(h => h === 'MONITORA');
-    const diaIdx = headers.findIndex(h => h === 'DIA');
-    const adreçaIdx = headers.findIndex(h => h === 'ADREÇA');
-    const activitatIdx = headers.findIndex(h => h === 'ACTIVITAT'); // Nueva columna
-
-    if (escolaIdx === -1 || monitoraIdx === -1) {
-      return { success: false, error: "No s'han trobat les columnes necessàries (ESCOLA, MONITORA)" };
-    }
-
-    const schools = new Map();
-    const monitors = new Map();
-
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const escola = row[escolaIdx]?.toString().trim();
-      const monitora = row[monitoraIdx]?.toString().trim();
-      const dia = row[diaIdx]?.toString().trim() || '';
-      const adreça = row[adreçaIdx]?.toString().trim() || '';
-      const activitat = activitatIdx !== -1 ? (row[activitatIdx]?.toString().trim() || '') : '';
-
-      if (!escola || !monitora) continue;
-
-      if (!schools.has(escola)) {
-        schools.set(escola, { nom: escola, adreça: adreça, monitors: [], dies: [] });
-      }
-
-      const schoolData = schools.get(escola);
-      if (!schoolData.monitors.includes(monitora)) {
-        schoolData.monitors.push(monitora);
-      }
-      if (dia && !schoolData.dies.includes(dia)) {
-        schoolData.dies.push(dia);
-      }
-
-      if (!monitors.has(monitora)) {
-        monitors.set(monitora, { nom: monitora, escoles: [] });
-      }
-
-      const monitorData = monitors.get(monitora);
-      const existingSchool = monitorData.escoles.find(s => s.escola === escola);
-
-      if (!existingSchool) {
-        monitorData.escoles.push({
-          escola: escola,
-          adreça: adreça,
-          dies: dia ? [dia] : [],
-          activitat: activitat // Guardar actividad
-        });
-      } else {
-        if (dia && !existingSchool.dies.includes(dia)) {
-          existingSchool.dies.push(dia);
-        }
-        // Actualizar actividad si existe
-        if (activitat && !existingSchool.activitat) {
-          existingSchool.activitat = activitat;
-        }
-      }
-    }
-
-    return {
-      success: true,
-      data: {
-        schools: Array.from(schools.values()),
-        monitors: Array.from(monitors.values()),
-        schoolsMap: schools,
-        monitorsMap: monitors
-      }
-    };
+    return await activihub.getSchoolMonitorData();
   } catch (error) {
-    console.error('Error in getSchoolMonitorData:', error);
+    console.error('Error in getSchoolMonitorData:', error.message);
     return { success: false, error: error.message };
   }
 }

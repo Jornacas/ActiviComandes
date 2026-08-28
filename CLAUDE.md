@@ -6,11 +6,28 @@ Sistema de gestió de comandes de materials per a activitats extraescolars d'Eix
 
 - **Backend**: Node.js + Express (port 3010) → `backend/src/`
 - **Frontend**: Next.js 14.2 + Material-UI → `frontend/src/`
-- **Base de dades**: Google Sheets (no SQL)
+- **Dades mestres**: ActiviHub (Supabase, schema `comandes`) — escoles, monitors, activitats
+- **Comandes i catàleg**: Google Sheets (full `Respostes` i fulls `Mat*`) — pendent de migrar (Fase 2)
 - **API Maps**: Google Routes API v2
 - **IA Copilot**: Claude Haiku (configurable a Gemini via `AI_PROVIDER` en `.env`)
-- **Notificacions**: Google Chat via Apps Script webhook
-- **Deploy**: Vercel (frontend: activi-comandes-admin) + Vercel (backend: backend-umber-six-64)
+- **Notificacions**: Google Chat API directa des del backend (delegació de domini)
+- **Deploy**: Vercel — `activi-comandes-admin` (frontend), `backend-umber-six-64` (backend), `activicomandes-mobil` (app del monitor)
+
+### Migració a ActiviHub (28-08-2026)
+
+El full `Dades` va morir (`#REF!`, el seu origen es va esborrar) i amb ell l'app del
+monitor sencera. Les dades mestres surten ara d'ActiviHub. Pla complet i decisions:
+`PLAN_MIGRACION_ACTIVIHUB.md`.
+
+- **Apps Script retirat del tot.** `app-mobil` parla amb el backend Node per REST i les
+  notificacions van directes a la Chat API. Ja no queda cap `.gs` al projecte.
+- **Estats visibles**: `ACTIVA` + `CONFIRMADA` (`ACTIVIHUB_ESTATS` al `.env`). Quan el curs
+  arrenqui i tot passi a `ACTIVA`, es pot deixar només aquest.
+- **Sembra de proves**: mentre ActiviHub no generi les sessions del 2627 no hi ha vincle
+  monitor↔activitat. `comandes_app.monitors_prova` l'omple provisionalment; la vista prefereix
+  sempre el real i marca quin fa servir a `monitor_origen`. **Esborrar la taula quan hi hagi
+  sessions.**
+- Comprovació: `node backend/scripts/check-activihub.js`
 
 ## Estructura backend
 
@@ -18,13 +35,13 @@ Sistema de gestió de comandes de materials per a activitats extraescolars d'Eix
 backend/src/
 ├── server.js              # Entry point Express
 ├── middleware/
-│   ├── auth.js            # Token auth (Bearer)
-│   └── legacy.js          # Compat Apps Script → REST
+│   └── auth.js            # Token auth (Bearer)
 ├── routes/
 │   ├── admin.js           # Routing layer (~300 línies, delega a serveis)
-│   ├── mobile.js          # API app mòbil (crear sol·licituds)
+│   ├── mobile.js          # API app mòbil (dades mestres + crear sol·licituds)
 │   └── copilot.js         # Chat IA endpoint
 ├── services/
+│   ├── activihub.js       # Dades mestres des de Supabase (substitueix el full "Dades")
 │   ├── orders.js          # Lògica CRUD comandes
 │   ├── delivery.js        # Optimització entregues i intermediaris
 │   ├── notifications.js   # Gestió notificacions Google Chat
@@ -34,8 +51,10 @@ backend/src/
 │   ├── maps.js            # Google Routes API (distàncies)
 │   ├── chat.js            # Google Chat notifications
 │   └── notification-messages.js  # Plantilles missatges
-└── utils/
-    └── helpers.js         # Utilitats compartides (UUID, dates, headers, mapHeaderToKey)
+├── utils/
+│   └── helpers.js         # Utilitats compartides (UUID, dates, headers, mapHeaderToKey)
+└── ../scripts/
+    └── check-activihub.js # Comprovació de la connexió amb ActiviHub
 ```
 
 ## Estructura frontend
@@ -64,18 +83,25 @@ frontend/src/
 
 ## Google Sheets
 
-### Fulls principals
-- **"Respostes"**: Registres de sol·licituds de materials (taula principal)
-- **"Dades"**: ESCOLA, MONITORA, DIA, HORA INICI, TORN, ACTIVITAT, ADREÇA
-- **"Distancies"**: Cache de distàncies Google Maps
-- **"Materiales"**: Catàleg de materials genèrics
+### Fulls vius
+- **"Respostes"**: les comandes (26 columnes, ~718 ítems). Taula principal.
+- **"Distancies"**: caché de distàncies de Google Routes. **La caché no funciona**:
+  `getDistanciesCached()` sempre retorna `[]` i `saveDistancia()` crida `updateRange()` amb
+  els arguments mal comptats, així que només afegeix files. 442 files per 46 adreces, i cada
+  consulta es factura a l'API. Es corregeix en migrar la taula (Fase 2).
+- **Fulls de materials per activitat**: `MatCO`, `MatDX1`, `MatDX2` (concepte a la columna B) i
+  `MatHC1`, `MatHC2`, `MatTC` (columna A). `MatTC` és buit — TC va per entrada manual, i `JL`
+  encara no té catàleg.
 
-### Fulls de materials per activitat (app mòbil)
-- Jocs Populars, Taller de Reciclatge, Arts, Manualitats, Ciencia, Graffiti, Dj
+### Fulls morts (no esborrar encara: són l'arxiu històric)
+- **"Dades"** i **"BaseApp"**: totes les files són `#REF!` des que es va esborrar el seu origen.
+  Substituïts per ActiviHub. Cap codi els llegeix ja.
+- **"ChatWebhooks"**: 172 espais de Google Chat. Segueix viu, el fa servir `chat.js`.
 
 ### Columna reutilitzada
-- `Distancia_Academia` (columna V de Respostes) → reutilitzada com `ID_Lliurament`
-- El codi gestiona ambdós noms amb fallback a `helpers.js`
+- `Distancia_Academia` → al full real ja es diu `ID_Lliurament` (columna W). El fallback pel
+  nom antic viu a `helpers.js` i es pot treure.
+- `Notes_Entrega` està buida a les 718 files: columna morta.
 
 ### SpreadsheetID
 - Configurat a `.env` (`SPREADSHEET_ID`)
@@ -105,8 +131,15 @@ PORT=3010
 AUTH_TOKEN=<token>
 SPREADSHEET_ID=<google-sheets-id>
 GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
+
+# ActiviHub (Supabase, projecte ActiviShift). NOMÉS servidor: mai amb NEXT_PUBLIC_
+SUPABASE_URL=<https://xxx.supabase.co>
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+ACTIVIHUB_ESTATS=ACTIVA,CONFIRMADA   # estats d'activitat visibles
+
 GOOGLE_MAPS_API_KEY=<key>
-APPS_SCRIPT_NOTIFICATION_URL=<webhook-url>
+# Google Chat: compte del Workspace que suplanta el compte de servei per publicar
+GOOGLE_CHAT_IMPERSONATE_USER=admin@eixos-creativa.com
 AI_PROVIDER=claude          # "claude" o "gemini"
 ANTHROPIC_API_KEY=<key>
 CLAUDE_MODEL=claude-haiku-4-5-20251001
@@ -153,5 +186,13 @@ L'aplicació està en **català**. El copilot respon en català. Els comentaris 
 
 ## Pendents
 
+**Migració (veure `PLAN_MIGRACION_ACTIVIHUB.md`)**
+- Fase 2: moure `Respostes`, els fulls `Mat*` i `Distancies` a `comandes_app`
+- Esborrar `comandes_app.monitors_prova` quan ActiviHub generi les sessions del 2627
+- Fase 3: login real del monitor (`empleats.id_supabase_auth_user`) i accés directe des
+  d'ActiviHub Monitor — a decidir amb en David
+
+**Deute tècnic**
 - Refactoritzar `DeliveryManager.tsx` (1300+ línies, dividir en components)
+- Sanejar l'HTML del copilot (`CopilotChat.tsx` fa servir `dangerouslySetInnerHTML` sense DOMPurify)
 - Afegir tests

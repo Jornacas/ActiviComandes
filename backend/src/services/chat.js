@@ -1,123 +1,159 @@
 /**
- * Servicio de Google Chat API
- * Envía notificaciones a espacios de Google Chat via Apps Script
+ * Notificacions a Google Chat.
+ *
+ * Publica directament amb la Chat API. El compte de servei suplanta un usuari del
+ * Workspace (delegació de domini) i els missatges surten en nom seu, igual que feia
+ * l'Apps Script amb "Execute as: Me".
+ *
+ * Muntatge (fet el 28-08-2026, no cal repetir-lo):
+ *  1. admin.google.com → Controls d'API → Delegació de tot el domini:
+ *     client ID del compte de servei + scope chat.messages.create
+ *  2. console.cloud.google.com → projecte activiconta → Google Chat API →
+ *     Configuració: nom, avatar i descripció, amb les funcions interactives
+ *     DESACTIVADES. Sense aquest pas la API respon "Google Chat app not found",
+ *     encara que la delegació sigui correcta.
+ *  3. GOOGLE_CHAT_IMPERSONATE_USER al .env (i a Vercel).
+ *
+ * Comprovació: `node backend/scripts/check-chat.js "<espai>"`.
+ *
+ * Nota: aquest servei diu la veritat quan un enviament falla. El webhook d'Apps
+ * Script que hi havia abans retornava `success: true` encara que el missatge no
+ * sortís, i notifications.js fa servir aquest valor per marcar la comanda com a
+ * notificada — o sigui que els errors quedaven enterrats.
  */
 
+const { google } = require('googleapis');
 const cache = require('./cache');
+const sheets = require('./sheets');
 
-/**
- * Refresca la caché de espacios de chat
- * Útil cuando se han añadido o modificado espacios en la hoja
- */
-async function refreshChatSpaces() {
-  cache.del('chat_webhooks_data');
-  console.log('🔄 Caché de espacios de chat refrescada');
+const IMPERSONATE_USER = process.env.GOOGLE_CHAT_IMPERSONATE_USER;
+// Mínim privilegi: només publicar. `chat.messages` a seques també permetria
+// llegir, editar i esborrar tots els missatges del compte suplantat.
+const CHAT_SCOPES = ['https://www.googleapis.com/auth/chat.messages.create'];
+
+if (!IMPERSONATE_USER) {
+  console.warn('WARNING: GOOGLE_CHAT_IMPERSONATE_USER no està configurada. Les notificacions de Google Chat fallaran.');
+}
+
+let chatClient = null;
+
+/** Client de la Chat API que publica en nom de l'usuari suplantat. */
+async function getChatClient() {
+  if (chatClient) return chatClient;
+
+  if (!IMPERSONATE_USER) {
+    throw new Error('GOOGLE_CHAT_IMPERSONATE_USER no està configurada');
+  }
+
+  const credentials = sheets.getCredentials();
+  const jwt = new google.auth.JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: CHAT_SCOPES,
+    subject: IMPERSONATE_USER
+  });
+
+  await jwt.authorize();
+  chatClient = google.chat({ version: 'v1', auth: jwt });
+  console.log(`[CHAT] Client autoritzat com a ${IMPERSONATE_USER}`);
+  return chatClient;
 }
 
 /**
- * Envía un mensaje a un espacio de Google Chat
- * Llama al microservicio de Apps Script (notificaciones.gs)
- * @param {string} spaceName - Nombre del espacio (debe existir en hoja ChatWebhooks)
- * @param {string} message - Mensaje a enviar
- * @returns {Promise<{success: boolean, error?: string, messageId?: string}>}
+ * Busca el Space ID pel nom al full ChatWebhooks.
+ *
+ * Manté el fallback seqüencial que feia l'Apps Script: si no troba
+ * "/LestonnacDX1A", prova "/LestonnacDX1", "/LestonnacDX"… fins a "/Lestonnac".
+ * Així una activitat sense espai propi acaba a l'espai de l'escola.
+ */
+async function getSpaceIdByName(spaceName) {
+  let webhooks = cache.get('chat_webhooks_data');
+
+  if (!webhooks) {
+    const data = await sheets.getSheetData('ChatWebhooks');
+    webhooks = new Map();
+    for (const row of (data || []).slice(1)) {
+      if (row[0] && row[1]) webhooks.set(String(row[0]).trim(), String(row[1]).trim());
+    }
+    cache.set('chat_webhooks_data', webhooks, 3600);
+  }
+
+  let name = String(spaceName || '').trim();
+  while (name.length > 1) {
+    const spaceId = webhooks.get(name);
+    if (spaceId) {
+      if (name !== spaceName) console.log(`[CHAT] ${spaceName} → ${name} (fallback)`);
+      return spaceId;
+    }
+    name = name.slice(0, -1);
+  }
+
+  return null;
+}
+
+/**
+ * Envia un missatge a un espai de Google Chat.
+ * @param {string} spaceName - Nom de l'espai al full ChatWebhooks
+ * @param {string} message - Text del missatge
  */
 async function sendChatNotification(spaceName, message) {
+  const spaceId = await getSpaceIdByName(spaceName);
+
+  if (!spaceId) {
+    const error = `No s'ha trobat cap Space ID per a "${spaceName}" al full ChatWebhooks`;
+    console.error(`[CHAT] ✗ ${error}`);
+    return { success: false, error, requestedSpace: spaceName, actualSpace: null };
+  }
+
   try {
-    console.log(`📤 Enviando notificación a Apps Script: ${spaceName}`);
-
-    const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_NOTIFICATION_URL;
-
-    // Verificar que la URL esté configurada
-    if (!APPS_SCRIPT_URL) {
-      console.error('❌ APPS_SCRIPT_NOTIFICATION_URL no configurada en .env');
-      return {
-        success: false,
-        error: 'APPS_SCRIPT_NOTIFICATION_URL no configurada',
-        requestedSpace: spaceName,
-        actualSpace: null,
-        simulated: true
-      };
-    }
-
-    // Llamar a Apps Script vía HTTP POST
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        spaceName: spaceName,
-        message: message
-      })
+    const chat = await getChatClient();
+    const response = await chat.spaces.messages.create({
+      parent: spaceId,
+      requestBody: { text: message }
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (result.success) {
-      console.log(`✅ Notificación enviada correctamente vía Apps Script a ${spaceName}`);
-      return {
-        success: true,
-        requestedSpace: spaceName,
-        actualSpace: spaceName,
-        spaceId: result.spaceId,
-        message: result.message || 'Notificación enviada correctamente',
-        messageId: result.messageId,
-        usedFallback: false
-      };
-    } else {
-      console.error(`❌ Apps Script devolvió error:`, result.error);
-      // Aunque falle, marcar como éxito simulado para no bloquear
-      return {
-        success: true,
-        requestedSpace: spaceName,
-        actualSpace: spaceName,
-        error: result.error,
-        message: 'Notificación registrada (Apps Script error)',
-        simulated: true
-      };
-    }
-
-  } catch (error) {
-    console.error('❌ Error llamando a Apps Script:', error.message);
-
-    // Devolver éxito simulado para no bloquear la operación
-    console.log('⚠️ Continuando con notificación simulada');
+    console.log(`[CHAT] ✓ Missatge enviat a ${spaceName} (${spaceId})`);
     return {
       success: true,
       requestedSpace: spaceName,
       actualSpace: spaceName,
-      message: 'Notificación registrada (modo simulado - error de conexión)',
-      simulated: true,
-      error: error.message
+      spaceId,
+      messageId: response.data.name,
+      message: 'Notificació enviada correctament',
+      usedFallback: false
+    };
+  } catch (error) {
+    const detail = error.errors?.[0]?.message || error.message;
+    console.error(`[CHAT] ✗ Error enviant a ${spaceName} (${spaceId}): ${detail}`);
+    return {
+      success: false,
+      error: `Chat API: ${detail}`,
+      requestedSpace: spaceName,
+      actualSpace: null,
+      spaceId
     };
   }
 }
 
-/**
- * Envía notificaciones a múltiples espacios
- * @param {Array<{spaceName: string, message: string}>} notifications
- * @returns {Promise<Array>}
- */
+/** Envia a diversos espais, en sèrie. */
 async function sendMultipleNotifications(notifications) {
   const results = [];
-
   for (const notif of notifications) {
     const result = await sendChatNotification(notif.spaceName, notif.message);
-    results.push({
-      ...result,
-      originalRequest: notif
-    });
+    results.push({ ...result, originalRequest: notif });
   }
-
   return results;
+}
+
+/** Buida la caché d'espais (quan s'han afegit o canviat files a ChatWebhooks). */
+async function refreshChatSpaces() {
+  cache.del('chat_webhooks_data');
+  console.log('[CHAT] Caché d\'espais buidada');
 }
 
 module.exports = {
   sendChatNotification,
   sendMultipleNotifications,
-  refreshChatSpaces
+  refreshChatSpaces,
+  getSpaceIdByName
 };

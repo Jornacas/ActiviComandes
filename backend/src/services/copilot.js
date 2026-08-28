@@ -4,6 +4,7 @@
  */
 
 const sheets = require('./sheets');
+const activihub = require('./activihub');
 const cache = require('./cache');
 const maps = require('./maps');
 const chat = require('./chat');
@@ -71,7 +72,9 @@ async function getOrders(filters = {}) {
 }
 
 async function getMasterData() {
-  const data = await sheets.getSheetData('Dades');
+  // Dades mestres des d'ActiviHub, amb la mateixa forma capçalera+files que
+  // tenia el full "Dades": les tools i el prompt del copilot no canvien.
+  const data = await activihub.getDadesComaFull();
   if (!data || data.length < 2) return { schools: [], monitors: [], activities: [] };
 
   const headers = data[0];

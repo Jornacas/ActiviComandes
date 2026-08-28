@@ -346,8 +346,31 @@ async function saveDistancia(escola, adreça, distanciaMetres, duracioMinuts) {
   }
 }
 
+/**
+ * Retorna les credencials del compte de servei tal com estan configurades
+ * (base64, JSON o fitxer). Les necessita chat.js per construir un client JWT
+ * amb delegació de domini, que GoogleAuth no permet fer directament.
+ */
+function getCredentials() {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
+    return JSON.parse(Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8'));
+  }
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  }
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    const path = require('path');
+    const resolved = path.isAbsolute(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+      ? process.env.GOOGLE_APPLICATION_CREDENTIALS
+      : path.join(process.cwd(), process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    return require(resolved);
+  }
+  throw new Error('No hi ha credencials de compte de servei configurades');
+}
+
 module.exports = {
   auth,
+  getCredentials,
   getSheetsClient,
   getCachedData,
   getSheetData,
