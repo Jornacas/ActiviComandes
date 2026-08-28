@@ -179,8 +179,14 @@
   --shadow-nav: 0 -2px 12px rgba(0,0,0,0.3);
 }
 
-* {
-  border-color: var(--color-border);
+/* Ha d'anar dins de @layer base. Sense capa, aquesta regla guanya a TOTES les
+   utilitats de Tailwind (que viuen a @layer utilities), i border-line,
+   border-brand o border-t-brand no pinten res: el spinner girava amb un anell
+   gris uniforme i els focus mai es posaven blaus. */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
 }
 
 body {

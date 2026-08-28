@@ -35,6 +35,15 @@ interface ItemFormProps {
 
 const ALTRES = 'Altres materials';
 
+/**
+ * crypto.randomUUID nomes existeix en context segur: obrint l'app des del mobil
+ * per IP (http://192.168.x.x) peta i no s'afegeix res al carret. Nomes cal que
+ * sigui unic dins d'aquesta llista.
+ */
+const idUnic = () =>
+  globalThis.crypto?.randomUUID?.() ??
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
 export default function ItemForm({ selectedMonitor, onAddItem, loading = false }: ItemFormProps) {
   const [escola, setEscola] = useState('');
   const [activitat, setActivitat] = useState('');
@@ -76,6 +85,11 @@ export default function ItemForm({ selectedMonitor, onAddItem, loading = false }
       .then(r => {
         if (!cancelat) setEscoles(r.success && r.data ? r.data : []);
       })
+      .catch(err => {
+        if (cancelat) return;
+        console.error('Error carregant escoles:', err);
+        setEscoles([]);
+      })
       .finally(() => {
         if (!cancelat) setCarregantEscoles(false);
       });
@@ -105,6 +119,11 @@ export default function ItemForm({ selectedMonitor, onAddItem, loading = false }
     carregar
       .then(r => {
         if (!cancelat) setActivitats(r.success && r.data ? r.data : []);
+      })
+      .catch(err => {
+        if (cancelat) return;
+        console.error('Error carregant activitats:', err);
+        setActivitats([]);
       })
       .finally(() => {
         if (!cancelat) setCarregantActivitats(false);
@@ -168,7 +187,7 @@ export default function ItemForm({ selectedMonitor, onAddItem, loading = false }
     }
 
     onAddItem({
-      id: crypto.randomUUID(),
+      id: idUnic(),
       escola,
       activitat,
       material: esLliure ? materialLliure.trim() : material,

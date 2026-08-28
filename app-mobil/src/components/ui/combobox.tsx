@@ -5,7 +5,9 @@
  *
  * Substitueix l'`Autocomplete` de MUI. Les llistes d'aquesta app són curtes
  * —21 monitores, les 6 escoles d'una monitora, 30 materials com a molt— així
- * que el camp de cerca només apareix quan de debò ajuda (a partir de 8 opcions).
+ * que el camp de cerca només apareix quan de debò ajuda (a partir de 8 opcions)
+ * O SEMPRE que s'admeti text lliure: si no, amb la llista curta o buida no hi ha
+ * cap manera d'escriure, i el mode admin («eixos») quedava inabastable.
  *
  * Pensat per al dit: opcions de 48px, la llista ocupa l'ample sencer i es tanca
  * tocant fora.
@@ -49,7 +51,7 @@ export function Combobox({
   const contenidor = React.useRef<HTMLDivElement>(null);
   const campCerca = React.useRef<HTMLInputElement>(null);
 
-  const ambCerca = options.length >= 8;
+  const ambCerca = allowCustom || options.length >= 8;
 
   const filtrades = React.useMemo(() => {
     if (!cerca.trim()) return options;
@@ -134,7 +136,10 @@ export function Combobox({
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (filtrades.length === 1) triar(filtrades[0]);
+                    // Amb coincidencies, Enter tria la primera. Nomes s'accepta
+                    // el text tal qual si no coincideix amb res: si no, escriure
+                    // "mar" amb tres monitores que hi encaixen desava "mar".
+                    if (filtrades.length > 0) triar(filtrades[0]);
                     else confirmarLliure();
                   }
                   if (e.key === 'Escape') setObert(false);

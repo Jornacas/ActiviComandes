@@ -4,8 +4,8 @@
   "description": "Aplicació per sol·licitar materials educatius",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1976d2",
+  "background_color": "#F7F9FA",
+  "theme_color": "#F7F9FA",
   "orientation": "portrait",
   "icons": [
     {
@@ -31,6 +31,9 @@
       "type": "image/png"
     }
   ],
-  "categories": ["education", "utilities"],
+  "categories": [
+    "education",
+    "utilities"
+  ],
   "lang": "ca"
 }

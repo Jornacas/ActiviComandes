@@ -59,7 +59,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <ThemeProvider>
           {children}
-          <Toaster position="top-center" richColors closeButton />
+          {/* sonner es queda en clar per defecte: sense aixo, el toast surt blanc sobre l'app fosca */}
+          <Toaster position="top-center" theme="system" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>
