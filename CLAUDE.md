@@ -5,7 +5,8 @@ Sistema de gestió de comandes de materials per a activitats extraescolars d'Eix
 ## Arquitectura
 
 - **Backend**: Node.js + Express (port 3010) → `backend/src/`
-- **Frontend**: Next.js 14.2 + Material-UI → `frontend/src/`
+- **Frontend admin**: Next.js 14.2 + Material-UI → `frontend/src/`
+- **App del monitor**: Next.js 16 + Tailwind 4 + el design system d'Eixos → `app-mobil/src/`
 - **Dades mestres**: ActiviHub (Supabase, schema `comandes`) — escoles, monitors, activitats
 - **Dades pròpies**: Supabase, schema `comandes_app` — comandes, materials, distàncies, espais de Chat
 - **Google Sheets**: ja no s'hi llegeix ni s'hi escriu. El full queda com a arxiu històric
@@ -202,6 +203,15 @@ L'aplicació està en **català**. El copilot respon en català. Els comentaris 
   hi conviuen `DIRECTA` i `Directa`. Cal arreglar la comparació i després normalitzar
 - El fallback d'espais de Chat desvia un 33 % de les notificacions a l'espai de tota l'escola
   (veure §7-Q1b del pla). Es resol quan `google_xats` pengi de l'activitat
+
+**App del monitor**
+- La pell ja és la d'ActiviHub Monitor (mateixos tokens, components `ui/`, Fredoka + Nunito,
+  tema clar/fosc). El flux de quatre desplegables es queda fins que hi hagi login.
+- L'objectiu és integrar-la dins d'ActiviHub Monitor: allà el monitor ja està identificat i
+  el formulari es reduiria a triar material i quantitat. Pendent de parlar-ho amb en David.
+- `@source` a `globals.css` és obligatori: Tailwind v4 no detecta els fonts sol perquè
+  `app-mobil` és una subcarpeta d'un repositori més gran. I necessita Next 15+; amb Next 14
+  generava els tokens però cap utilitat, i la pàgina sortia sense estils.
 
 **Deute tècnic**
 - Migrar el frontend de l'admin del format `?action=` a REST i retirar `middleware/legacy.js`

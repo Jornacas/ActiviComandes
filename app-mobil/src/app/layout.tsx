@@ -1,58 +1,67 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { Box } from '@mui/material'
-import CustomThemeProvider from '../components/ThemeProvider'
-import './globals.css'
+import type { Metadata, Viewport } from 'next';
+import { Fredoka, Nunito_Sans } from 'next/font/google';
+import { ThemeProvider } from '@/components/ThemeProvider';
+import { Toaster } from 'sonner';
+import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] })
+/**
+ * Tipografia del design system d'Eixos, la mateixa que l'app del monitor:
+ * Fredoka per als títols, Nunito Sans per al text.
+ */
+const fredoka = Fredoka({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-fredoka',
+  display: 'swap',
+});
+
+const nunitoSans = Nunito_Sans({
+  subsets: ['latin'],
+  variable: '--font-nunito',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'Sol·licitud de Materials - v2.1',
-  description: 'App per sol·licitar materials educatius - Sistema de carret',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
-  themeColor: '#1976d2',
+  title: 'Materials · Eixos Creativa',
+  description: 'Sol·licitud de materials per a les activitats',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Materials',
+  },
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
       { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icon-512x512.png', sizes: '512x512', type: 'image/png' }
+      { url: '/icon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
-    ]
-  }
-}
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+};
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F7F9FA' },
+    { media: '(prefers-color-scheme: dark)', color: '#0F1117' },
+  ],
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ca">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-        <meta name="theme-color" content="#1976d2" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Materials" />
-        <link rel="icon" href="/favicon.ico" />
-      </head>
-      <body className={inter.className} style={{ margin: 0, padding: 0 }}>
-        <CustomThemeProvider>
-          <Box sx={{ 
-            width: '100%', 
-            minHeight: '100vh', 
-            px: { xs: 1, sm: 2 }, 
-            py: { xs: 1, sm: 2 },
-            backgroundColor: '#f5f5f5'
-          }}>
-            {children}
-          </Box>
-        </CustomThemeProvider>
+    <html lang="ca" suppressHydrationWarning>
+      <body
+        className={`${fredoka.variable} ${nunitoSans.variable} font-[family-name:var(--font-body)] bg-page text-fg1 antialiased`}
+      >
+        <ThemeProvider>
+          {children}
+          <Toaster position="top-center" richColors closeButton />
+        </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }

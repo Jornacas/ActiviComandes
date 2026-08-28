@@ -1,75 +1,224 @@
-/* Reset básico para móvil */
+@import "tailwindcss";
+
+/* Tailwind v4 detecta els fitxers font sol quan el CSS viu al mateix arrel que
+   el codi. Aqui `app-mobil` es una subcarpeta d'un repositori mes gran i la
+   deteccio no hi arriba: generava els tokens de @theme pero cap utilitat, i la
+   pagina sortia sense estils. Amb @source no hi ha ambiguitat. */
+@source "../**/*.{ts,tsx}";
+
+/* El variant `dark:` ha de seguir la classe que posa next-themes, no el tema
+   del sistema operatiu.
+   A Tailwind v4 `dark:` compila per defecte a `prefers-color-scheme`, mentre
+   que el ThemeProvider treballa amb `attribute="class"` i el bloc `.dark`
+   d'aquest fitxer també. Sense això van per camins separats: amb el sistema en
+   fosc i l'app en clar, les variables deien «clar» i els `dark:` deien
+   «fosc» —el logotip negatiu apareixia sobre fons blanc—, i el selector
+   d'Aparença del Perfil no controlava del tot el tema. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --radius: 0.75rem;
+  --color-success: hsl(142 76% 45%);
+  --color-warning: hsl(38 92% 55%);
+}
+
+/* ── Redisseny visual · design system d'Eixos ─────────────────────────────
+   Derivat de `colors_and_type.css` del design system (paleta «A — Vibrant i
+   infantil»), que és la font autoritativa de color, tipus, radis i ombres.
+
+   Capa ADDITIVA: cap nom col·lideix amb els tokens antics d'aquest fitxer, ni
+   amb els que Tailwind v4 ja porta de sèrie. Per això els radis i les corbes
+   NO fan servir els noms del design system (`--radius-md`, `--ease-out`…):
+   redefinir-los canviaria `rounded-md` o `ease-out` a TOTA l'app, també a les
+   pantalles encara sense migrar. Mateix valor, nom semàntic. */
+@theme {
+  /* Rampes de marca — un color per activitat */
+  --color-blau-50: #E6F5FC;    --color-blau-100: #C2E8F8;    --color-blau-200: #8AD3F0;
+  --color-blau-500: #009CDE;   --color-blau-600: #0086C0;    --color-blau-700: #006A99;
+  --color-groc-50: #FFF8E6;    --color-groc-100: #FEEDB8;    --color-groc-200: #FEDE85;
+  --color-groc-500: #FDB913;   --color-groc-600: #E0A300;    --color-groc-700: #B38100;
+  --color-coral-50: #FDECEC;   --color-coral-100: #FBD3D2;   --color-coral-200: #F7A9A7;
+  --color-coral-500: #EF5350;  --color-coral-600: #E5352F;   --color-coral-700: #C42822;
+  --color-lila-50: #F1ECF9;    --color-lila-100: #DECEF0;    --color-lila-200: #C0A6E3;
+  --color-lila-500: #7E57C2;   --color-lila-600: #6A43AC;    --color-lila-700: #543488;
+  --color-verd-50: #EDF7EE;    --color-verd-100: #D2ECD3;    --color-verd-200: #A8DBAB;
+  --color-verd-500: #66BB6A;   --color-verd-600: #51A455;    --color-verd-700: #3F8443;
+  --color-taronja-50: #FEF0EB; --color-taronja-100: #FBD9CC; --color-taronja-200: #F9BCA6;
+  --color-taronja-500: #F4845F;--color-taronja-600: #E66A43; --color-taronja-700: #C25232;
+
+  /* Rampa neutra */
+  --color-ink-900: #20262B; --color-ink-800: #2E353B; --color-ink-700: #434A50;
+  --color-ink-600: #5E666D; --color-ink-500: #828A91; --color-ink-400: #AAB1B7;
+  --color-ink-300: #CDD2D6; --color-ink-200: #E4E7EA; --color-ink-100: #F1F3F4;
+  --color-ink-050: #F7F9FA;
+
+  /* Semàntics — els ÚNICS que canvien en tema fosc. Fes-los servir sempre que
+     el color depengui de la superfície; les rampes, només sobre color fix. */
+  /* `page` és el fons enfonsat de la pantalla i `surface` el de les targetes
+     que hi suren. Han de contrastar entre ells en els dos temes: en clar,
+     targeta blanca sobre gris molt clar; en fosc, targeta més clara que el
+     fons. Si tots dos fossin blancs, les targetes només es veurien per
+     l'ombra. */
+  --color-page: #F7F9FA;
+  --color-surface: #FFFFFF;
+  --color-soft: #F1F3F4;
+  --color-field: #F1F3F4;
+  --color-fg1: #20262B;
+  --color-fg2: #434A50;
+  --color-fg3: #828A91;
+  --color-line: #E4E7EA;
+  --color-line-strong: #CDD2D6;
+  --color-brand: #009CDE;
+  --color-brand-hover: #0086C0;
+  --color-cta: #EF5350;
+
+  /* Radis — escala del design system (4 · 8 · 14 · 20 · 28 · pill) */
+  --radius-tiny: 4px;
+  --radius-chip: 8px;
+  --radius-field: 14px;
+  --radius-card: 20px;
+  --radius-hero: 28px;
+
+  /* Ombres — elevació neutra + elevació de color sota botons plens */
+  --shadow-1: 0 1px 2px rgba(32, 38, 43, 0.06), 0 1px 1px rgba(32, 38, 43, 0.04);
+  --shadow-2: 0 4px 14px rgba(32, 38, 43, 0.08), 0 2px 4px rgba(32, 38, 43, 0.05);
+  --shadow-3: 0 12px 32px rgba(32, 38, 43, 0.12), 0 4px 8px rgba(32, 38, 43, 0.06);
+  --shadow-blau: 0 10px 26px rgba(0, 156, 222, 0.3);
+  --shadow-coral: 0 10px 26px rgba(239, 83, 80, 0.32);
+  --shadow-verd: 0 10px 26px rgba(102, 187, 106, 0.3);
+  --shadow-groc: 0 10px 26px rgba(253, 185, 19, 0.32);
+  --shadow-press: inset 0 2px 6px rgba(32, 38, 43, 0.16);
+
+  /* Moviment — `--ease-out` és de Tailwind, per això el nom propi */
+  --ease-eixos: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Tipografia */
+  --font-display: var(--font-fredoka), system-ui, sans-serif;
+  --font-body: var(--font-nunito), system-ui, sans-serif;
+}
+
+/* ── Tema fosc del redisseny ──────────────────────────────────────────────
+   DERIVAT, no és del design system: la font autoritativa només defineix tema
+   clar («White is the default surface»). Els valors surten de la paleta fosca
+   que ja tenia l'app, i els tints i els textos-sobre-tint s'han recalculat per
+   mantenir el contrast. Pendent de validar amb el disseny. */
+.dark {
+  --color-page: #0F1117;
+  --color-surface: #1A1D26;
+  --color-soft: #252830;
+  --color-field: #252830;
+  --color-fg1: #E8EAED;
+  --color-fg2: #C4C8CE;
+  --color-fg3: #8892A0;
+  --color-line: #2D3140;
+  --color-line-strong: #3A3F52;
+
+  /* Tints: sobre fons fosc han de ser fons foscos tenyits, no pastels */
+  --color-blau-50: #10222E;    --color-blau-700: #6FC7EE;
+  --color-groc-50: #2A2312;    --color-groc-700: #E8C464;
+  --color-coral-50: #2A1717;   --color-coral-700: #F79B97;
+  --color-lila-50: #1F1830;    --color-lila-700: #BCA4E6;
+  --color-verd-50: #16251A;    --color-verd-700: #8CD190;
+  --color-taronja-50: #2A1A14; --color-taronja-700: #F0A184;
+}
+
+/* ── Light theme — Eixos Creativa identity ── */
+:root {
+  --color-background: #F3F4F6;
+  --color-foreground: #1a1a2e;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a1a2e;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a1a2e;
+  --color-primary: #01D49D;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #eef1f5;
+  --color-secondary-foreground: #444444;
+  --color-muted: #eef1f5;
+  --color-muted-foreground: #5D6E82;
+  --color-accent: #009BDD;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2e5ea;
+  --color-input: #e2e5ea;
+  --color-ring: #01D49D;
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 2px 6px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+  --shadow-hero: 0 8px 32px -4px rgba(1,212,157,0.3);
+  --shadow-nav: 0 -2px 12px rgba(0,0,0,0.06);
+}
+
+/* ── Dark theme ── */
+.dark {
+  --color-background: #0F1117;
+  --color-foreground: #e8eaed;
+  --color-card: #1A1D26;
+  --color-card-foreground: #e8eaed;
+  --color-popover: #1A1D26;
+  --color-popover-foreground: #e8eaed;
+  --color-primary: #2EDBA8;
+  --color-primary-foreground: #0F1117;
+  --color-secondary: #252830;
+  --color-secondary-foreground: #c4c8ce;
+  --color-muted: #252830;
+  --color-muted-foreground: #8892a0;
+  --color-accent: #3aaee0;
+  --color-accent-foreground: #0F1117;
+  --color-destructive: #f87171;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #2d3140;
+  --color-input: #2d3140;
+  --color-ring: #2EDBA8;
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.2), 0 4px 14px rgba(0,0,0,0.15);
+  --shadow-card-hover: 0 2px 6px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.2);
+  --shadow-hero: 0 8px 32px -4px rgba(46,219,168,0.2);
+  --shadow-nav: 0 -2px 12px rgba(0,0,0,0.3);
+}
+
 * {
-  box-sizing: border-box;
+  border-color: var(--color-border);
 }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow-x: hidden;
-  -webkit-text-size-adjust: 100%;
-  -ms-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-
-/* Mejoras para móvil */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
+  /* SPEC-0027 D5: es treu «overscroll-behavior: none» → torna el pull-to-refresh natiu del navegador */
 }
 
-/* Evitar zoom en inputs en iOS */
-input[type="text"],
-input[type="email"],
-input[type="number"],
-input[type="tel"],
-input[type="url"],
-input[type="password"],
-input[type="search"],
-textarea,
-select {
-  font-size: 16px !important;
+/* ── Utility classes ── */
+
+.gradient-hero {
+  background: linear-gradient(135deg, #01D49D 0%, #009BDD 100%);
 }
 
-/* Mejorar el scroll en móvil */
-.MuiContainer-root,
-.MuiBox-root {
-  -webkit-overflow-scrolling: touch;
+.dark .gradient-hero {
+  background: linear-gradient(135deg, #01B886 0%, #0088C4 100%);
 }
 
-/* Mejorar botones en móvil */
-.MuiButton-root {
-  min-height: 44px;
-  touch-action: manipulation;
+@keyframes slow-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* Mejorar campos de texto en móvil */
-.MuiTextField-root .MuiInputBase-root {
-  min-height: 44px;
-}
-
-/* Evitar el bounce en iOS */
-html {
-  position: fixed;
-  height: 100%;
-  overflow: hidden;
-}
-
-body {
-  position: relative;
-  height: 100%;
-  overflow: auto;
-}
-
-/* Mejorar el aspecto de las tarjetas en móvil */
-@media (max-width: 600px) {
-  .MuiCard-root {
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
   }
-} 
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Capçaleres del redisseny. `pt-safe` només aporta l'inset del dispositiu, que
+   a escriptori i en mòbils sense osca val 0 i deixa el títol enganxat a dalt.
+   Els 54px de la maqueta són zona segura O espaiat propi, el que sigui més
+   gran. */
+.pt-header {
+  padding-top: max(env(safe-area-inset-top, 0px), 1.25rem);
+}

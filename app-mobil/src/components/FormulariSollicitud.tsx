@@ -1,391 +1,258 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  TextField,
-  Typography,
-  Alert,
-  CircularProgress,
-  Grid,
-  Autocomplete,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-} from '@mui/material';
-import {
-  CalendarToday,
-  Person,
-  Warning,
-} from '@mui/icons-material';
-import { apiClient, type SollicitudMultiple, type CartItem } from '../lib/api';
-import { validarPlazoPedido, testValidacion, type ValidacionFecha } from '../lib/dateValidation';
+import { CalendarDays, User, TriangleAlert, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiClient, type SollicitudMultiple, type CartItem } from '@/lib/api';
+import { validarPlazoPedido, type ValidacionFecha } from '@/lib/dateValidation';
+import { Combobox } from '@/components/ui/combobox';
 import ItemForm from './ItemForm';
 import CartView from './CartView';
 
-const FormulariSollicitud: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+export default function FormulariSollicitud() {
+  const [carregant, setCarregant] = useState(true);
+  const [enviant, setEnviant] = useState(false);
+  const [enviat, setEnviat] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [escoles, setEscoles] = useState<string[]>([]);
   const [monitors, setMonitors] = useState<string[]>([]);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [carret, setCarret] = useState<CartItem[]>([]);
 
-  const [formData, setFormData] = useState({
-    nomCognoms: '',
-    dataNecessitat: '',
-    altresMaterials: '',
-  });
+  const [nomCognoms, setNomCognoms] = useState('');
+  const [dataNecessitat, setDataNecessitat] = useState('');
+  const [comentaris, setComentaris] = useState('');
 
-  // Date validation
-  const [validacionFecha, setValidacionFecha] = useState<ValidacionFecha | null>(null);
-  const [showPlazoDialog, setShowPlazoDialog] = useState(false);
+  const [validacio, setValidacio] = useState<ValidacionFecha | null>(null);
+  const [avisTermini, setAvisTermini] = useState(false);
 
-  // Carregar dades inicials
   useEffect(() => {
-    loadInitialData();
-    // Test de validación (solo para desarrollo) - FORZADO PARA DEBUG
-    console.log('🚀 INICIANDO TESTS DE VALIDACIÓN...');
-    testValidacion();
-    console.log('🏁 TESTS DE VALIDACIÓN COMPLETADOS');
+    apiClient
+      .getMonitors()
+      .then(r => {
+        if (r.success && r.data) setMonitors(r.data);
+        else setError('No s\'han pogut carregar els monitors');
+      })
+      .catch(() => setError('Error carregant les dades inicials'))
+      .finally(() => setCarregant(false));
   }, []);
 
-  const loadInitialData = async () => {
-    setLoading(true);
-    try {
-      // Load schools and monitors in parallel
-      const [escolesResponse, monitorsResponse] = await Promise.all([
-        apiClient.getEscoles(),
-        apiClient.getMonitors()
-      ]);
-      
-      if (escolesResponse.success && escolesResponse.data) {
-        setEscoles(escolesResponse.data);
-      }
-      
-      if (monitorsResponse.success && monitorsResponse.data) {
-        setMonitors(monitorsResponse.data);
-      }
-    } catch (err) {
-      setError('Error carregant les dades inicials');
-    } finally {
-      setLoading(false);
+  const canviarData = (valor: string) => {
+    setDataNecessitat(valor);
+    if (!valor) {
+      setValidacio(null);
+      return;
     }
+
+    const resultat = validarPlazoPedido(new Date(valor));
+    setValidacio(resultat);
+    setAvisTermini(!resultat.cumplePlazo);
   };
 
-  const handleInputChange = (field: string) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const value = event.target.value;
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
-    // Validar fecha si es el campo de fecha de necesidad
-    if (field === 'dataNecessitat' && value) {
-      console.log('🔄 Validando fecha:', value);
-      const fechaNecesidad = new Date(value);
-      console.log('📅 Fecha parseada:', fechaNecesidad);
-      const validacion = validarPlazoPedido(fechaNecesidad);
-      setValidacionFecha(validacion);
-
-      console.log('✅ Resultado validación completo:', validacion);
-      console.log('❓ ¿Cumple plazo?:', validacion.cumplePlazo);
-      console.log('💬 Mensaje:', validacion.mensaje);
-
-      // Mostrar dialog si no cumple plazo
-      if (!validacion.cumplePlazo) {
-        console.log('⚠️ MOSTRANDO DIALOG - Plazo vencido');
-        console.log('🔴 FORZANDO setShowPlazoDialog(true)');
-        setShowPlazoDialog(true);
-      } else {
-        console.log('✅ Plazo correcto - No se muestra dialog');
-        setShowPlazoDialog(false);
-      }
-    }
-  };
-
-  const handleAddItem = (item: CartItem) => {
-    setCartItems(prev => [...prev, item]);
-    setError(null);
-  };
-
-  const handleRemoveItem = (itemId: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== itemId));
-  };
-
-  const handleSubmitCart = async () => {
+  const enviar = async () => {
     setError(null);
 
-    // Validació bàsica
-    if (!formData.nomCognoms.trim()) {
-      setError('Si us plau, selecciona el teu nom de la llista');
-      return;
+    const nom = nomCognoms.trim();
+    const esAdmin = nom.toLowerCase() === 'eixos';
+
+    if (!nom) return setError('Tria el teu nom de la llista');
+    if (!esAdmin && !monitors.includes(nom)) {
+      return setError('Tria un nom vàlid de la llista, o escriu «eixos» per al mode admin');
     }
+    if (!dataNecessitat) return setError('Indica per quin dia et fa falta');
+    if (carret.length === 0) return setError('Afegeix almenys un material al carret');
 
-    // Verificar que el nom sigui vàlid (està a la llista de monitors o és "eixos")
-    const isEixosAdmin = formData.nomCognoms.trim().toLowerCase() === 'eixos';
-    if (!isEixosAdmin && !monitors.includes(formData.nomCognoms.trim())) {
-      setError('Si us plau, selecciona un nom vàlid de la llista de monitors o escriu "eixos" per mode admin');
-      return;
-    }
-
-    if (!formData.dataNecessitat) {
-      setError('Si us plau, selecciona la data de necessitat');
-      return;
-    }
-
-    if (cartItems.length === 0) {
-      setError('Si us plau, afegeix almenys un material al carret');
-      return;
-    }
-
-    setSubmitting(true);
-
+    setEnviant(true);
     try {
-      const solicitudData: SollicitudMultiple = {
-        nomCognoms: formData.nomCognoms.trim(),
-        dataNecessitat: formData.dataNecessitat,
-        items: cartItems,
-        altresMaterials: formData.altresMaterials.trim() || undefined,
-        entregaManual: validacionFecha?.requiereEntregaManual || false,
+      const sollicitud: SollicitudMultiple = {
+        nomCognoms: nom,
+        dataNecessitat,
+        items: carret,
+        altresMaterials: comentaris.trim() || undefined,
+        entregaManual: validacio?.requiereEntregaManual || false,
       };
 
-      const response = await apiClient.createMultipleSollicitud(solicitudData);
+      const resposta = await apiClient.createMultipleSollicitud(sollicitud);
 
-      if (response.success) {
-        setSuccess(true);
-        // Reset form
-        setFormData({
-          nomCognoms: '',
-          dataNecessitat: '',
-          altresMaterials: '',
-        });
-        setCartItems([]);
-        setValidacionFecha(null);
-
-        // Amagar missatge d'èxit després de 5 segons
-        setTimeout(() => setSuccess(false), 5000);
+      if (resposta.success) {
+        setEnviat(true);
+        toast.success(`Sol·licitud enviada · ${carret.length} materials`);
+        setNomCognoms('');
+        setDataNecessitat('');
+        setComentaris('');
+        setCarret([]);
+        setValidacio(null);
+        setTimeout(() => setEnviat(false), 6000);
       } else {
-        setError(response.error || 'Error enviant la sol·licitud');
+        setError(resposta.error || 'Error enviant la sol·licitud');
       }
-    } catch (err) {
-      setError('Error de connexió. Comprova la teva connexió a internet.');
+    } catch {
+      setError('Error de connexió. Comprova que tens internet.');
     } finally {
-      setSubmitting(false);
+      setEnviant(false);
     }
   };
 
-  if (loading) {
+  if (carregant) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-        <CircularProgress />
-        <Typography sx={{ ml: 2 }}>Carregant...</Typography>
-      </Box>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
+        <div className="size-8 animate-spin rounded-full border-2 border-line border-t-brand" />
+        <p className="text-sm text-fg3">Carregant…</p>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ width: '100%', minHeight: '100vh' }}>
-      <Card sx={{ mb: { xs: 2, sm: 3 }, borderRadius: { xs: 0, sm: 2 } }}>
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Box sx={{ textAlign: 'center', mb: { xs: 2, sm: 3 } }}>
-            <Box sx={{ mb: { xs: 1, sm: 2 } }}>
-              <img 
-                src="https://www.eixoscreativa.com/wp-content/uploads/2024/01/Eixos-creativa.png.webp" 
-                alt="Eixos Creativa" 
-                style={{ 
-                  height: '40px', 
-                  objectFit: 'contain',
-                  maxWidth: '100%'
-                }}
+    <div className="mx-auto w-full max-w-lg px-4 pb-12">
+      <header className="pt-header pb-5 text-center">
+        <img
+          src="https://www.eixoscreativa.com/wp-content/uploads/2024/01/Eixos-creativa.png.webp"
+          alt="Eixos Creativa"
+          className="mx-auto h-9 object-contain dark:brightness-0 dark:invert"
+        />
+        <h1 className="mt-4 font-[family-name:var(--font-display)] text-2xl font-semibold text-fg1">
+          Sol·licitud de materials
+        </h1>
+        <p className="mt-1 text-sm text-fg3">
+          Afegeix el que necessites i envia-ho tot de cop
+        </p>
+      </header>
+
+      {enviat && (
+        <p className="mb-4 flex items-start gap-2 rounded-[var(--radius-field)] bg-verd-50 px-4 py-3 text-sm text-verd-700">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          Sol·licitud enviada correctament. Rebràs la confirmació aviat.
+        </p>
+      )}
+
+      {error && (
+        <p className="mb-4 flex items-start gap-2 rounded-[var(--radius-field)] bg-coral-50 px-4 py-3 text-sm text-coral-700">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          {error}
+        </p>
+      )}
+
+      <div className="space-y-4">
+        <section className="rounded-[var(--radius-card)] border border-line bg-surface p-5 shadow-[var(--shadow-1)]">
+          <h2 className="mb-4 font-[family-name:var(--font-display)] text-lg font-semibold text-fg1">
+            Les teves dades
+          </h2>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-fg2">Nom i cognoms</label>
+              <Combobox
+                value={nomCognoms}
+                onChange={setNomCognoms}
+                options={monitors}
+                allowCustom
+                placeholder="Qui ets?"
+                emptyText="Cap monitor amb aquest nom"
+                icon={<User className="size-4" />}
               />
-            </Box>
-            <Typography 
-              variant="h5" 
-              component="h1" 
-              color="primary" 
-              gutterBottom
-              sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
-            >
-              Sol·licitud de Materials
-            </Typography>
-          </Box>
+            </div>
 
-          <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 3 }}>
-            Omple les teves dades, afegeix els materials que necessites i envia la sol·licitud completa
-          </Typography>
+            <div className="space-y-1.5">
+              <label htmlFor="data" className="block text-sm font-medium text-fg2">
+                Per quin dia et fa falta
+              </label>
+              <div className="relative">
+                <CalendarDays className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-fg3" />
+                <input
+                  id="data"
+                  type="date"
+                  value={dataNecessitat}
+                  onChange={e => canviarData(e.target.value)}
+                  className="w-full rounded-[var(--radius-field)] border border-line bg-field py-3 pl-11 pr-4 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/25"
+                />
+              </div>
 
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              ✅ Sol·licitud enviada correctament! Rebràs confirmació aviat.
-              <br />
-              <strong>Materials sol·licitats:</strong> {cartItems.length} items
-            </Alert>
-          )}
+              {validacio && !validacio.cumplePlazo && (
+                <button
+                  type="button"
+                  onClick={() => setAvisTermini(true)}
+                  className="flex w-full items-center gap-2 rounded-[var(--radius-field)] bg-groc-50 px-4 py-2.5 text-left text-sm text-groc-700"
+                >
+                  <TriangleAlert className="size-4 shrink-0" />
+                  Termini just — toca per veure què implica
+                </button>
+              )}
+            </div>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+            <div className="space-y-1.5">
+              <label htmlFor="comentaris" className="block text-sm font-medium text-fg2">
+                Comentaris <span className="font-normal text-fg3">(opcional)</span>
+              </label>
+              <textarea
+                id="comentaris"
+                rows={2}
+                value={comentaris}
+                onChange={e => setComentaris(e.target.value)}
+                placeholder="Alguna cosa que hàgim de saber"
+                className="w-full resize-none rounded-[var(--radius-field)] border border-line bg-field px-4 py-3 text-[15px] outline-none transition-colors placeholder:text-fg3 focus:border-brand focus:ring-2 focus:ring-brand/25"
+              />
+            </div>
+          </div>
+        </section>
 
-          {/* Datos comunes del usuario */}
-          <Card variant="outlined" sx={{ mb: { xs: 2, sm: 3 }, borderRadius: { xs: 1, sm: 2 } }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-              <Typography variant="h6" gutterBottom color="primary">
-                👤 Dades del Sol·licitant
-              </Typography>
-              
-              <Grid container spacing={2}>
-                {/* Nom i cognoms */}
-                <Grid item xs={12} md={6}>
-                  <Autocomplete
-                    fullWidth
-                    options={monitors}
-                    value={formData.nomCognoms || null}
-                    onChange={(_, newValue) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        nomCognoms: newValue || ''
-                      }));
-                    }}
-                    freeSolo={true} // Allow free text for "eixos" admin mode
-                    autoComplete
-                    autoHighlight
-                    autoSelect
-                    blurOnSelect
-                    clearOnBlur
-                    handleHomeEndKeys
-                    openOnFocus={false} // Don't open on focus
-                    disablePortal
-                    slotProps={{
-                      popper: {
-                        sx: {
-                          '& .MuiAutocomplete-listbox': {
-                            maxHeight: '120px', // Smaller dropdown
-                            fontSize: '0.875rem'
-                          }
-                        }
-                      }
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Nom i cognoms *"
-                        placeholder="Comença a escriure el teu nom o 'eixos' per mode admin..."
-                        InputProps={{
-                          ...params.InputProps,
-                          startAdornment: <Person color="action" sx={{ mr: 1 }} />,
-                          endAdornment: null, // Remove the arrow icon
-                        }}
-                      />
-                    )}
-                    renderOption={(props, option) => {
-                      const { key, ...otherProps } = props;
-                      return (
-                        <Box component="li" key={key} {...otherProps} sx={{ py: 0.5, fontSize: '0.875rem' }}>
-                          {option}
-                        </Box>
-                      );
-                    }}
-                    noOptionsText="No s'ha trobat cap monitor (prova 'eixos' per mode admin)"
-                    getOptionLabel={(option) => option}
-                    isOptionEqualToValue={(option, value) => option === value}
-                  />
-                </Grid>
+        <ItemForm
+          selectedMonitor={nomCognoms}
+          onAddItem={item => {
+            setCarret(prev => [...prev, item]);
+            setError(null);
+          }}
+          loading={enviant}
+        />
 
-                {/* Data necessitat */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    type="date"
-                    label="Data de necessitat *"
-                    value={formData.dataNecessitat}
-                    onChange={handleInputChange('dataNecessitat')}
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      startAdornment: <CalendarToday color="action" sx={{ mr: 1 }} />,
-                    }}
-                  />
-                </Grid>
+        <CartView
+          items={carret}
+          onRemoveItem={id => setCarret(prev => prev.filter(i => i.id !== id))}
+          onSubmitCart={enviar}
+          submitting={enviant}
+        />
+      </div>
 
-                {/* Comentaris adicionals */}
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={2}
-                    label="Comentaris adicionals"
-                    value={formData.altresMaterials}
-                    onChange={handleInputChange('altresMaterials')}
-                    placeholder="Informació adicional sobre la sol·licitud (opcional)"
-                  />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
+      <p className="mt-6 px-2 text-center text-sm text-fg3">
+        Pots posar materials de diferents escoles i activitats al mateix carret.
+      </p>
 
-          {/* Formulario para añadir items */}
-          <ItemForm 
-            escoles={escoles}
-            selectedMonitor={formData.nomCognoms}
-            onAddItem={handleAddItem}
-            loading={submitting}
-          />
-
-          {/* Vista del carrito */}
-          <CartView 
-            items={cartItems}
-            onRemoveItem={handleRemoveItem}
-            onSubmitCart={handleSubmitCart}
-            submitting={submitting}
-          />
-
-          {/* Informació adicional */}
-          <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-            <Typography variant="body2" color="text.secondary" align="center">
-              💡 <strong>Consell:</strong> Pots afegir múltiples materials de diferents escoles i activitats al mateix carret abans d'enviar la sol·licitud
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
-
-      {/* Dialog de aviso de plazo vencido */}
-      <Dialog 
-        open={showPlazoDialog} 
-        onClose={() => setShowPlazoDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Warning color="warning" />
-          Termini de comanda vençut
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
-            {validacionFecha?.mensaje}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => setShowPlazoDialog(false)} 
-            variant="contained" 
-            color="primary"
+      {avisTermini && validacio && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/40 p-4 sm:items-center"
+          onClick={() => setAvisTermini(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-[var(--radius-hero)] bg-surface p-6 shadow-[var(--shadow-3)]"
+            onClick={e => e.stopPropagation()}
           >
-            Entendido
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
-};
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h3 className="flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-semibold text-fg1">
+                <TriangleAlert className="size-5 text-groc-600" />
+                Termini vençut
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAvisTermini(false)}
+                aria-label="Tancar"
+                className="-mr-2 -mt-1 rounded-full p-2 text-fg3 hover:bg-soft"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
 
-export default FormulariSollicitud;
+            <p className="whitespace-pre-line text-[15px] leading-relaxed text-fg2">
+              {validacio.mensaje}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setAvisTermini(false)}
+              className="mt-5 min-h-12 w-full rounded-[var(--radius-field)] bg-brand px-5 font-semibold text-white shadow-[var(--shadow-blau)] active:scale-[0.99]"
+            >
+              Entesos
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

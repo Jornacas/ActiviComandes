@@ -1,458 +1,297 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  TextField,
-  Button,
-  Typography,
-  Alert,
-  CircularProgress,
-  Autocomplete,
-  Grid,
-  Collapse,
-} from '@mui/material';
-import {
-  School,
-  Category,
-  Inventory,
-  Numbers,
-  Add,
-} from '@mui/icons-material';
-import { apiClient, type CartItem } from '../lib/api';
-import { v4 as uuidv4 } from 'uuid';
+import { School, Layers, Package, Plus, AlertCircle } from 'lucide-react';
+import { apiClient, type CartItem } from '@/lib/api';
+import { Combobox } from '@/components/ui/combobox';
+import { cn } from '@/lib/utils';
 
-const formatSentenceCase = (text: string | null | undefined): string => {
-  if (!text) return '';
-  const trimmed = String(text).trim();
-  if (trimmed.length === 0) return '';
-  const lower = trimmed.toLowerCase();
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
-};
+/**
+ * Els materials que comencen per SOBRE van primer (són la base de les fitxes de
+ * Honey Clay) i «Altres materials» sempre al final.
+ */
+const ordenaMaterials = (materials: string[]): string[] => {
+  if (!materials?.length) return [];
 
-const sortMaterials = (materials: string[]): string[] => {
-  if (!materials || materials.length === 0) return [];
-  
-  const sobreMaterials: string[] = [];
-  const otherMaterials: string[] = [];
-  const altresMaterials: string[] = [];
-  
-  materials.forEach(material => {
-    if (material === 'Altres materials') {
-      altresMaterials.push(material);
-    } else if (material.toUpperCase().startsWith('SOBRE')) {
-      sobreMaterials.push(material);
-    } else {
-      otherMaterials.push(material);
-    }
-  });
-  
-  otherMaterials.sort((a, b) => a.localeCompare(b, 'ca', { sensitivity: 'base' }));
-  
-  // Return materials with "Altres materials" at the end if present
-  return [...sobreMaterials, ...otherMaterials, ...altresMaterials];
+  const sobres: string[] = [];
+  const altres: string[] = [];
+  const resta: string[] = [];
+
+  for (const material of materials) {
+    if (material === 'Altres materials') altres.push(material);
+    else if (material.toUpperCase().startsWith('SOBRE')) sobres.push(material);
+    else resta.push(material);
+  }
+
+  resta.sort((a, b) => a.localeCompare(b, 'ca', { sensitivity: 'base' }));
+  return [...sobres, ...resta, ...altres];
 };
 
 interface ItemFormProps {
-  escoles: string[];
   selectedMonitor: string;
   onAddItem: (item: CartItem) => void;
   loading?: boolean;
 }
 
-const ItemForm: React.FC<ItemFormProps> = ({ escoles, selectedMonitor, onAddItem, loading = false }) => {
-  const [formData, setFormData] = useState({
-    escola: '',
-    activitat: '',
-    material: '',
-    customMaterial: '',
-    unitats: '',
-  });
-  
-  const [filteredEscoles, setFilteredEscoles] = useState<string[]>([]);
+const ALTRES = 'Altres materials';
+
+export default function ItemForm({ selectedMonitor, onAddItem, loading = false }: ItemFormProps) {
+  const [escola, setEscola] = useState('');
+  const [activitat, setActivitat] = useState('');
+  const [material, setMaterial] = useState('');
+  const [materialLliure, setMaterialLliure] = useState('');
+  const [unitats, setUnitats] = useState('');
+
+  const [escoles, setEscoles] = useState<string[]>([]);
   const [activitats, setActivitats] = useState<string[]>([]);
   const [materials, setMaterials] = useState<string[]>([]);
-  const [loadingEscoles, setLoadingEscoles] = useState(false);
-  const [loadingActivities, setLoadingActivities] = useState(false);
-  const [loadingMaterials, setLoadingMaterials] = useState(false);
+
+  const [carregantEscoles, setCarregantEscoles] = useState(false);
+  const [carregantActivitats, setCarregantActivitats] = useState(false);
+  const [carregantMaterials, setCarregantMaterials] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load schools for the selected monitor
+  // "eixos" és el mode admin: veu totes les escoles, no només les seves
+  const esAdmin = selectedMonitor.trim().toLowerCase() === 'eixos';
+
   useEffect(() => {
-    if (selectedMonitor) {
-      loadSchoolsForMonitor(selectedMonitor);
-    } else {
-      setFilteredEscoles([]);
-    }
-  }, [selectedMonitor]);
+    setEscola('');
+    setActivitat('');
+    setMaterial('');
+    setMaterialLliure('');
 
-  const loadSchoolsForMonitor = async (monitor: string) => {
-    if (!monitor) {
-      setFilteredEscoles([]);
+    if (!selectedMonitor) {
+      setEscoles([]);
       return;
     }
 
-    setLoadingEscoles(true);
-    try {
-      // Special case: "eixos" admin mode - load all schools
-      if (monitor.toLowerCase() === 'eixos') {
-        console.log('🔑 Admin mode activated: eixos');
-        const response = await apiClient.getEscoles();
-        if (response.success && response.data) {
-          setFilteredEscoles(response.data);
-        } else {
-          setFilteredEscoles([]);
-        }
-      } else {
-        // Normal mode: filter schools by monitor
-        const response = await apiClient.getSchoolsByMonitor(monitor);
-        if (response.success && response.data) {
-          setFilteredEscoles(response.data);
-        } else {
-          setFilteredEscoles([]);
-        }
-      }
-    } catch (err) {
-      console.error(`Error loading schools for monitor ${monitor}:`, err);
-      setFilteredEscoles([]);
-    } finally {
-      setLoadingEscoles(false);
-    }
-  };
+    let cancelat = false;
+    setCarregantEscoles(true);
 
-  const loadActivitiesForSchool = async (school: string) => {
-    if (!school || !selectedMonitor) {
+    const carregar = esAdmin
+      ? apiClient.getEscoles()
+      : apiClient.getSchoolsByMonitor(selectedMonitor);
+
+    carregar
+      .then(r => {
+        if (!cancelat) setEscoles(r.success && r.data ? r.data : []);
+      })
+      .finally(() => {
+        if (!cancelat) setCarregantEscoles(false);
+      });
+
+    return () => {
+      cancelat = true;
+    };
+  }, [selectedMonitor, esAdmin]);
+
+  useEffect(() => {
+    setActivitat('');
+    setMaterial('');
+    setMaterialLliure('');
+
+    if (!escola || !selectedMonitor) {
       setActivitats([]);
       return;
     }
 
-    setLoadingActivities(true);
-    try {
-      // Special case: "eixos" admin mode - load all activities for school
-      if (selectedMonitor.toLowerCase() === 'eixos') {
-        console.log('🔑 Admin mode: Loading all activities for school', school);
-        const response = await apiClient.getActivitiesBySchool(school);
-        if (response.success && response.data) {
-          setActivitats(response.data);
-        } else {
-          setActivitats([]);
-        }
-      } else {
-        // Normal mode: filter activities by monitor and school
-        const response = await apiClient.getActivitiesByMonitorAndSchool(selectedMonitor, school);
-        if (response.success && response.data) {
-          setActivitats(response.data);
-        } else {
-          setActivitats([]);
-        }
-      }
-    } catch (err) {
-      console.error(`Error loading activities for monitor ${selectedMonitor} and school ${school}:`, err);
-      setActivitats([]);
-    } finally {
-      setLoadingActivities(false);
-    }
-  };
+    let cancelat = false;
+    setCarregantActivitats(true);
 
-  const loadMaterialsForActivity = async (activity: string) => {
-    if (!activity) {
-      setMaterials(['Altres materials']);
+    const carregar = esAdmin
+      ? apiClient.getActivitiesBySchool(escola)
+      : apiClient.getActivitiesByMonitorAndSchool(selectedMonitor, escola);
+
+    carregar
+      .then(r => {
+        if (!cancelat) setActivitats(r.success && r.data ? r.data : []);
+      })
+      .finally(() => {
+        if (!cancelat) setCarregantActivitats(false);
+      });
+
+    return () => {
+      cancelat = true;
+    };
+  }, [escola, selectedMonitor, esAdmin]);
+
+  useEffect(() => {
+    setMaterial('');
+    setMaterialLliure('');
+
+    if (!activitat) {
+      setMaterials([]);
       return;
     }
 
-    // Check if it's a TC activity - force manual entry
-    const baseActivity = activity.match(/^([A-Z]+)/)?.[1] || '';
-    if (baseActivity === 'TC') {
-      setMaterials(['Altres materials']); // Only manual entry for TC
-      return;
-    }
+    let cancelat = false;
+    setCarregantMaterials(true);
 
-    setLoadingMaterials(true);
-    try {
-      const response = await apiClient.getMaterialsByActivity(activity);
-      if (response.success && response.data && response.data.length > 0) {
-        // Add "Altres materials" option to allow custom materials
-        const materialsWithCustom = [...response.data, 'Altres materials'];
-        setMaterials(sortMaterials(materialsWithCustom));
-      } else {
-        // If no materials found, allow manual entry
-        console.warn(`No materials found for activity ${activity}, allowing manual entry`);
-        setMaterials(['Altres materials']);
-      }
-    } catch (err) {
-      console.error(`Error loading materials for ${activity}:`, err);
-      setMaterials(['Altres materials']);
-    } finally {
-      setLoadingMaterials(false);
-    }
-  };
+    apiClient
+      .getMaterialsByActivity(activitat)
+      .then(r => {
+        if (cancelat) return;
+        // Sense catàleg (TC, JL) o resposta buida: només entrada manual
+        const llista = r.success && r.data?.length ? [...r.data, ALTRES] : [ALTRES];
+        setMaterials(ordenaMaterials(llista));
+      })
+      .catch(() => {
+        if (!cancelat) setMaterials([ALTRES]);
+      })
+      .finally(() => {
+        if (!cancelat) setCarregantMaterials(false);
+      });
 
-  const handleInputChange = (field: string) => (value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    return () => {
+      cancelat = true;
+    };
+  }, [activitat]);
 
-    if (field === 'escola') {
-      loadActivitiesForSchool(value);
-      setFormData(prev => ({
-        ...prev,
-        activitat: '',
-        material: '',
-        customMaterial: ''
-      }));
-      setMaterials(['Altres materials']);
-    }
+  const esLliure = material === ALTRES;
 
-    if (field === 'activitat') {
-      loadMaterialsForActivity(value);
-      setFormData(prev => ({
-        ...prev,
-        material: '',
-        customMaterial: ''
-      }));
-    }
-
-    if (field === 'material' && value !== 'Altres materials') {
-      setFormData(prev => ({
-        ...prev,
-        customMaterial: ''
-      }));
-    }
-  };
-
-  const handleAddItem = () => {
+  const afegir = () => {
     setError(null);
 
-    // Validación
-    if (!formData.escola || !formData.activitat || (!formData.material && !formData.customMaterial)) {
-      setError('Si us plau, omple tots els camps obligatoris');
+    if (!escola || !activitat || !material) {
+      setError('Omple escola, activitat i material');
+      return;
+    }
+    if (esLliure && !materialLliure.trim()) {
+      setError('Escriu quin material necessites');
       return;
     }
 
-    if (formData.material === 'Altres materials' && !formData.customMaterial.trim()) {
-      setError('Si us plau, especifica el material personalitzat');
-      return;
-    }
-
-    const unitats = parseInt(formData.unitats) || 1;
-    if (unitats <= 0) {
+    const quantitat = parseInt(unitats, 10) || 1;
+    if (quantitat <= 0) {
       setError('Les unitats han de ser un nombre positiu');
       return;
     }
 
-    const newItem: CartItem = {
-      id: uuidv4(),
-      escola: formData.escola,
-      activitat: formData.activitat,
-      material: formData.material === 'Altres materials' ? formData.customMaterial : formData.material,
-      customMaterial: formData.material === 'Altres materials' ? formData.customMaterial : undefined,
-      unitats: unitats,
-    };
+    onAddItem({
+      id: crypto.randomUUID(),
+      escola,
+      activitat,
+      material: esLliure ? materialLliure.trim() : material,
+      customMaterial: esLliure ? materialLliure.trim() : undefined,
+      unitats: quantitat,
+    });
 
-    onAddItem(newItem);
-
-    // Reset form pero mantener escuela y actividad si es posible
-    setFormData(prev => ({
-      ...prev,
-      material: '',
-      customMaterial: '',
-      unitats: '',
-    }));
+    // L'escola i l'activitat es mantenen: normalment s'afegeixen diversos
+    // materials seguits de la mateixa activitat.
+    setMaterial('');
+    setMaterialLliure('');
+    setUnitats('');
   };
 
-  const isCustomMaterial = formData.material === 'Altres materials';
+  const potAfegir = Boolean(escola && activitat && material && (!esLliure || materialLliure.trim()));
 
   return (
-    <Box sx={{ 
-      p: { xs: 2, sm: 3 }, 
-      border: 1, 
-      borderColor: 'divider', 
-      borderRadius: { xs: 1, sm: 2 }, 
-      mb: { xs: 2, sm: 3 },
-      backgroundColor: 'background.paper'
-    }}>
-      <Typography 
-        variant="h6" 
-        gutterBottom 
-        color="primary"
-        sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
-      >
-        ➕ Afegir Material al Carret
-      </Typography>
+    <section className="rounded-[var(--radius-card)] border border-line bg-surface p-5 shadow-[var(--shadow-1)]">
+      <h2 className="mb-4 font-[family-name:var(--font-display)] text-lg font-semibold text-fg1">
+        Afegir material
+      </h2>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
+      {!selectedMonitor && (
+        <p className="rounded-[var(--radius-field)] bg-soft px-4 py-3 text-sm text-fg2">
+          Tria primer el teu nom a dalt.
+        </p>
       )}
 
-      <Grid container spacing={2}>
-        {/* Escola */}
-        <Grid item xs={12} md={6}>
-          <Autocomplete
-            fullWidth
-            options={filteredEscoles}
-            value={formData.escola || null}
-            onChange={(_, newValue) => handleInputChange('escola')(newValue || '')}
-            loading={loadingEscoles}
-            disabled={!selectedMonitor}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Escola *"
-                placeholder={selectedMonitor ? "Selecciona una escola..." : "Primer selecciona un monitor"}
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: <School color="action" sx={{ mr: 1 }} />,
-                  endAdornment: (
-                    <>
-                      {loadingEscoles ? <CircularProgress color="inherit" size={20} /> : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
-              />
-            )}
-            renderOption={(props, option) => {
-              const { key, ...otherProps } = props;
-              return (
-                <Box component="li" key={key} {...otherProps}>
-                  <School sx={{ mr: 1, color: 'text.secondary' }} />
-                  {option}
-                </Box>
-              );
-            }}
-            noOptionsText="No s'han trobat escoles"
-          />
-        </Grid>
-
-        {/* Activitat */}
-        <Grid item xs={12} md={6}>
-          <Autocomplete
-            fullWidth
-            options={activitats}
-            value={formData.activitat || null}
-            onChange={(_, newValue) => handleInputChange('activitat')(newValue || '')}
-            loading={loadingActivities}
-            disabled={!formData.escola}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Activitat *"
-                placeholder={formData.escola ? "Selecciona una activitat..." : "Selecciona primer una escola"}
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: <Category color="action" sx={{ mr: 1 }} />,
-                  endAdornment: (
-                    <>
-                      {loadingActivities ? <CircularProgress color="inherit" size={20} /> : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
-              />
-            )}
-            renderOption={(props, option) => {
-              const { key, ...otherProps } = props;
-              return (
-                <Box component="li" key={key} {...otherProps}>
-                  <Category sx={{ mr: 1, color: 'text.secondary' }} />
-                  {option}
-                </Box>
-              );
-            }}
-            noOptionsText="No s'han trobat activitats"
-          />
-        </Grid>
-
-        {/* Material */}
-        <Grid item xs={12} md={6}>
-          <Autocomplete
-            fullWidth
-            options={materials}
-            value={formData.material || null}
-            onChange={(_, newValue) => handleInputChange('material')(newValue || '')}
-            loading={loadingMaterials}
-            disabled={!formData.activitat}
-            getOptionLabel={(option) => option === 'Altres materials' ? option : formatSentenceCase(option)}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Material *"
-                placeholder={formData.activitat ? "Selecciona un material..." : "Selecciona primer una activitat"}
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: <Inventory color="action" sx={{ mr: 1 }} />,
-                  endAdornment: (
-                    <>
-                      {loadingMaterials ? <CircularProgress color="inherit" size={20} /> : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
-              />
-            )}
-            renderOption={(props, option) => {
-              const { key, ...otherProps } = props;
-              return (
-                <Box component="li" key={key} {...otherProps}>
-                  <Inventory sx={{ mr: 1, color: 'text.secondary' }} />
-                  {option === 'Altres materials' ? option : formatSentenceCase(option)}
-                </Box>
-              );
-            }}
-            noOptionsText="No s'han trobat materials"
-          />
-        </Grid>
-
-        {/* Unitats */}
-        <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            type="number"
-            label="Unitats *"
-            value={formData.unitats}
-            onChange={(e) => {
-              handleInputChange('unitats')(e.target.value);
-            }}
-            inputProps={{ min: 1 }}
-            placeholder="1"
-          />
-        </Grid>
-
-        {/* Campo custom material (aparece cuando se selecciona "Altres materials") */}
-        <Grid item xs={12}>
-          <Collapse in={isCustomMaterial}>
-            <TextField
-              fullWidth
-              label="Especifica el material *"
-              value={formData.customMaterial}
-              onChange={(e) => handleInputChange('customMaterial')(e.target.value)}
-              placeholder="Escriu el nom del material que necessites..."
-              multiline
-              rows={2}
+      {selectedMonitor && (
+        <div className="space-y-4">
+          <Field label="Escola">
+            <Combobox
+              value={escola}
+              onChange={setEscola}
+              options={escoles}
+              loading={carregantEscoles}
+              placeholder="A quina escola?"
+              emptyText="Cap escola per a aquest monitor"
+              icon={<School className="size-4" />}
             />
-          </Collapse>
-        </Grid>
+          </Field>
 
-        {/* Botón añadir */}
-        <Grid item xs={12}>
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            onClick={handleAddItem}
-            disabled={loading}
-            startIcon={<Add />}
-            sx={{ py: 1.5, textTransform: 'none' }}
+          <Field label="Activitat">
+            <Combobox
+              value={activitat}
+              onChange={setActivitat}
+              options={activitats}
+              disabled={!escola}
+              loading={carregantActivitats}
+              placeholder={escola ? 'Quina activitat?' : 'Tria una escola primer'}
+              emptyText="Cap activitat en aquesta escola"
+              icon={<Layers className="size-4" />}
+            />
+          </Field>
+
+          <Field label="Material">
+            <Combobox
+              value={material}
+              onChange={setMaterial}
+              options={materials}
+              disabled={!activitat}
+              loading={carregantMaterials}
+              placeholder={activitat ? 'Quin material?' : "Tria una activitat primer"}
+              icon={<Package className="size-4" />}
+            />
+          </Field>
+
+          {esLliure && (
+            <Field label="Quin material">
+              <input
+                value={materialLliure}
+                onChange={e => setMaterialLliure(e.target.value)}
+                placeholder="Escriu-lo tal com el demanaries"
+                autoFocus
+                className="w-full rounded-[var(--radius-field)] border border-line bg-field px-4 py-3 text-[15px] outline-none transition-colors placeholder:text-fg3 focus:border-brand focus:ring-2 focus:ring-brand/25"
+              />
+            </Field>
+          )}
+
+          <Field label="Unitats">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={unitats}
+              onChange={e => setUnitats(e.target.value)}
+              placeholder="1"
+              className="w-full rounded-[var(--radius-field)] border border-line bg-field px-4 py-3 text-[15px] outline-none transition-colors placeholder:text-fg3 focus:border-brand focus:ring-2 focus:ring-brand/25"
+            />
+          </Field>
+
+          {error && (
+            <p className="flex items-start gap-2 rounded-[var(--radius-field)] bg-coral-50 px-4 py-3 text-sm text-coral-700">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              {error}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={afegir}
+            disabled={!potAfegir || loading}
+            className={cn(
+              'flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-field)] px-5 font-semibold transition-all',
+              potAfegir && !loading
+                ? 'bg-brand text-white shadow-[var(--shadow-blau)] active:scale-[0.99]'
+                : 'cursor-not-allowed bg-soft text-fg3'
+            )}
           >
-            Afegir al Carret
-          </Button>
-        </Grid>
-      </Grid>
-    </Box>
+            <Plus className="size-5" />
+            Afegir al carret
+          </button>
+        </div>
+      )}
+    </section>
   );
-};
+}
 
-export default ItemForm; 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-sm font-medium text-fg2">{label}</label>
+      {children}
+    </div>
+  );
+}
