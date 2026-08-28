@@ -4,6 +4,7 @@ const cors = require('cors');
 const mobileRoutes = require('./routes/mobile');
 const adminRoutes = require('./routes/admin');
 const copilotRoutes = require('./routes/copilot');
+const { legacyCompatibility } = require('./middleware/legacy');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,12 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// El frontend de l'admin encara crida en format ?action=xxx des de lib/api.ts
+// (loadData, updateOrderStatus, deleteOrders, getStats…) i des de quatre
+// components. Aquest middleware ho tradueix a REST. Es retira quan el frontend
+// estigui migrat, no abans.
+app.use(legacyCompatibility);
 
 // Health check
 app.get('/', (req, res) => {

@@ -35,7 +35,10 @@ monitor sencera. Les dades mestres surten ara d'ActiviHub. Pla complet i decisio
 backend/src/
 ├── server.js              # Entry point Express
 ├── middleware/
-│   └── auth.js            # Token auth (Bearer)
+│   ├── auth.js            # Token auth (Bearer)
+│   └── legacy.js          # Tradueix ?action=xxx a REST. El frontend de l'admin
+│                          # encara crida així (lib/api.ts i 4 components): NO retirar
+│                          # fins que estigui migrat.
 ├── routes/
 │   ├── admin.js           # Routing layer (~300 línies, delega a serveis)
 │   ├── mobile.js          # API app mòbil (dades mestres + crear sol·licituds)
@@ -193,6 +196,8 @@ L'aplicació està en **català**. El copilot respon en català. Els comentaris 
   d'ActiviHub Monitor — a decidir amb en David
 
 **Deute tècnic**
+- Migrar el frontend de l'admin del format `?action=` a REST i retirar `middleware/legacy.js`
+  (afecta `lib/api.ts` i `NotificationManager`, `OrderNotesDialog`, `OrdersTable`)
 - Refactoritzar `DeliveryManager.tsx` (1300+ línies, dividir en components)
 - Sanejar l'HTML del copilot (`CopilotChat.tsx` fa servir `dangerouslySetInnerHTML` sense DOMPurify)
 - Afegir tests
