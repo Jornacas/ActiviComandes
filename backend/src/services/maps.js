@@ -6,7 +6,7 @@
  */
 
 const axios = require('axios');
-const sheets = require('./sheets');
+const catalegs = require('./catalegs');
 
 const ORIGIN = "Carrer Ramon Turró 73, 08005 Barcelona"; // Eixos Creativa
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
@@ -47,8 +47,8 @@ async function calculateDistances(schoolAddresses) {
     console.log('✅ Using Google Routes API (v2) with Sheets cache');
 
     // 🆕 PASO 1: Cargar distancias del caché
-    const distanciesCache = await sheets.getDistanciesCached();
-    console.log(`📦 Cache loaded: ${distanciesCache.length} distàncies guardades`);
+    const distanciesCache = await catalegs.getDistancies();
+    console.log(`📦 Cache loaded: ${distanciesCache.size} distàncies guardades`);
 
     const results = [];
     let apiCallsCount = 0;
@@ -61,21 +61,21 @@ async function calculateDistances(schoolAddresses) {
         console.log(`🗺️ Processing: ${escola} - ${adreça}`);
 
         // 🆕 PASO 2: Buscar en caché primero
-        const cached = distanciesCache.find(d => d.adreça === adreça);
+        const cached = distanciesCache.get(adreça);
 
         if (cached) {
           console.log(`💾 CACHE HIT! Usando distancia guardada para ${escola}`);
           cacheHitsCount++;
 
-          const distanceKm = (cached.distanciaMetres / 1000).toFixed(1);
-          const durationMin = Math.ceil(cached.duracioMinuts);
+          const distanceKm = (cached.distancia_metres / 1000).toFixed(1);
+          const durationMin = Math.ceil(cached.duracio_minuts);
 
           results.push({
             address: adreça,
             distance: `${distanceKm} km`,
             duration: `${durationMin} min`,
-            distanceValue: cached.distanciaMetres,
-            durationValue: cached.duracioMinuts * 60, // convertir minutos a segundos
+            distanceValue: cached.distancia_metres,
+            durationValue: cached.duracio_minuts * 60, // convertir minutos a segundos
             fromCache: true
           });
           continue; // ⚡ Saltar llamada a API
@@ -159,7 +159,7 @@ async function calculateDistances(schoolAddresses) {
 
           // 🆕 PASO 3: Guardar en caché para la próxima vez
           console.log(`💾 Saving to cache for ${escola}...`);
-          await sheets.saveDistancia(escola, adreça, route.distanceMeters, durationMin);
+          await catalegs.saveDistancia(escola, adreça, route.distanceMeters, durationMin);
           console.log(`✅ Saved to cache!`);
         } else {
           console.log(`❌ No route found for ${escola}`);

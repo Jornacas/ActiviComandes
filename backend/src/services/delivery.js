@@ -3,7 +3,7 @@
  * Lògica de negoci extreta de admin.js
  */
 
-const sheets = require('./sheets');
+const comandes = require('./comandes-repo');
 const cache = require('./cache');
 const maps = require('./maps');
 const activihub = require('./activihub');
@@ -738,7 +738,7 @@ async function createDelivery(deliveryData) {
     }
 
     // Obtener datos de la hoja Respostes
-    const data = await sheets.getSheetData('Respostes');
+    const data = await comandes.getSheetData();
 
     if (!data || data.length <= 1) {
       return {
@@ -869,7 +869,7 @@ async function createDelivery(deliveryData) {
 
     if (updatedRows > 0) {
       // Actualizar en Sheets
-      await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+      await comandes.saveSheetData(updatedData);
 
       // Invalidar caché
       cache.del('cache_respostes_data');
@@ -914,7 +914,7 @@ async function removeIntermediary(orderIds) {
     }
 
     // Obtener datos de la hoja Respostes
-    const data = await sheets.getSheetData('Respostes');
+    const data = await comandes.getSheetData();
 
     if (!data || data.length <= 1) {
       return {
@@ -1017,7 +1017,7 @@ async function removeIntermediary(orderIds) {
 
     if (updatedRows > 0) {
       // Actualizar en Sheets
-      await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+      await comandes.saveSheetData(updatedData);
 
       // Invalidar caché
       cache.del('cache_respostes_data');

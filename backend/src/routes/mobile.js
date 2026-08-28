@@ -3,15 +3,16 @@
  *
  * Les dades mestres (escoles, monitors, activitats) venen d'ActiviHub des del
  * 28-08-2026: el full "Dades" va quedar mort (#REF!) i amb ell l'app sencera.
- * El catàleg de materials encara viu al Sheet (fulls MatCO, MatDX1/2, MatHC1/2, MatTC)
- * i els comandes s'hi segueixen escrivint; això es mou a Supabase a la Fase 2.
+ * El catàleg de materials i les comandes viuen a comandes_app (Supabase) des de
+ * la Fase 2. Ja no es toca cap Google Sheet.
  */
 
 const express = require('express');
 const router = express.Router();
 const { authenticateRequest } = require('../middleware/auth');
-const sheets = require('../services/sheets');
 const activihub = require('../services/activihub');
+const catalegs = require('../services/catalegs');
+const comandes = require('../services/comandes-repo');
 const { generateUUID } = require('../utils/helpers');
 
 router.use(authenticateRequest);
@@ -87,7 +88,7 @@ router.get('/activities/by-monitor-and-school', handle(async (req, res) => {
 }));
 
 // ======================================================
-// CATÀLEG DE MATERIALS (encara al Sheet)
+// CATÀLEG DE MATERIALS (comandes_app.materials)
 // ======================================================
 
 /**
@@ -103,14 +104,14 @@ function parseActivityCode(activityCode) {
 }
 
 /**
- * Full i columna del catàleg. TC i JL no en tenen: van per entrada manual
- * (MatTC és buit i JL encara no té catàleg).
+ * Nivell del catàleg per a una àrea. CO en té un de sol (nivell null); DX i HC
+ * en tenen un per nivell. TC i JL encara no en tenen: entrada manual.
  */
-function getSheetConfigForActivity({ area, nivell }) {
+function nivellCataleg({ area, nivell }) {
   switch (area) {
-    case 'CO': return { sheetName: 'MatCO', column: 'B' };
-    case 'DX': return { sheetName: nivell === 1 ? 'MatDX1' : 'MatDX2', column: 'B' };
-    case 'HC': return { sheetName: nivell === 1 ? 'MatHC1' : 'MatHC2', column: 'A' };
+    case 'CO': return { nivell: null };
+    case 'DX': return { nivell: nivell === 1 ? 1 : 2 };
+    case 'HC': return { nivell: nivell === 1 ? 1 : 2 };
     default:   return null;
   }
 }
@@ -127,9 +128,9 @@ router.get('/materials/by-activity', handle(async (req, res) => {
     return res.json({ success: false, error: "Codi d'activitat no reconegut: " + activityCode });
   }
 
-  const sheetConfig = getSheetConfigForActivity(parsed);
+  const cataleg = nivellCataleg(parsed);
 
-  if (!sheetConfig) {
+  if (!cataleg) {
     return res.json({
       success: true,
       data: [],
@@ -140,63 +141,22 @@ router.get('/materials/by-activity', handle(async (req, res) => {
     });
   }
 
-  const data = await sheets.getCachedData(
-    sheetConfig.sheetName,
-    `cache_materials_${sheetConfig.sheetName}`
-  );
-
-  if (!data || data.length === 0) {
-    return res.json({
-      success: true,
-      data: [],
-      activityCode,
-      baseActivity: parsed.area,
-      requiresManualEntry: true,
-      message: `El catàleg '${sheetConfig.sheetName}' és buit`
-    });
-  }
-
-  const columnIndex = sheetConfig.column === 'A' ? 0 : 1;
-  const materials = data.slice(1)
-    .filter(row => row[columnIndex] && row[columnIndex].toString().trim() !== '')
-    .map(row => row[columnIndex].toString().trim());
-
-  const uniqueMaterials = [...new Set(materials)].sort((a, b) => a.localeCompare(b, 'ca'));
+  const materials = await catalegs.getMaterials(parsed.area, cataleg.nivell);
 
   res.json({
     success: true,
-    data: uniqueMaterials,
+    data: materials,
     activityCode,
     baseActivity: parsed.area,
-    sheetUsed: sheetConfig.sheetName,
-    columnUsed: sheetConfig.column
+    nivell: cataleg.nivell,
+    requiresManualEntry: materials.length === 0
   });
 }));
 
-/** GET /api/materials — tot el catàleg junt, de tots els fulls */
+/** GET /api/materials — tot el catàleg junt */
 router.get('/materials', handle(async (req, res) => {
-  const fulls = [
-    { sheetName: 'MatCO', column: 'B' },
-    { sheetName: 'MatDX1', column: 'B' },
-    { sheetName: 'MatDX2', column: 'B' },
-    { sheetName: 'MatHC1', column: 'A' },
-    { sheetName: 'MatHC2', column: 'A' },
-    { sheetName: 'MatTC', column: 'A' }
-  ];
-
-  const tots = [];
-  for (const full of fulls) {
-    const data = await sheets.getCachedData(full.sheetName, `cache_materials_${full.sheetName}`);
-    if (!data || data.length === 0) continue;
-
-    const columnIndex = full.column === 'A' ? 0 : 1;
-    tots.push(...data.slice(1)
-      .filter(row => row[columnIndex] && row[columnIndex].toString().trim() !== '')
-      .map(row => row[columnIndex].toString().trim()));
-  }
-
-  const uniqueMaterials = [...new Set(tots)].sort((a, b) => a.localeCompare(b, 'ca'));
-  res.json({ success: true, data: uniqueMaterials });
+  const data = await catalegs.getTotsElsMaterials();
+  res.json({ success: true, data });
 }));
 
 // ======================================================
@@ -204,35 +164,35 @@ router.get('/materials', handle(async (req, res) => {
 // ======================================================
 
 /**
- * Construeix la fila de "Respostes". Ha de coincidir columna a columna amb les
- * capçaleres del full (A–U); la versió anterior n'escrivia 11 i deixava l'estat
- * a la columna de comentaris.
+ * Construeix la fila d'una comanda, en l'ordre de columnes del repositori.
+ * La versió anterior n'escrivia 11 de 21 i deixava l'estat a la columna de
+ * comentaris.
  */
-function buildRespostesRow({ timestamp, idPedido, idItem, nomCognoms, dataNecessitat,
+function buildComandaRow({ timestamp, idPedido, idItem, nomCognoms, dataNecessitat,
                              escola, activitat, material, esPersonalitzat, unitats,
                              comentaris, entregaManual }) {
   return [
-    timestamp,                              // A Timestamp
-    idPedido,                               // B ID_Pedido
-    idItem,                                 // C ID_Item
-    nomCognoms,                             // D Nom_Cognoms
-    dataNecessitat,                         // E Data_Necessitat
-    escola,                                 // F Escola
-    activitat,                              // G Activitat
-    material,                               // H Material
-    esPersonalitzat ? 'TRUE' : 'FALSE',     // I Es_Material_Personalitzat
-    unitats,                                // J Unitats
-    comentaris,                             // K Comentaris_Generals
-    entregaManual ? 'TRUE' : 'FALSE',       // L Lliurament_Manual
-    'Pendent',                              // M Estat
-    timestamp,                              // N Data_Estat
-    '',                                     // O Responsable_Preparacio
-    '',                                     // P Notes_Internes
-    entregaManual ? 'MANUAL' : 'NORMAL',    // Q Modalitat_Lliurament
-    '',                                     // R Monitor_Intermediari
-    '',                                     // S Escola_Destino_Intermediari
-    '',                                     // T Escola_Recollida_Intermediari
-    ''                                      // U Activitat_Intermediari
+    timestamp,                              // Timestamp
+    idPedido,                               // ID_Pedido
+    idItem,                                 // ID_Item
+    nomCognoms,                             // Nom_Cognoms
+    dataNecessitat,                         // Data_Necessitat
+    escola,                                 // Escola
+    activitat,                              // Activitat
+    material,                               // Material
+    esPersonalitzat ? 'TRUE' : 'FALSE',     // Es_Material_Personalitzat
+    unitats,                                // Unitats
+    comentaris,                             // Comentaris_Generals
+    entregaManual ? 'TRUE' : 'FALSE',       // Lliurament_Manual
+    'Pendent',                              // Estat
+    timestamp,                              // Data_Estat
+    '',                                     // Responsable_Preparacio
+    '',                                     // Notes_Internes
+    entregaManual ? 'MANUAL' : 'NORMAL',    // Modalitat_Lliurament
+    '',                                     // Monitor_Intermediari
+    '',                                     // Escola_Destino_Intermediari
+    '',                                     // Escola_Recollida_Intermediari
+    ''                                      // Activitat_Intermediari
   ];
 }
 
@@ -249,7 +209,7 @@ router.post('/sollicitud', handle(async (req, res) => {
   const idItem = `${idPedido}-001`;
   const material = s.customMaterial || s.material || '';
 
-  await sheets.appendRow('Respostes', buildRespostesRow({
+  await comandes.appendRow(buildComandaRow({
     timestamp,
     idPedido,
     idItem,
@@ -294,7 +254,7 @@ router.post('/sollicitud/multiple', handle(async (req, res) => {
     const material = item.customMaterial || item.material || '';
     const unitats = item.unitats ?? item.quantitat ?? 0;
 
-    await sheets.appendRow('Respostes', buildRespostesRow({
+    await comandes.appendRow(buildComandaRow({
       timestamp,
       idPedido,
       idItem,

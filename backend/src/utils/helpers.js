@@ -166,9 +166,7 @@ function getColumnIndices(headers) {
 }
 
 /**
- * Invalida la caché de comandes (Respostes).
- * Centralitza el patró repetit de cache.del('cache_respostes_data').
- *
+ * Invalida la caché de comandes.
  * @param {object} cache - Instància de node-cache
  */
 function invalidateOrdersCache(cache) {

@@ -3,7 +3,7 @@
  * Suporta ambdós proveïdors via AI_PROVIDER a .env ("gemini" o "claude")
  */
 
-const sheets = require('./sheets');
+const comandes = require('./comandes-repo');
 const activihub = require('./activihub');
 const cache = require('./cache');
 const maps = require('./maps');
@@ -21,7 +21,7 @@ const SESSION_TTL = 30 * 60 * 1000; // 30 minuts
 // ======================================================
 
 async function getOrders(filters = {}) {
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
   if (!data || data.length < 2) return { orders: [], stats: { total: 0 } };
 
   const headers = data[0];
@@ -133,7 +133,7 @@ async function updateOrderStatus(uuids, newStatus) {
   if (!validStatuses.includes(newStatus)) {
     return { success: false, error: `Estat no vàlid. Opcions: ${validStatuses.join(', ')}` };
   }
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
   if (!data || data.length <= 1) return { success: false, error: 'No hi ha dades' };
 
   const headers = data[0];
@@ -155,14 +155,14 @@ async function updateOrderStatus(uuids, newStatus) {
   });
 
   if (changesMade > 0) {
-    await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+    await comandes.saveSheetData(updatedData);
     cache.del('cache_respostes_data');
   }
   return { success: true, changesMade, message: `${changesMade} pedidos actualitzats a "${newStatus}"` };
 }
 
 async function updateNotes(orderId, notes) {
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
   if (!data || data.length <= 1) return { success: false, error: 'No hi ha dades' };
   const headers = data[0];
   const idItemIdx = headers.findIndex(h => h === 'ID_Item');
@@ -175,12 +175,12 @@ async function updateNotes(orderId, notes) {
     if (orderId === row[idItemIdx] || orderId === row[idPedidoIdx]) { row[notesIdx] = notes; updated = true; }
     return row;
   });
-  if (updated) { await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData); cache.del('cache_respostes_data'); }
+  if (updated) { await comandes.saveSheetData(updatedData); cache.del('cache_respostes_data'); }
   return { success: updated, message: updated ? 'Notes actualitzades' : 'Pedido no trobat' };
 }
 
 async function deleteOrders(uuids) {
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
   if (!data || data.length <= 1) return { success: false, error: 'No hi ha dades' };
   const headers = data[0];
   const idItemIdx = headers.findIndex(h => h === 'ID_Item');
@@ -190,11 +190,10 @@ async function deleteOrders(uuids) {
   for (let i = data.length - 1; i >= 1; i--) {
     const rowIdItem = String(data[i][idItemIdx] || '');
     const rowIdPedido = String(data[i][idPedidoIdx] || '');
-    if (uuids.some(uuid => uuid === rowIdItem || uuid === rowIdPedido)) rowsToDelete.push(i);
+    if (uuids.some(uuid => uuid === rowIdItem || uuid === rowIdPedido)) rowsToDelete.push(rowIdItem);
   }
-  for (const rowIndex of rowsToDelete) await sheets.deleteRows('Respostes', rowIndex, rowIndex + 1);
-  cache.del('cache_respostes_data');
-  return { success: true, deletedCount: rowsToDelete.length };
+  const deletedCount = await comandes.deleteByIdItems(rowsToDelete);
+  return { success: true, deletedCount };
 }
 
 async function getDeliveryOptions(orderIds) {

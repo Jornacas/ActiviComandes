@@ -7,7 +7,8 @@ Sistema de gestió de comandes de materials per a activitats extraescolars d'Eix
 - **Backend**: Node.js + Express (port 3010) → `backend/src/`
 - **Frontend**: Next.js 14.2 + Material-UI → `frontend/src/`
 - **Dades mestres**: ActiviHub (Supabase, schema `comandes`) — escoles, monitors, activitats
-- **Comandes i catàleg**: Google Sheets (full `Respostes` i fulls `Mat*`) — pendent de migrar (Fase 2)
+- **Dades pròpies**: Supabase, schema `comandes_app` — comandes, materials, distàncies, espais de Chat
+- **Google Sheets**: ja no s'hi llegeix ni s'hi escriu. El full queda com a arxiu històric
 - **API Maps**: Google Routes API v2
 - **IA Copilot**: Claude Haiku (configurable a Gemini via `AI_PROVIDER` en `.env`)
 - **Notificacions**: Google Chat API directa des del backend (delegació de domini)
@@ -21,6 +22,10 @@ monitor sencera. Les dades mestres surten ara d'ActiviHub. Pla complet i decisio
 
 - **Apps Script retirat del tot.** `app-mobil` parla amb el backend Node per REST i les
   notificacions van directes a la Chat API. Ja no queda cap `.gs` al projecte.
+- **Google Sheets desconnectat (Fase 2).** Les 718 comandes, els 107 materials, les 46
+  distàncies i els 172 espais de Chat viuen a `comandes_app`. `services/comandes-repo.js`
+  exposa la mateixa forma `[capçaleres, ...files]` que donava el full, així que la lògica de
+  negoci i el frontend no s'han hagut de tocar.
 - **Estats visibles**: `ACTIVA` + `CONFIRMADA` (`ACTIVIHUB_ESTATS` al `.env`). Quan el curs
   arrenqui i tot passi a `ACTIVA`, es pot deixar només aquest.
 - **Sembra de proves**: mentre ActiviHub no generi les sessions del 2627 no hi ha vincle
@@ -84,30 +89,26 @@ frontend/src/
     └── api.ts             # Client API
 ```
 
-## Google Sheets
+## Google Sheets (arxiu històric)
 
-### Fulls vius
-- **"Respostes"**: les comandes (26 columnes, ~718 ítems). Taula principal.
-- **"Distancies"**: caché de distàncies de Google Routes. **La caché no funciona**:
-  `getDistanciesCached()` sempre retorna `[]` i `saveDistancia()` crida `updateRange()` amb
-  els arguments mal comptats, així que només afegeix files. 442 files per 46 adreces, i cada
-  consulta es factura a l'API. Es corregeix en migrar la taula (Fase 2).
-- **Fulls de materials per activitat**: `MatCO`, `MatDX1`, `MatDX2` (concepte a la columna B) i
-  `MatHC1`, `MatHC2`, `MatTC` (columna A). `MatTC` és buit — TC va per entrada manual, i `JL`
-  encara no té catàleg.
+El full `ActiviComandes` ja no el llegeix ningú. Es conserva com a còpia del que hi havia
+fins al 28-08-2026. Els scripts `backend/scripts/migrate-*.js` el saben rellegir si mai cal.
 
-### Fulls morts (no esborrar encara: són l'arxiu històric)
-- **"Dades"** i **"BaseApp"**: totes les files són `#REF!` des que es va esborrar el seu origen.
-  Substituïts per ActiviHub. Cap codi els llegeix ja.
-- **"ChatWebhooks"**: 172 espais de Google Chat. Segueix viu, el fa servir `chat.js`.
+- `Respostes` → `comandes_app.comandes` (718 ítems, 339 comandes)
+- `MatCO`, `MatDX1/2`, `MatHC1/2`, `MatTC` → `comandes_app.materials` (107)
+- `Distancies` → `comandes_app.distancies` (442 files → 46 adreces; la caché estava trencada)
+- `ChatWebhooks` → `comandes_app.chat_espais` (172)
+- `Dades` i `BaseApp` → morts (`#REF!`), substituïts per ActiviHub
 
-### Columna reutilitzada
-- `Distancia_Academia` → al full real ja es diu `ID_Lliurament` (columna W). El fallback pel
-  nom antic viu a `helpers.js` i es pot treure.
-- `Notes_Entrega` està buida a les 718 files: columna morta.
+### Model de dades
 
-### SpreadsheetID
-- Configurat a `.env` (`SPREADSHEET_ID`)
+`comandes_app.comandes` és plana: una fila per ítem demanat, igual que el full. No està
+normalitzada a propòsit — tota la lògica (agrupacions, intermediaris, notificacions) itera
+ítems i el frontend llegeix per nom de columna. Normalitzar és un pas a part.
+
+Porta a més `centre_id`, `activitat_id` i `monitor_id` d'ActiviHub, resolts on s'ha pogut
+(82 % / 42 % / 53 % de l'històric). Encara no els fa servir cap lògica: hi són per poder
+deixar de casar per text més endavant.
 
 ## Lògica de negoci clau
 
@@ -190,10 +191,17 @@ L'aplicació està en **català**. El copilot respon en català. Els comentaris 
 ## Pendents
 
 **Migració (veure `PLAN_MIGRACION_ACTIVIHUB.md`)**
-- Fase 2: moure `Respostes`, els fulls `Mat*` i `Distancies` a `comandes_app`
 - Esborrar `comandes_app.monitors_prova` quan ActiviHub generi les sessions del 2627
 - Fase 3: login real del monitor (`empleats.id_supabase_auth_user`) i accés directe des
   d'ActiviHub Monitor — a decidir amb en David
+
+**Errors coneguts, anteriors a la migració**
+- `getStats()` compta l'estat `'Entregat'`, però l'estat real és `'Lliurat'`: el comptador
+  d'entregats sempre surt 0
+- El frontend compara `modalitatEntrega === 'DIRECTA'` distingint majúscules, i a les dades
+  hi conviuen `DIRECTA` i `Directa`. Cal arreglar la comparació i després normalitzar
+- El fallback d'espais de Chat desvia un 33 % de les notificacions a l'espai de tota l'escola
+  (veure §7-Q1b del pla). Es resol quan `google_xats` pengi de l'activitat
 
 **Deute tècnic**
 - Migrar el frontend de l'admin del format `?action=` a REST i retirar `middleware/legacy.js`

@@ -3,7 +3,7 @@
  * Lògica de negoci de comandes extreta de routes/admin.js
  */
 
-const sheets = require('./sheets');
+const comandes = require('./comandes-repo');
 const cache = require('./cache');
 const { generateUUID, formatDate, parseTimestamp, getDefaultHeaders, getColumnIndices, invalidateOrdersCache, mapHeaderToKey } = require('../utils/helpers');
 
@@ -13,7 +13,7 @@ const { generateUUID, formatDate, parseTimestamp, getDefaultHeaders, getColumnIn
  * @returns {object} { headers, rows, estadisticas }
  */
 async function getOrders(limit) {
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length === 0) {
     return {
@@ -186,7 +186,7 @@ async function getOrders(limit) {
  * @returns {object} { success, nuevosRegistros, message, estadisticas }
  */
 async function processOrders() {
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length < 2) {
     return {
@@ -261,7 +261,7 @@ async function updateOrderStatus(uuids, newStatus) {
     };
   }
 
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length <= 1) {
     return {
@@ -363,7 +363,7 @@ async function updateOrderStatus(uuids, newStatus) {
 
   if (changesMade > 0) {
     // Actualizar en Sheets
-    await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+    await comandes.saveSheetData(updatedData);
 
     // Invalidar caché
     cache.del('cache_respostes_data');
@@ -396,7 +396,7 @@ async function updateOrderNotes(orderId, notes) {
     };
   }
 
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length <= 1) {
     return {
@@ -442,7 +442,7 @@ async function updateOrderNotes(orderId, notes) {
 
   if (updated) {
     // Actualizar en Sheets
-    await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+    await comandes.saveSheetData(updatedData);
 
     // Invalidar caché
     cache.del('cache_respostes_data');
@@ -484,7 +484,7 @@ async function updateOrderFields(idItem, updates) {
     };
   }
 
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length <= 1) {
     return {
@@ -544,7 +544,7 @@ async function updateOrderFields(idItem, updates) {
 
   if (updated) {
     // Actualitzar a Google Sheets
-    await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+    await comandes.saveSheetData(updatedData);
 
     // Invalidar caché
     cache.del('cache_respostes_data');
@@ -575,7 +575,7 @@ async function deleteOrders(uuids) {
     };
   }
 
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length <= 1) {
     return {
@@ -612,16 +612,12 @@ async function deleteOrders(uuids) {
     );
 
     if (matches) {
-      rowsToDelete.push(i);
+      rowsToDelete.push(String(data[i][idItemIndex] || ''));
     }
   }
 
-  // Eliminar filas
-  let deletedCount = 0;
-  for (const rowIndex of rowsToDelete) {
-    await sheets.deleteRows('Respostes', rowIndex, rowIndex + 1);
-    deletedCount++;
-  }
+  // Eliminar por ID_Item: la posición de fila ya no significa nada
+  const deletedCount = await comandes.deleteByIdItems(rowsToDelete);
 
   // Invalidar caché
   const cacheKeys = [
@@ -675,7 +671,7 @@ async function createOrder(orderData) {
     orderData.notesInternes || ''
   ];
 
-  await sheets.appendRow('Respostes', rowData);
+  await comandes.appendRow(rowData);
 
   // Invalidar caché
   cache.del('cache_respostes_data');
@@ -693,7 +689,7 @@ async function createOrder(orderData) {
  * @returns {object} { total, pendents, enProces, preparats, entregats }
  */
 async function getStats(filters) {
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length < 2) {
     return {
@@ -743,7 +739,7 @@ async function getStats(filters) {
  * @returns {object} { success, data: orders[], error? }
  */
 async function getPreparatedOrders() {
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length < 2) {
     return {

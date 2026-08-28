@@ -3,7 +3,7 @@
  * Extracted from routes/admin.js
  */
 
-const sheets = require('./sheets');
+const comandes = require('./comandes-repo');
 const cache = require('./cache');
 const chat = require('./chat');
 
@@ -35,7 +35,7 @@ async function sendNotification(spaceName, message, orderId, notificationType) {
     // Si hay orderId, actualizar el estado de notificación en Sheets
     if (orderId && notificationType) {
       try {
-        const data = await sheets.getSheetData('Respostes');
+        const data = await comandes.getSheetData();
 
         if (data && data.length > 1) {
           const headers = data[0];
@@ -53,7 +53,7 @@ async function sendNotification(spaceName, message, orderId, notificationType) {
               return row;
             });
 
-            await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+            await comandes.saveSheetData(updatedData);
             cache.del('cache_respostes_data');
             console.log(`✅ Estado de notificación actualizado para ${orderId}`);
           }
@@ -99,7 +99,7 @@ async function getNotificationStatus(orderId) {
   }
 
   // Obtener datos del sheet Respostes
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length < 2) {
     return {
@@ -160,7 +160,7 @@ async function getNotificationStatuses(orderIds) {
   }
 
   // Obtener datos del sheet Respostes
-  const data = await sheets.getSheetData('Respostes');
+  const data = await comandes.getSheetData();
 
   if (!data || data.length < 2) {
     return {
@@ -248,7 +248,7 @@ async function sendGroupedNotification(spaceName, message, orderIds, notificatio
     // Actualizar TODOS los pedidos del grupo como notificados
     if (notificationType) {
       try {
-        const data = await sheets.getSheetData('Respostes');
+        const data = await comandes.getSheetData();
 
         if (data && data.length > 1) {
           const headers = data[0];
@@ -281,7 +281,7 @@ async function sendGroupedNotification(spaceName, message, orderIds, notificatio
               return row;
             });
 
-            await sheets.updateRange('Respostes', `A1:Z${updatedData.length}`, updatedData);
+            await comandes.saveSheetData(updatedData);
             cache.del('cache_respostes_data');
             console.log(`✅ Estado de notificación actualizado para ${updatedCount} pedidos del grupo`);
           }

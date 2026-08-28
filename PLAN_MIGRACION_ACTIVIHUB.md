@@ -190,8 +190,9 @@ frontend admin       ─┘   (server)                        └─► prod_005
 
 ## 5. Fases
 
-> **Estado 28-08-2026:** Fase 0 ✅ · Fase 1 ✅ (pendiente solo de desplegar) · Fase 2 pendiente ·
-> Fase 3 a decidir con David. **Apps Script retirado del todo**: no queda ningún `.gs` en el repo.
+> **Estado 28-08-2026:** Fase 0 ✅ · Fase 1 ✅ · Fase 2 ✅ · Fase 3 a decidir con David.
+> **Apps Script retirado del todo** y **Google Sheets desconectado**: la app no lee ni escribe
+> ninguna hoja. El Sheet queda como archivo histórico.
 >
 > Decisiones cerradas por Jordi ese día: Apps Script fuera (Q1); las sesiones del 2627 se
 > generan la semana del 31-08 y mientras tanto se usa una siembra (Q2); solo actividades
@@ -249,20 +250,50 @@ escribiéndose en el Sheet. Riesgo contenido.
 **Hecho:** `npm run build` verde · un monitor puede elegir escuela → actividad → material y enviar
 un pedido · el admin ve escuelas y monitores otra vez · commit + deploy.
 
-### Fase 2 — Mover los pedidos a Supabase _(1–2 sesiones)_
-1. Crear `comandes_app` con sus tablas y RLS.
-2. Migrar los **718 ítems** históricos normalizando de paso: modalidad a 4 valores,
-   `Responsable_Preparacio` sin duplicados por acento, `Monitor_Intermediari` sin el literal
-   `DIRECTA`, y `Notes_Entrega` (0/718) fuera. Enlazar por `centre_id` y `empleats.id` donde se pueda,
-   conservando el texto original como respaldo.
-3. Reescribir `services/orders.js`, `delivery.js` y `notifications.js` contra la BD. Aquí desaparece
-   el patrón `updateRange('A1:Z…')` que hoy **reescribe la hoja entera** en cada cambio de estado.
-4. Migrar el catálogo `Mat*` y la caché de distancias (§6).
-5. **Retirar Apps Script**: `Code.gs`, `clasp`, `temp-deploy-*`, `temp-clasp` y el `.env` que apunta a
-   `script.google.com`.
+### Fase 2 — Google Sheets desconectado ✅
 
-**Hecho:** el Sheet queda como archivo histórico de solo lectura · build verde · prueba real de
-pedido → preparación → entrega → notificación.
+Hecho el 28-08-2026, en el mismo día que la Fase 1.
+
+**Principio, el mismo que en ActiviRutes: se sustituye el origen, no el contrato.**
+`services/comandes-repo.js` lee y escribe en `comandes_app.comandes` pero devuelve
+`[cabeceras, ...filas]`, la misma forma que daba el Sheet. Toda la lógica de negocio
+—`orders.js`, `delivery.js`, `notifications.js`, `copilot.js`— y el frontend del admin leen por
+nombre de cabecera e índice de columna, así que no se han tocado. La migración queda contenida
+en un fichero.
+
+Lo migrado, verificado contra la hoja:
+
+| Origen | Destino | Volumen |
+|---|---|---|
+| `Respostes` | `comandes_app.comandes` | 718 ítems · 339 pedidos · 22-09-2025 → 11-06-2026 |
+| `MatCO`, `MatDX1/2`, `MatHC1/2`, `MatTC` | `comandes_app.materials` | 107 |
+| `Distancies` | `comandes_app.distancies` | 442 filas → **46 direcciones** |
+| `ChatWebhooks` | `comandes_app.chat_espais` | 172 |
+
+Estados idénticos tras migrar: 691 `Lliurat` · 20 `Preparat` · 4 `En proces` · 3 `Pendent`.
+
+**Copia fiel, no limpieza.** Los valores de texto se migraron tal cual. La suciedad conocida
+(`DIRECTA`/`Directa`, `Lídia`/`Lidia`, el literal `DIRECTA` en el campo de monitor) **no se
+normalizó**: el frontend compara `modalitatEntrega === 'DIRECTA'` distinguiendo mayúsculas, así
+que normalizar habría cambiado lo que se ve en pantalla en 17 o en 41 filas según hacia dónde.
+Se arregla aparte, empezando por la comparación.
+
+Otros cambios del camino:
+
+- **El borrado ya no va por posición de fila.** `sheets.deleteRows(i, i+1)` no tiene sentido
+  contra una tabla; ahora es `deleteByIdItems()`.
+- **La caché de distancias vuelve a funcionar** (§6): `adreca` es clave primaria, y leer ya no
+  devuelve vacío. Se acabaron las llamadas facturadas de más a Routes API.
+- `services/sheets.js` desaparece: lo único que quedaba vivo era cargar las credenciales de
+  Google para Chat, y eso vive ahora en `services/google-auth.js`.
+- Los scripts `migrate-catalegs.js` y `migrate-comandes.js` son idempotentes y llevan su propio
+  lector de hojas (`scripts/_sheet.js`), por si hay que releer el archivo.
+
+**Verificado de punta a punta** con el backend en local, contra la BD: alta desde la app del
+monitor (material de catálogo y material personalizado) → aparece en el listado → cambio de
+estado → notas internas → opciones de entrega (111 opciones, con distancias reales) →
+asignación de intermediario (con `activitat_intermediari` resuelta desde ActiviHub) → retirada
+del intermediario → borrado. Y de vuelta a 718 filas.
 
 ### Fase 3 — Identidad del monitor e integración con ActiviHub Monitor _(con David)_
 Hoy la app móvil **no tiene login**: el monitor elige su nombre de un desplegable y el token viaja en

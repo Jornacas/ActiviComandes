@@ -24,7 +24,8 @@
 
 const { google } = require('googleapis');
 const cache = require('./cache');
-const sheets = require('./sheets');
+const googleAuth = require('./google-auth');
+const catalegs = require('./catalegs');
 
 const IMPERSONATE_USER = process.env.GOOGLE_CHAT_IMPERSONATE_USER;
 // Mínim privilegi: només publicar. `chat.messages` a seques també permetria
@@ -45,7 +46,7 @@ async function getChatClient() {
     throw new Error('GOOGLE_CHAT_IMPERSONATE_USER no està configurada');
   }
 
-  const credentials = sheets.getCredentials();
+  const credentials = googleAuth.getCredentials();
   const jwt = new google.auth.JWT({
     email: credentials.client_email,
     key: credentials.private_key,
@@ -67,16 +68,7 @@ async function getChatClient() {
  * Així una activitat sense espai propi acaba a l'espai de l'escola.
  */
 async function getSpaceIdByName(spaceName) {
-  let webhooks = cache.get('chat_webhooks_data');
-
-  if (!webhooks) {
-    const data = await sheets.getSheetData('ChatWebhooks');
-    webhooks = new Map();
-    for (const row of (data || []).slice(1)) {
-      if (row[0] && row[1]) webhooks.set(String(row[0]).trim(), String(row[1]).trim());
-    }
-    cache.set('chat_webhooks_data', webhooks, 3600);
-  }
+  const webhooks = await catalegs.getChatEspais();
 
   const demanat = String(spaceName || '').trim();
   let name = demanat;
@@ -159,7 +151,7 @@ async function sendMultipleNotifications(notifications) {
 
 /** Buida la caché d'espais (quan s'han afegit o canviat files a ChatWebhooks). */
 async function refreshChatSpaces() {
-  cache.del('chat_webhooks_data');
+  catalegs.invalidateChatEspais();
   console.log('[CHAT] Caché d\'espais buidada');
 }
 
